@@ -2,13 +2,12 @@
 
 from __future__ import print_function
 
-import sys
-
 import argparse
 import os
 import platform
 import subprocess
-import traceback
+import time
+import sys
 
 if sys.version_info < (3, 0):
     # noinspection PyUnresolvedReferences
@@ -23,21 +22,21 @@ except ImportError:
     # noinspection PyUnresolvedReferences
     from lxml import etree
 
-__version__ = 'pyro-1.0 by fireundubh <github.com/fireundubh>'
+__version__ = 'pyro-1.1 by fireundubh <github.com/fireundubh>'
 
 PROGRAM_PATH = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 
 SOURCE_PATH = os.path.join('Data', 'Scripts', 'Source')
 BASE_PATH = os.path.join(SOURCE_PATH, 'Base')
 USER_PATH = os.path.join(SOURCE_PATH, 'User')
+FILE_EXTENSIONS = ['.psc', '.pex']
 
 XML_PARSER = etree.XMLParser(remove_blank_text=True)
 
 
 def main():
     """Determine arguments and pass arguments to compiler"""
-    compile_scripts = False
-    compile_project = False
+    compile_project = True
 
     is_file = os.path.isfile(args.input)
     is_folder = os.path.isdir(args.input)
@@ -48,20 +47,66 @@ def main():
             if args.game == 'fo4':
                 compiler_args.append('-release')
                 compiler_args.append('-final')
-            compile_scripts = True
-        elif file_extension == '.ppj':
-            compile_project = True
+            compile_project = False
     elif is_folder:
         compiler_args.append('-all')
-        compile_scripts = True
+        compile_project = False
 
-    if compile_scripts:
+    if not args.skip_output_validation or args.show_time_elapsed:
+        start_time = time.time()
+
+    if not compile_project:
         capture(subprocess.Popen(compiler_args, stdout=subprocess.PIPE, shell=False, universal_newlines=True))
-    elif compile_project:
+    else:
         if args.game == 'fo4':
-            capture(subprocess.Popen([compiler_args[0], compiler_args[1]], stdout=subprocess.PIPE, shell=False, universal_newlines=True))
+            capture(subprocess.Popen([compiler_path, args.input, '-q' if args.quiet else ''], stdout=subprocess.PIPE, shell=False, universal_newlines=True))
         else:
             xml_process_ppj(args.input)
+
+    if not args.skip_output_validation or args.show_time_elapsed:
+        end_time = time.time()
+
+    if not args.skip_output_validation:
+        if not compile_project:
+            output_file = os.path.basename(args.input)
+            if args.game == 'fo4' and os.path.join('Source', 'User').lower() in args.input.lower():
+                output_file = os.path.join(*args.input.split('\\')[-2:])
+            # noinspection PyUnboundLocalVariable
+            validate_output(os.path.join(args.output, output_file.replace(*FILE_EXTENSIONS)), start_time, end_time)
+        else:
+            output_path = xml_get_output(args.input)
+            scripts = [os.path.join(output_path, script.replace(*FILE_EXTENSIONS)) for script in xml_get_scripts(args.input)]
+            if args.game != 'fo4':
+                scripts = [os.path.join(output_path, os.path.basename(script)) for script in scripts]
+            for script in scripts:
+                # noinspection PyUnboundLocalVariable
+                validate_output(script, start_time, end_time)
+
+    if args.show_time_elapsed:
+        # noinspection PyUnboundLocalVariable
+        print('[PYRO] Time elapsed: ' + '{0:.2f}s'.format(float(end_time - start_time)))
+
+
+def validate_output(script, start_time, end_time):
+    if os.path.exists(script):
+        if start_time < os.stat(script).st_mtime < end_time:
+            print('[PYRO] Wrote file: ' + script)
+        else:
+            print('[PYRO] Failed to write file: ' + script + ' (not recently modified)')
+    else:
+        print('[PYRO] Failed to write file: ' + script + ' (file does not exist)')
+
+
+def xml_get_scripts(input_file):
+    """Returns a list of scripts in XML file"""
+    root = etree.parse(input_file, XML_PARSER).getroot()
+    return xml_get_child_node_values(root, 'Scripts')
+
+
+def xml_get_output(input_file):
+    """Returns the output path in XML file"""
+    root = etree.parse(input_file, XML_PARSER).getroot()
+    return str(root.get('Output'))
 
 
 def xml_process_ppj(input_file):
@@ -76,17 +121,18 @@ def xml_process_ppj(input_file):
     # script and import paths
     script_paths = xml_get_child_node_values(root, 'Scripts')
     import_paths = xml_get_child_node_values(root, 'Imports')
-    imports = build_imports_from_scripts(script_paths, import_paths) + import_paths
 
-    # compile scripts in parallel
-    queue = []
+    generated_imports = generate_imports_from_scripts(script_paths, import_paths)
+
+    commands = []
     for script_path in script_paths:
-        arg_string = build_arguments_as_string(script_path, optimize, output_path, imports, flags)
-        output = subprocess.Popen(arg_string, stderr=subprocess.STDOUT, shell=False, universal_newlines=True)
-        queue.append(output)
+        params = [script_path, optimize, output_path, generated_imports, flags]
+        cmd = build_arguments_as_string(*params)
+        commands.append(cmd)
 
-    for q in queue:
-        q.wait()
+    process_queue = [subprocess.Popen(cmd, shell=False, universal_newlines=True) for cmd in commands]
+    for process in process_queue:
+        process.wait()
 
 
 def xml_get_bool_attr(root, attr):
@@ -96,58 +142,82 @@ def xml_get_bool_attr(root, attr):
     return bool(root.get(attr))
 
 
-def xml_get_child_node_values(root, tag):
+def xml_get_child_node_values(root, tag, namespace='PapyrusProject.xsd'):
     """Return list of child node text values using namespace"""
-    ns = {'ns': 'PapyrusProject.xsd'}
-
-    parent = root.find('ns:%s' % tag, ns)
+    parent = root.find('ns:%s' % tag, {'ns': '%s' % namespace})
     if parent is None:
-        raise SyntaxError('Cannot proceed without required node: <%s>' % tag)
+        return None
 
-    children = parent.findall('ns:%s' % tag[:-1], ns)
+    children = parent.findall('ns:%s' % tag[:-1], {'ns': '%s' % namespace})
     if len(children) == 0 or children is None:
-        raise SyntaxError('Cannot proceed without required nodes: <%s>' % tag[:-1])
+        return None
 
     return xml_get_field_text(children)
 
 
 def xml_validate_flags(root):
     """Validate and return flags attribute value from XML"""
-    flags = os.path.basename(get_flags_path(args.game))
+    result = os.path.basename(get_flags_path(args.game))
     if 'Flags' in root.attrib:
-        flags_attr = root.get('Flags')
-        if flags != flags_attr:
-            raise ValueError('Cannot proceed without correct flags for game: %s' % flags_attr)
-        return flags_attr
-    return flags
+        xml_result = root.get('Flags')
+        if result != xml_result:
+            raise ValueError('Cannot proceed without correct flags for game: %s' % xml_result)
+        return xml_result
+    return result
 
 
-def build_arguments_as_string(script_path, optimize, output_path, imports, flags):
+def build_arguments_as_string(script_path, optimize, output_path, import_paths, flags):
     """Generate string of arguments for compiler"""
-    result = ['"%s"' % compiler_path, '"%s"' % script_path, '-o="%s"' % output_path, '-i="%s"' % ';'.join(imports), '-f="%s"' % flags]
+    result = ['"%s"' % compiler_path, '"%s"' % script_path, '-o="%s"' % output_path, '-i="%s"' % ';'.join(import_paths), '-f="%s"' % flags]
     if optimize:
         result.insert(2, '-op')
-    return ' '.join([str(x) for x in result])
+    if args.quiet:
+        result.append('-q')
+    return ' '.join(result)
 
 
-def build_imports_from_scripts(scripts, imports):
+def remove_duplicates_in_list(items):
+    """Removes duplicate items in list and returns list"""
+    [items.remove(item) for item in items if items.count(item) > 1]
+    return items
+
+
+def generate_imports_from_scripts(scripts, import_paths):
     """Generate list of unique paths to scripts from imports"""
     script_bases = list()
+
+    if import_paths is None:
+        import_paths = default_imports
+
+        for import_path in import_paths:
+            # remove invalid paths
+            if not os.path.exists(import_path):
+                import_paths.remove(import_path)
+
     for script in scripts:
-        for import_path in imports:
+        for import_path in import_paths:
             script_base = os.path.join(import_path, os.path.dirname(script))
+
+            # don't add duplicates
+            if script_base in script_bases:
+                break
+
+            # only add valid paths
             if os.path.exists(script_base):
                 script_bases.append(script_base)
                 break
-    return list(set(script_bases))
+
+    # remove duplicates, if any
+    import_paths = remove_duplicates_in_list(import_paths)
+    script_bases = remove_duplicates_in_list(script_bases)
+
+    result = list(script_bases + import_paths)
+    return result
 
 
 def xml_get_field_text(fields):
-    """Append field text to files list"""
-    files = list()
-    for field in fields:
-        files.append(field.text)
-    return files
+    """Returns list of field values from fields"""
+    return [str(field.text) for field in fields if field.text is not None and field.text != '']
 
 
 def get_game_path(game):
@@ -212,18 +282,15 @@ def get_game_scripts_path(game):
 
 def get_registry_value(reg_path, key):
     """Retrieve key value from Windows Registry"""
-    try:
-        registry_key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, reg_path, 0, _winreg.KEY_READ)
-        value, regtype = _winreg.QueryValueEx(registry_key, key)
-        _winreg.CloseKey(registry_key)
-        return value
-    except WindowsError:
-        traceback.print_exc()
+    registry_key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, reg_path, 0, _winreg.KEY_READ)
+    value, regtype = _winreg.QueryValueEx(registry_key, key)
+    _winreg.CloseKey(registry_key)
+    return value
 
 
 def get_script_folder():
     result = os.path.dirname(args.input)
-    if r'source\User' in result:
+    if os.path.join('Source', 'User').lower() in result.lower():
         result = os.path.dirname(result)
     return result
 
@@ -238,12 +305,14 @@ def get_compiler_path():
 def capture(output):
     """Prints stdout messages in real time without extra line breaks"""
     while True:
-        line = output.stdout.readline()
-        if not line:
+        state = output.poll()
+        if state is not None and state >= 0:
+            exit(state)
+        line = output.stdout.readline().strip()
+        if not line or line == '':
             break
-        result = line.strip()
+        result = '[COMPILER] ' + line
         print(result)
-
 
 if __name__ == '__main__':
     if platform.system() != 'Windows':
@@ -257,9 +326,9 @@ if __name__ == '__main__':
 
     optional_arguments = parser.add_argument_group('optional arguments')
     optional_arguments.add_argument('-o', action='store', dest='output', default='..', help='set absolute path to output folder (default: ..)')
-
-    optional_flags = parser.add_argument_group('optional flags')
-    optional_flags.add_argument('-p', action='store_true', dest='project_output', default=False, help='resolve .. to compiled project scripts folder')
+    optional_arguments.add_argument('-q', action='store_true', dest='quiet', default=False, help='report only compiler failures')
+    optional_arguments.add_argument('-s', action='store_true', dest='skip_output_validation', default=False, help='skip output validation')
+    optional_arguments.add_argument('-t', action='store_true', dest='show_time_elapsed', default=False, help='show time elapsed during compilation')
 
     program_arguments = parser.add_argument_group('program arguments')
     program_arguments.add_argument('--help', action='store_true', dest='show_help', default=False, help='show help and exit')
@@ -279,30 +348,25 @@ if __name__ == '__main__':
         print('[ERROR] required argument missing: -i INPUT' + os.linesep)
         exit(parser.print_help())
 
-    # more information
-    if args.project_output and args.output not in ['.', '..']:
-        print('[WARN] given argument not applicable, skipping: -p' + os.linesep)
-
+    # global variables
     game_path = get_game_path(args.game)
-    flags_path = get_flags_path(args.game)
-
     compiler_path = get_compiler_path()
-
-    game_scripts_path = get_game_scripts_path(args.game)
+    flags_path = get_flags_path(args.game)
     user_path = get_user_path(args.game)
-
     script_folder = get_script_folder()
-
+    game_scripts_path = get_game_scripts_path(args.game)
     default_imports = [script_folder, user_path, game_scripts_path]
 
     # output parser
     relative_base_path = os.path.dirname(args.input)
     if args.output == '..':
-        args.output = os.path.join(relative_base_path, os.pardir)
-        if args.project_output:
-            args.output = os.path.join(relative_base_path, os.pardir, os.pardir, os.pardir)
+        args.output = os.path.abspath(os.path.join(relative_base_path, os.pardir))
+
+        if os.path.join('Source', 'User').lower() in args.output.lower():
+            args.output = os.path.abspath(os.path.join(relative_base_path, os.pardir, os.pardir, os.pardir))
+
     elif args.output == '.':
-        args.output = os.path.join(relative_base_path, os.curdir)
+        args.output = os.path.abspath(os.path.join(relative_base_path, os.curdir))
     elif not os.path.isabs(args.output):
         raise ValueError('Cannot proceed with relative output path: %s' % args.output)
 
@@ -314,5 +378,8 @@ if __name__ == '__main__':
         '-i=%s' % ';'.join(default_imports),
         '-f=%s' % flags_path
     ]
+
+    if args.quiet:
+        compiler_args.append('-q')
 
     main()
