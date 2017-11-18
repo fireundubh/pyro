@@ -22,7 +22,8 @@ except ImportError:
     # noinspection PyUnresolvedReferences
     from lxml import etree
 
-__version__ = 'pyro-1.1 by fireundubh <github.com/fireundubh>'
+
+__version__ = 'pyro-1.2 by fireundubh <github.com/fireundubh>'
 
 PROGRAM_PATH = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 
@@ -59,7 +60,9 @@ def main():
         capture(subprocess.Popen(compiler_args, stdout=subprocess.PIPE, shell=False, universal_newlines=True))
     else:
         if args.game == 'fo4':
-            capture(subprocess.Popen([compiler_path, args.input, '-q' if args.quiet else ''], stdout=subprocess.PIPE, shell=False, universal_newlines=True))
+            project_args = [compiler_path, args.input]
+            project_args.append('-q') if args.quiet else None
+            capture(subprocess.Popen(project_args, stdout=subprocess.PIPE, shell=False, universal_newlines=True))
         else:
             xml_process_ppj(args.input)
 
@@ -178,41 +181,24 @@ def build_arguments_as_string(script_path, optimize, output_path, import_paths, 
 
 def remove_duplicates_in_list(items):
     """Removes duplicate items in list and returns list"""
-    [items.remove(item) for item in items if items.count(item) > 1]
+    for item in items:
+        while items.count(item) > 1:
+            items.remove(item)
     return items
 
 
 def generate_imports_from_scripts(scripts, import_paths):
     """Generate list of unique paths to scripts from imports"""
-    script_bases = list()
-
     if import_paths is None:
-        import_paths = default_imports
+        import_paths = [import_path for import_path in default_imports if os.path.exists(import_path)]
 
-        for import_path in import_paths:
-            # remove invalid paths
-            if not os.path.exists(import_path):
-                import_paths.remove(import_path)
+    script_bases = [os.path.join(import_path, os.path.dirname(script)) for import_path in import_paths for script in scripts]
+    script_bases = [script_base for script_base in script_bases if os.path.exists(script_base)]
 
-    for script in scripts:
-        for import_path in import_paths:
-            script_base = os.path.join(import_path, os.path.dirname(script))
-
-            # don't add duplicates
-            if script_base in script_bases:
-                break
-
-            # only add valid paths
-            if os.path.exists(script_base):
-                script_bases.append(script_base)
-                break
-
-    # remove duplicates, if any
     import_paths = remove_duplicates_in_list(import_paths)
     script_bases = remove_duplicates_in_list(script_bases)
 
-    result = list(script_bases + import_paths)
-    return result
+    return list(script_bases + import_paths)
 
 
 def xml_get_field_text(fields):
@@ -250,33 +236,24 @@ def get_flags_path(game):
         result = os.path.join(game_path, SOURCE_PATH, 'TESV_Papyrus_Flags.flg')
 
     if not os.path.exists(result):
-        raise Exception('File does not exist: %s' % result)
+        raise Exception('File does not exist: ' + result)
 
     return result
 
 
 def get_user_path(game):
     """Retrieve path to user scripts folder"""
-    if game in ['fo4', 'sse']:
-        result = os.path.join(game_path, USER_PATH)
-    else:
-        result = os.path.join(game_path, SOURCE_PATH)
-
+    result = os.path.join(game_path, USER_PATH) if game in ['fo4', 'sse'] else os.path.join(game_path, SOURCE_PATH)
     if not os.path.exists(result):
-        raise Exception('Directory does not exist: %s' % result)
-
+        raise Exception('Directory does not exist: ' + result)
     return result
+
 
 def get_game_scripts_path(game):
     """Retrieve path to game scripts folder"""
-    if game in ['fo4', 'sse']:
-        result = os.path.join(game_path, BASE_PATH)
-    else:
-        result = os.path.join(game_path, SOURCE_PATH)
-
+    result = os.path.join(game_path, BASE_PATH) if game in ['fo4', 'sse'] else os.path.join(game_path, SOURCE_PATH)
     if not os.path.exists(result):
-        raise Exception('Directory does not exist: %s' % result)
-
+        raise Exception('Directory does not exist: ' + result)
     return result
 
 
@@ -298,7 +275,7 @@ def get_script_folder():
 def get_compiler_path():
     result = os.path.join(game_path, os.path.join('Papyrus Compiler', 'PapyrusCompiler.exe'))
     if not os.path.exists(result):
-        raise Exception('Compiler does not exist at path: %s' % result)
+        raise Exception('Compiler does not exist at path: ' + result)
     return result
 
 
@@ -313,6 +290,7 @@ def capture(output):
             break
         result = '[COMPILER] ' + line
         print(result)
+
 
 if __name__ == '__main__':
     if platform.system() != 'Windows':
@@ -360,15 +338,16 @@ if __name__ == '__main__':
     # output parser
     relative_base_path = os.path.dirname(args.input)
     if args.output == '..':
-        args.output = os.path.abspath(os.path.join(relative_base_path, os.pardir))
-
+        project_output_path = [relative_base_path, os.pardir]
         if os.path.join('Source', 'User').lower() in args.output.lower():
-            args.output = os.path.abspath(os.path.join(relative_base_path, os.pardir, os.pardir, os.pardir))
+            project_output_path = project_output_path + [os.pardir, os.pardir]
+        args.output = os.path.abspath(os.path.join(*project_output_path))
 
     elif args.output == '.':
         args.output = os.path.abspath(os.path.join(relative_base_path, os.curdir))
+
     elif not os.path.isabs(args.output):
-        raise ValueError('Cannot proceed with relative output path: %s' % args.output)
+        raise ValueError('Cannot proceed with relative output path: ' + args.output)
 
     compiler_args = [
         '%s' % compiler_path,
