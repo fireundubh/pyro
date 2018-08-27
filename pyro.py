@@ -341,7 +341,8 @@ if __name__ == '__main__':
         project_output_path = [relative_base_path, os.pardir]
         if os.path.join('Source', 'User').lower() in args.output.lower():
             project_output_path = project_output_path + [os.pardir, os.pardir]
-        args.output = os.path.abspath(os.path.join(*project_output_path))
+        if project_output_path is not None:
+            args.output = os.path.abspath(os.path.join(*project_output_path))
 
     elif args.output == '.':
         args.output = os.path.abspath(os.path.join(relative_base_path, os.curdir))
@@ -357,6 +358,8 @@ if __name__ == '__main__':
         '-i=%s' % ';'.join(default_imports),
         '-f=%s' % flags_path
     ]
+
+    print(compiler_args)
 
     if args.quiet:
         compiler_args.append('-q')
