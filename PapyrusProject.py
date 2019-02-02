@@ -14,11 +14,13 @@ except ImportError:
 
 from Arguments import Arguments
 from Project import Project
+from TimeElapsed import TimeElapsed
 
 
 class PapyrusProject:
     def __init__(self, prj: Project):
-        self.compiler_path = prj.compiler_path
+        self.project = prj
+        self.compiler_path = prj.get_compiler_path()
         self.game_type = prj.game_type
         self.input_path = prj.input_path
         self.root_node = etree.parse(prj.input_path, etree.XMLParser(remove_blank_text=True)).getroot()
@@ -38,14 +40,14 @@ class PapyrusProject:
         return [str(field.text) for field in child_nodes if field.text is not None and field.text != '']
 
     @staticmethod
-    def _open_process(command: list) -> int:
+    def open_process(command: list) -> int:
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True)
 
         try:
             while process.poll() is None:
                 line = process.stdout.readline().strip()
                 exclude_lines = not line.startswith(('Starting', 'Assembly', 'Compilation', 'Batch')) and 'error(s)' not in line
-                print(line) if line != '' and exclude_lines else None
+                print('[COMPILER]', line) if line != '' and exclude_lines else None
             return 0
 
         except KeyboardInterrupt:
@@ -64,16 +66,17 @@ class PapyrusProject:
 
     def _get_imports_from_script_paths(self) -> list:
         """Generate list of unique import paths from script paths"""
-        import_paths = [os.path.join(import_path, os.path.dirname(script_path))
-                        for import_path in self._get_imports_from_root_node()
-                        for script_path in self.get_script_paths()]
+        script_paths = self.get_script_paths()
+        xml_import_paths = self._get_imports_from_root_node()
 
-        import_paths = [import_path for import_path in import_paths
-                        if os.path.exists(import_path)]
+        script_import_paths = [os.path.join(xml_import_path, os.path.dirname(script_path))
+                               for xml_import_path in xml_import_paths
+                               for script_path in script_paths]
 
-        paths = import_paths + self._get_imports_from_root_node()
+        script_import_paths = [script_import_path for script_import_path in script_import_paths
+                               if os.path.exists(script_import_path)]
 
-        return self._unique_list(paths)
+        return self._unique_list(script_import_paths + xml_import_paths)
 
     def _build_commands(self, output_path: str, quiet: bool) -> list:
         commands = list()
@@ -115,7 +118,21 @@ class PapyrusProject:
     def compile(self, output_file: str, quiet: bool) -> None:
         output_path = output_file if 'Output' not in self.root_node.attrib else self.get_output_path()
 
+        commands = self._build_commands(output_path, quiet)
+
         p = multiprocessing.Pool(processes=os.cpu_count())
-        p.map(self._open_process, self._build_commands(output_path, quiet))
+        p.map(self.open_process, commands)
         p.close()
         p.join()
+
+    def validate_project(self, time_elapsed: TimeElapsed) -> None:
+        output_path = self.get_output_path()
+        script_paths = self.get_script_paths()
+
+        compiled_script_paths = map(lambda x: os.path.join(output_path, x.replace('.psc', '.pex')), script_paths)
+
+        if not self.project.is_fallout4:
+            compiled_script_paths = map(lambda x: os.path.join(output_path, os.path.basename(x)), compiled_script_paths)
+
+        for compiled_script_path in compiled_script_paths:
+            self.project.validate_script(compiled_script_path, time_elapsed)

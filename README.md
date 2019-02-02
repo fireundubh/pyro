@@ -17,10 +17,11 @@ usage: pyro.py [-g {sse,fo4,tesv}] [-i INPUT] [-o OUTPUT] [-q] [-s] [-t]
 
 required arguments:
   -g {sse,fo4,tesv}  set compiler version
-  -i INPUT           set absolute path to input file or folder
+  -i INPUT           absolute path to input file or folder
 
 optional arguments:
-  -o OUTPUT          set absolute path to output folder (default: ..)
+  -ns NAMESPACE      namespace for single script compilation
+  -o OUTPUT          absolute path to output folder (default: ..)
   -q                 report only compiler failures
   -s                 skip output validation
 

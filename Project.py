@@ -3,13 +3,14 @@ import os
 import sys
 
 from GameType import GameType
+from TimeElapsed import TimeElapsed
 
 
 class Project:
     """Used to pass common data to single-file and project compilation"""
     USER_PATH_PART = os.path.join('Source', 'User').casefold()
 
-    def __init__(self, game_type: GameType, input_path: str, output_path: str):
+    def __init__(self, game_type: GameType, input_path: str, output_path: str, namespace: str):
         self._ini = configparser.ConfigParser()
         self._ini.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'pyro.ini'))
 
@@ -17,16 +18,19 @@ class Project:
         self.game_path = self.get_game_path()
         self.input_path = input_path
         self.output_path = output_path
+        self.namespace = namespace
 
     @property
-    def compiler_path(self) -> str:
-        """Retrieve compiler path from pyro.ini"""
-        return os.path.join(self.game_path, self._ini['Compiler']['Path'])
+    def is_fallout4(self):
+        return self.game_type == GameType.Fallout4
 
     @property
-    def flags_path(self):
-        """Retrieve flags path from pyro.ini"""
-        return os.path.join(self.game_path, self._ini[self.game_type.name]['Flags'])
+    def is_skyrim_special_edition(self):
+        return self.game_type == GameType.SkyrimSpecialEdition
+
+    @property
+    def is_skyrim_classic(self):
+        return self.game_type == GameType.SkyrimClassic
 
     def _winreg_get_game_path(self) -> str:
         """Retrieve installed path of game using Windows Registry"""
@@ -46,6 +50,23 @@ class Project:
 
         return reg_value
 
+    @staticmethod
+    def validate_script(script_path: str, time_elapsed: TimeElapsed):
+        if not os.path.exists(script_path):
+            print('[PYRO] Failed to write file: {0} (file does not exist)'.format(script_path))
+        elif time_elapsed.start_time < os.stat(script_path).st_mtime < time_elapsed.end_time:
+            print('[PYRO] Wrote file:', script_path)
+        else:
+            print('[PYRO] Failed to write file: {0} (not recently modified)'.format(script_path))
+
+    def get_compiler_path(self) -> str:
+        """Retrieve compiler path from pyro.ini"""
+        return os.path.join(self.game_path, self._ini['Compiler']['Path'])
+
+    def get_flags_path(self):
+        """Retrieve flags path from pyro.ini"""
+        return os.path.join(self.game_path, self._ini[self.game_type.name]['Flags'])
+
     def get_game_path(self) -> str:
         """Retrieve game path from either pyro.ini or Windows Registry"""
         game_path = self._ini['Shared']['GamePath']
@@ -58,6 +79,18 @@ class Project:
 
         raise ValueError('Cannot retrieve game path from pyro.ini or Windows Registry')
 
+    def get_scripts_base_path(self) -> str:
+        game_path = self.get_game_path()
+        return os.path.join(game_path, self._ini['Shared']['BasePath'])
+
+    def get_scripts_source_path(self) -> str:
+        game_path = self.get_game_path()
+        return os.path.join(game_path, self._ini['Shared']['SourcePath'])
+
+    def get_scripts_user_path(self) -> str:
+        game_path = self.get_game_path()
+        return os.path.join(game_path, self._ini['Shared']['UserPath'])
+
     def try_parse_relative_output_path(self) -> str:
         """Try to parse the user-defined relative project output path. If the path is not relative, return the unmodified path."""
         relative_base_path = os.path.dirname(self.input_path)
@@ -65,7 +98,7 @@ class Project:
         if self.output_path == '..':
             project_output_path = [relative_base_path, os.pardir]
 
-            if Project.USER_PATH_PART in self.output_path.casefold():
+            if Project.USER_PATH_PART in os.path.join(*project_output_path).casefold():
                 project_output_path = project_output_path + [os.pardir, os.pardir]
 
             if project_output_path is not None:
