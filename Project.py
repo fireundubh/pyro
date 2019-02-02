@@ -8,8 +8,6 @@ from TimeElapsed import TimeElapsed
 
 class Project:
     """Used to pass common data to single-file and project compilation"""
-    USER_PATH_PART = os.path.join('Source', 'User').casefold()
-
     def __init__(self, game_type: GameType, input_path: str):
         self._ini = configparser.ConfigParser()
         self._ini.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'pyro.ini'))

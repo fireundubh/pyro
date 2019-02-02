@@ -5,7 +5,6 @@ import argparse
 import os
 import subprocess
 import sys
-import time
 
 try:
     from lxml import etree
@@ -30,52 +29,23 @@ def main():
         _, file_extension = os.path.splitext(args.input)
         compile_project = file_extension == '.ppj'
 
-    time_elapsed = TimeElapsed()
-
     if not compile_project:
         sys.tracebacklimit = 0
         raise ValueError('Single script compilation is no longer supported. Use a PPJ file.')
     else:
+        time_elapsed = TimeElapsed()
+
+        ppj = PapyrusProject(project)
+
         if project.is_fallout4:
-            compile_ppj_native(project, args.quiet, args.skip_output_validation, time_elapsed)
+            ppj.compile_native(args.quiet, time_elapsed)
         else:
-            compile_ppj_custom(project, args.quiet, args.skip_output_validation, time_elapsed)
+            ppj.compile_custom(args.quiet, time_elapsed)
 
-    time_elapsed.print()
+        if not args.skip_output_validation:
+            ppj.validate_project(time_elapsed)
 
-
-def compile_ppj_native(prj: Project, quiet: bool, skip_validation: bool, time_elapsed: TimeElapsed) -> None:
-    game_path = prj.get_game_path()
-
-    compiler_path = prj.get_compiler_path()
-
-    project_args = [os.path.join(game_path, compiler_path), prj.input_path]
-
-    if quiet:
-        project_args.append('-q')
-
-    time_elapsed.start_time = time.time()
-
-    PapyrusProject._open_process(project_args)
-
-    time_elapsed.end_time = time.time()
-
-    if not skip_validation:
-        ppj = PapyrusProject(prj)
-        ppj.validate_project(time_elapsed)
-
-
-def compile_ppj_custom(prj: Project, quiet: bool, skip_validation: bool, time_elapsed: TimeElapsed) -> None:
-    ppj = PapyrusProject(prj)
-
-    time_elapsed.start_time = time.time()
-
-    ppj.compile(quiet)
-
-    time_elapsed.end_time = time.time()
-
-    if not skip_validation:
-        ppj.validate_project(time_elapsed)
+        time_elapsed.print()
 
 
 if __name__ == '__main__':
