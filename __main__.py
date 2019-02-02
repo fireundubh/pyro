@@ -78,7 +78,7 @@ def compile_script(prj: Project, skip_validation: bool, time_elapsed: TimeElapse
 
 
 def compile_ppj_native(prj: Project, quiet: bool, skip_validation: bool, time_elapsed: TimeElapsed):
-    project_args = [os.path.join(prj.get_game_path, prj.compiler_path), prj.input_path, '-q' if quiet else None]
+    project_args = [os.path.join(prj.get_game_path(), prj.compiler_path), prj.input_path, '-q' if quiet else None]
 
     process = subprocess.Popen(project_args, shell=False, universal_newlines=True)
 
