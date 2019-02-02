@@ -5,7 +5,7 @@ A Python CLI for the Papyrus Compiler with PPJ Support for TESV, SSE, and FO4
 
 ## Requirements
 
-* Python 2.7+
+* Python 3.4+
 * [lxml](http://lxml.de/) module (`python -m pip install lxml`)
 
 
@@ -23,7 +23,6 @@ optional arguments:
   -o OUTPUT          set absolute path to output folder (default: ..)
   -q                 report only compiler failures
   -s                 skip output validation
-  -t                 show time elapsed during compilation
 
 program arguments:
   --help             show help and exit
@@ -35,15 +34,15 @@ program arguments:
 ### Supports multiple games
 
 When the game is switched, all paths are generated using the `Installed Path` key in the Windows Registry for the respective games.
+
+You can also set a path explicitly in `pyro.ini` if you are on a non-Windows platform.
  
 
 ### Supports recursive compilation
 
 The CLI can compile single `.psc` files and folders recursively.
 
-Scripts are compiled with either `-op[timize]` (SSE/TESV) or `-op[timize]`, `-release`, and `-final` (FO4).
-
-If you want to use different flags for compiling individual files and folders, you might as well just use the compiler directly.
+Fallout 4 scripts are compiled with the `-release`, and `-final` arguments.
  
 
 ### Supports Papyrus Project XML (PPJ) files
@@ -58,15 +57,42 @@ If you want to use different flags for compiling individual files and folders, y
  
 #### Notes: Release/Final/Optimize
 
-The `Release` and `Final` attributes are supported by only the FO4 compiler, but `Optimize` is supported for all games.
+The `Release` and `Final` attributes are supported by only the FO4 compiler.
 
 The PPJ parser will ignore unsupported attributes.
+
+`Optimize` is unsupported because the official recommendation is not use it.
 
 
 #### Notes: Performance 
 
 The native PPJ compiler for FO4 is around 4 seconds faster, but TESV and SSE do not have a PPJ compiler.
 
+
+## Examples
+
+### Master of Disguise.ppj
+
+```xml
+<PapyrusProject xmlns="PapyrusProject.xsd" Flags="TESV_Papyrus_Flags.flg" Output="E:\projects\skyrim\Master of Disguise - Special Edition\scripts">
+  <Imports>
+  	<Import>E:\SKSE SDK\Scripts\Source</Import>
+  	<Import>E:\SkyUI 5.1 SDK\Scripts\Source</Import>
+    <Import>E:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data\Scripts\Source\User</Import>
+    <Import>E:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data\Scripts\Source\Base</Import>
+  </Imports>
+  <Scripts>
+  	<Script>Master of Disguise\dubhDisguiseMCMHelper.psc</Script>
+  	<Script>Master of Disguise\dubhDisguiseMCMQuestScript.psc</Script>
+  	<Script>Master of Disguise\dubhDisguiseMCMStringUtil.psc</Script>
+  	<Script>Master of Disguise\dubhApplyingEffectScript.psc</Script>
+  	<Script>Master of Disguise\dubhDisguiseQuestScript.psc</Script>
+  	<Script>Master of Disguise\dubhFactionEnemyScript.psc</Script>
+  	<Script>Master of Disguise\dubhMonitorEffectScript.psc</Script>
+  	<Script>Master of Disguise\dubhPlayerScript.psc</Script>
+  </Scripts>
+</PapyrusProject>
+```
 
 ## IDE Integration
 
