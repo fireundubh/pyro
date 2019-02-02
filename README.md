@@ -75,24 +75,25 @@ The native PPJ compiler for FO4 is around 4 seconds faster, but TESV and SSE do 
 
 ```xml
 <PapyrusProject xmlns="PapyrusProject.xsd" Flags="TESV_Papyrus_Flags.flg" Output="E:\projects\skyrim\Master of Disguise - Special Edition\scripts">
-  <Imports>
-  	<Import>E:\SKSE SDK\Scripts\Source</Import>
-  	<Import>E:\SkyUI 5.1 SDK\Scripts\Source</Import>
-    <Import>E:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data\Scripts\Source\User</Import>
-    <Import>E:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data\Scripts\Source\Base</Import>
-  </Imports>
-  <Scripts>
-  	<Script>Master of Disguise\dubhDisguiseMCMHelper.psc</Script>
-  	<Script>Master of Disguise\dubhDisguiseMCMQuestScript.psc</Script>
-  	<Script>Master of Disguise\dubhDisguiseMCMStringUtil.psc</Script>
-  	<Script>Master of Disguise\dubhApplyingEffectScript.psc</Script>
-  	<Script>Master of Disguise\dubhDisguiseQuestScript.psc</Script>
-  	<Script>Master of Disguise\dubhFactionEnemyScript.psc</Script>
-  	<Script>Master of Disguise\dubhMonitorEffectScript.psc</Script>
-  	<Script>Master of Disguise\dubhPlayerScript.psc</Script>
-  </Scripts>
+	<Imports>
+		<Import>E:\SKSE SDK\Scripts\Source</Import>
+		<Import>E:\SkyUI 5.1 SDK\Scripts\Source</Import>
+		<Import>E:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data\Scripts\Source\User</Import>
+		<Import>E:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data\Scripts\Source\Base</Import>
+	</Imports>
+	<Scripts>
+		<Script>Master of Disguise\dubhDisguiseMCMHelper.psc</Script>
+		<Script>Master of Disguise\dubhDisguiseMCMQuestScript.psc</Script>
+		<Script>Master of Disguise\dubhDisguiseMCMStringUtil.psc</Script>
+		<Script>Master of Disguise\dubhApplyingEffectScript.psc</Script>
+		<Script>Master of Disguise\dubhDisguiseQuestScript.psc</Script>
+		<Script>Master of Disguise\dubhFactionEnemyScript.psc</Script>
+		<Script>Master of Disguise\dubhMonitorEffectScript.psc</Script>
+		<Script>Master of Disguise\dubhPlayerScript.psc</Script>
+	</Scripts>
 </PapyrusProject>
 ```
+
 
 ## IDE Integration
 
