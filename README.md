@@ -20,8 +20,6 @@ required arguments:
   -i INPUT           absolute path to input file or folder
 
 optional arguments:
-  -ns NAMESPACE      namespace for single script compilation
-  -o OUTPUT          absolute path to output folder (default: ..)
   -q                 report only compiler failures
   -s                 skip output validation
 
@@ -37,22 +35,20 @@ program arguments:
 When the game is switched, all paths are generated using the `Installed Path` key in the Windows Registry for the respective games.
 
 You can also set a path explicitly in `pyro.ini` if you are on a non-Windows platform.
- 
 
-### Supports recursive compilation
-
-The CLI can compile single `.psc` files and folders recursively.
-
-Fallout 4 scripts are compiled with the `-release`, and `-final` arguments.
- 
 
 ### Supports Papyrus Project XML (PPJ) files
+
+Pyro currently uses the native PPJ compiler for Fallout 4 projects.
+
+For Skyrim and Skyrim Special Edition, Pyro:
 
 * Compiles each script individually in parallel
 * Generates imports from both the input path and `<Scripts>`
 * No changes to script names in scripts or plugins are needed
-* The `<Scripts>` tag is required.
-* The `<Imports>` tag is required only for third-party libraries, like SKSE, etc.
+* Absolute `Output` and `Import` paths are required.
+* The `<Scripts>` tag and child elements are required.
+* The `<Imports>` tag and child elements are required for third-party libraries.
 * The `<Folders>` tag is not supported.
 
  
@@ -60,9 +56,9 @@ Fallout 4 scripts are compiled with the `-release`, and `-final` arguments.
 
 The `Release` and `Final` attributes are supported by only the FO4 compiler.
 
-The PPJ parser will ignore unsupported attributes.
+`Optimize` support was removed. Bethesda Softworks officially recommends against its use.
 
-`Optimize` is unsupported because the official recommendation is not use it.
+The custom PPJ parser will ignore unsupported attributes.
 
 
 #### Notes: Performance 
@@ -103,7 +99,7 @@ The native PPJ compiler for FO4 is around 4 seconds faster, but TESV and SSE do 
 Go to `Advanced > Tool` Configuration and click the Insert button.
 
 1. `[Command Tab]` **Menu item name** = `Compile Papyrus (FO4)`
-2. `[Command Tab]` **Command line** = `python pyro.py -g fo4 -i "%p%n%e" -p`
+2. `[Command Tab]` **Command line** = `python pyro.py -g fo4 -i "%p%n%e"`
 3. `[Options Tab]` **Program type: DOS program** = `True`
 4. `[Options Tab]` **Save active file** = `True`
 5. `[Output Tab]` **Command output: Output to list box** = `True`

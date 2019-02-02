@@ -13,6 +13,7 @@ except ImportError:
     from lxml import etree
 
 from Arguments import Arguments
+from GameType import GameType
 from Project import Project
 from TimeElapsed import TimeElapsed
 
@@ -40,7 +41,7 @@ class PapyrusProject:
         return [str(field.text) for field in child_nodes if field.text is not None and field.text != '']
 
     @staticmethod
-    def open_process(command: list) -> int:
+    def _open_process(command: list) -> int:
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True)
 
         try:
@@ -92,14 +93,14 @@ class PapyrusProject:
             arguments.append_quoted(';'.join(unique_imports), 'i')
             arguments.append_quoted(self.root_node.get('Flags'), 'f')
 
-            # if self.game_type == GameType.Fallout4:
-            #     release = self.root_node.get('Release')
-            #     if release and release.casefold() == 'true':
-            #         arguments.append('-release')
-            #
-            #     final = self.root_node.get('Final')
-            #     if final and final.casefold() == 'true':
-            #         arguments.append('-final')
+            if self.game_type == GameType.Fallout4:
+                release = self.root_node.get('Release')
+                if release and release.casefold() == 'true':
+                    arguments.append('-release')
+
+                final = self.root_node.get('Final')
+                if final and final.casefold() == 'true':
+                    arguments.append('-final')
 
             if quiet:
                 arguments.append('-q')
@@ -115,13 +116,13 @@ class PapyrusProject:
     def get_output_path(self) -> str:
         return self.root_node.get('Output')
 
-    def compile(self, output_file: str, quiet: bool) -> None:
-        output_path = output_file if 'Output' not in self.root_node.attrib else self.get_output_path()
+    def compile(self, quiet: bool) -> None:
+        output_path = self.get_output_path()
 
         commands = self._build_commands(output_path, quiet)
 
         p = multiprocessing.Pool(processes=os.cpu_count())
-        p.map(self.open_process, commands)
+        p.map(self._open_process, commands)
         p.close()
         p.join()
 

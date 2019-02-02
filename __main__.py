@@ -14,7 +14,6 @@ except ImportError:
     # noinspection PyUnresolvedReferences
     from lxml import etree
 
-from Arguments import Arguments
 from GameType import GameType
 from PapyrusProject import PapyrusProject
 from Project import Project
@@ -34,7 +33,8 @@ def main():
     time_elapsed = TimeElapsed()
 
     if not compile_project:
-        compile_script(project, args.skip_output_validation, time_elapsed)
+        sys.tracebacklimit = 0
+        raise ValueError('Single script compilation is no longer supported. Use a PPJ file.')
     else:
         if project.is_fallout4:
             compile_ppj_native(project, args.quiet, args.skip_output_validation, time_elapsed)
@@ -42,52 +42,6 @@ def main():
             compile_ppj_custom(project, args.quiet, args.skip_output_validation, time_elapsed)
 
     time_elapsed.print()
-
-
-def compile_script(prj: Project, skip_validation: bool, time_elapsed: TimeElapsed) -> None:
-    arguments = Arguments()
-
-    imports = [prj.get_scripts_user_path(), prj.get_scripts_base_path()]
-    if not prj.is_fallout4:
-        imports.insert(0, os.path.dirname(prj.input_path))
-
-    imports = ';'.join(map(lambda x: x if os.path.exists(x) else '', imports))
-
-    arguments.append_quoted(prj.get_compiler_path())
-    if prj.namespace:
-        arguments.append_quoted(os.path.join(prj.namespace, os.path.basename(prj.input_path)))
-    else:
-        arguments.append_quoted(prj.input_path)
-    arguments.append_quoted(prj.try_parse_relative_output_path(), 'o')
-    arguments.append_quoted(imports, 'i')
-    arguments.append_quoted(os.path.basename(prj.get_flags_path()), 'f')
-
-    if args.quiet:
-        arguments.append('-q')
-
-    if os.path.isdir(args.input):
-        arguments.append('-all')
-
-    print(arguments.join())
-
-    process = subprocess.Popen(arguments.join(), stdout=subprocess.PIPE, shell=False, universal_newlines=True)
-
-    time_elapsed.start_time = time.time()
-
-    process.wait()
-
-    time_elapsed.end_time = time.time()
-
-    if not skip_validation:
-        _, output_file_name = os.path.split(prj.input_path)
-
-        if prj.is_fallout4 and prj.USER_PATH_PART in prj.input_path.casefold():
-            output_file_name = os.path.join(prj.namespace, os.path.basename(prj.input_path))
-
-        output_file_name = output_file_name.replace('.psc', '.pex')
-        output_file_path = os.path.join(prj.try_parse_relative_output_path(), output_file_name)
-
-        prj.validate_script(output_file_path, time_elapsed)
 
 
 def compile_ppj_native(prj: Project, quiet: bool, skip_validation: bool, time_elapsed: TimeElapsed) -> None:
@@ -102,7 +56,7 @@ def compile_ppj_native(prj: Project, quiet: bool, skip_validation: bool, time_el
 
     time_elapsed.start_time = time.time()
 
-    PapyrusProject.open_process(project_args)
+    PapyrusProject._open_process(project_args)
 
     time_elapsed.end_time = time.time()
 
@@ -116,7 +70,7 @@ def compile_ppj_custom(prj: Project, quiet: bool, skip_validation: bool, time_el
 
     time_elapsed.start_time = time.time()
 
-    ppj.compile(prj.output_path, quiet)
+    ppj.compile(quiet)
 
     time_elapsed.end_time = time.time()
 
@@ -135,8 +89,6 @@ if __name__ == '__main__':
     _required_arguments.add_argument('-i', action='store', dest='input', help='absolute path to input file or folder')
 
     _optional_arguments = parser.add_argument_group('optional arguments')
-    _optional_arguments.add_argument('-ns', action='store', dest='namespace', default='', help='namespace for single script compilation (fo4)')
-    _optional_arguments.add_argument('-o', action='store', dest='output', default='..', help='absolute path to output folder (default: ..)')
     _optional_arguments.add_argument('-q', action='store_true', dest='quiet', default=False, help='report only compiler failures')
     _optional_arguments.add_argument('-s', action='store_true', dest='skip_output_validation', default=False, help='skip output validation')
 
@@ -158,6 +110,6 @@ if __name__ == '__main__':
         print('[ERROR] required argument missing: -i INPUT' + os.linesep)
         exit(parser.print_help())
 
-    project = Project(GameType.from_str(args.game), args.input, args.output, args.namespace)
+    project = Project(GameType.from_str(args.game), args.input)
 
     main()
