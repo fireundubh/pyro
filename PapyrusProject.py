@@ -81,7 +81,7 @@ class PapyrusProject:
         commands = list()
 
         unique_imports = self._get_imports_from_script_paths()
-        script_paths = self._get_script_paths()
+        script_paths = self._get_script_paths_scripts_node()
 
         arguments = Arguments()
 
@@ -109,9 +109,19 @@ class PapyrusProject:
 
         return commands
 
+    def _build_commands_native(self, quiet: bool) -> list:
+        arguments = Arguments()
+        arguments.append_quoted(os.path.join(self.game_path, self.compiler_path))
+        arguments.append_quoted(self.input_path)
+
+        if quiet:
+            arguments.append('-q')
+
+        return arguments.join()
+
     def _get_imports_from_script_paths(self) -> list:
         """Generate list of unique import paths from script paths"""
-        script_paths = self._get_script_paths()
+        script_paths = self._get_script_paths_scripts_node()
 
         xml_import_paths = self._get_node_children_values(self.root_node, 'Imports')
 
@@ -126,8 +136,7 @@ class PapyrusProject:
 
         return self._unique_list(script_import_paths + xml_import_paths)
 
-    def _get_script_paths(self) -> list:
-        """Retrieves script paths from Folders and Scripts tags"""
+    def _get_script_paths_from_folders_node(self) -> list:
         script_paths = list()
 
         # <Folders>
@@ -153,15 +162,31 @@ class PapyrusProject:
                 abs_script_paths = glob.glob(os.path.join(folder, '*.psc'), recursive=not no_recurse)
 
                 # we need path parts, not absolute paths - we're assuming namespaces though (critical flaw?)
-                script_paths.extend([os.path.join(*f.split(os.sep)[-2:]) for f in abs_script_paths])
+                for script_path in abs_script_paths:
+                    namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(script_path), script_path])
+                    script_paths.append(os.path.join(namespace, file_name))
+
+        return script_paths
+
+    def _get_script_paths_scripts_node(self) -> list:
+        """Retrieves script paths from Folders and Scripts tags"""
+        script_paths = list()
+
+        # <Folders>
+        folder_paths = self._get_script_paths_from_folders_node()
+        if len(folder_paths) > 0:
+            script_paths.extend(folder_paths)
 
         # <Scripts>
-        scripts_node = PapyrusProject._get_node(self.root_node, 'Scripts')
+        scripts_node = self._get_node(self.root_node, 'Scripts')
         if scripts_node is not None:
             # "support" colons by replacing them with path separators so they're proper path parts
             # but watch out for absolute paths and use the path parts directly instead
-            def fix_path(x):
-                return x.replace(':', os.sep) if not os.path.isabs(x) else os.path.join(*x.split(os.sep)[-2:])
+            def fix_path(script_path):
+                if os.path.isabs(script_path):
+                    namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(script_path), script_path])
+                    return os.path.join(namespace, file_name)
+                return script_path.replace(':', os.sep)
 
             scripts = map(lambda x: fix_path(x), self._get_node_children_values(self.root_node, 'Scripts'))
 
@@ -176,14 +201,11 @@ class PapyrusProject:
         p.join()
 
     def compile_native(self, quiet: bool, time_elapsed: TimeElapsed) -> None:
-        project_args = [os.path.join(self.game_path, self.compiler_path), self.input_path]
-
-        if quiet:
-            project_args.append('-q')
+        commands = self._build_commands_native(quiet)
 
         time_elapsed.start_time = time.time()
 
-        self._open_process(project_args)
+        self._open_process(commands)
 
         time_elapsed.end_time = time.time()
 
@@ -197,7 +219,7 @@ class PapyrusProject:
         time_elapsed.end_time = time.time()
 
     def validate_project(self, time_elapsed: TimeElapsed) -> None:
-        script_paths = self._get_script_paths()
+        script_paths = self._get_script_paths_scripts_node()
 
         compiled_script_paths = map(lambda x: os.path.join(self.output_path, x.replace('.psc', '.pex')), script_paths)
 
