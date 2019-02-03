@@ -15,7 +15,6 @@ except ImportError:
     from lxml import etree
 
 from Arguments import Arguments
-from GameType import GameType
 from Project import Project
 from TimeElapsed import TimeElapsed
 
@@ -132,7 +131,7 @@ class PapyrusProject:
         script_paths = list()
 
         # <Folders>
-        folders_node = PapyrusProject._get_node(self.root_node, 'Folders')
+        folders_node = self._get_node(self.root_node, 'Folders')
 
         if folders_node is not None:
             # defaults to False if the attribute does not exist
@@ -160,7 +159,12 @@ class PapyrusProject:
         scripts_node = PapyrusProject._get_node(self.root_node, 'Scripts')
         if scripts_node is not None:
             # "support" colons by replacing them with path separators so they're proper path parts
-            scripts = map(lambda x: x.replace(':', os.sep), self._get_node_children_values(self.root_node, 'Scripts'))
+            # but watch out for absolute paths and use the path parts directly instead
+            def fix_path(x):
+                return x.replace(':', os.sep) if not os.path.isabs(x) else os.path.join(*x.split(os.sep)[-2:])
+
+            scripts = map(lambda x: fix_path(x), self._get_node_children_values(self.root_node, 'Scripts'))
+
             script_paths.extend(scripts)
 
         return self._unique_list(script_paths)
