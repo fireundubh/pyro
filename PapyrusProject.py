@@ -81,7 +81,7 @@ class PapyrusProject:
         commands = list()
 
         unique_imports = self._get_imports_from_script_paths()
-        script_paths = self._get_script_paths_scripts_node()
+        script_paths = self._get_script_paths()
 
         arguments = Arguments()
 
@@ -102,6 +102,10 @@ class PapyrusProject:
                 if final and final.casefold() == 'true':
                     arguments.append('-final')
 
+            optimize = self.root_node.get('Optimize')
+            if optimize and optimize.casefold() == 'true':
+                arguments.append('-op')
+
             if quiet:
                 arguments.append('-q')
 
@@ -121,7 +125,7 @@ class PapyrusProject:
 
     def _get_imports_from_script_paths(self) -> list:
         """Generate list of unique import paths from script paths"""
-        script_paths = self._get_script_paths_scripts_node()
+        script_paths = self._get_script_paths()
 
         xml_import_paths = self._get_node_children_values(self.root_node, 'Imports')
 
@@ -136,10 +140,27 @@ class PapyrusProject:
 
         return self._unique_list(script_import_paths + xml_import_paths)
 
-    def _get_script_paths_from_folders_node(self) -> list:
-        script_paths = list()
+    def _get_script_paths(self) -> list:
+        """Retrieves script paths both Folders and Scripts nodes"""
+        paths = list()
 
         # <Folders>
+        folder_paths = self._get_script_paths_from_folders_node()
+        if len(folder_paths) > 0:
+            paths.extend(folder_paths)
+
+        script_paths = self._get_script_paths_from_scripts_node()
+        if len(script_paths) > 0:
+            paths.extend(script_paths)
+
+        norm_paths = map(lambda x: os.path.normpath(x), paths)
+
+        return self._unique_list(list(norm_paths))
+
+    def _get_script_paths_from_folders_node(self) -> list:
+        """Retrieves script paths from the Folders node"""
+        script_paths = list()
+
         folders_node = self._get_node(self.root_node, 'Folders')
 
         if folders_node is not None:
@@ -168,16 +189,10 @@ class PapyrusProject:
 
         return script_paths
 
-    def _get_script_paths_scripts_node(self) -> list:
-        """Retrieves script paths from Folders and Scripts tags"""
+    def _get_script_paths_from_scripts_node(self) -> list:
+        """Retrieves script paths from the Scripts node"""
         script_paths = list()
 
-        # <Folders>
-        folder_paths = self._get_script_paths_from_folders_node()
-        if len(folder_paths) > 0:
-            script_paths.extend(folder_paths)
-
-        # <Scripts>
         scripts_node = self._get_node(self.root_node, 'Scripts')
         if scripts_node is not None:
             # "support" colons by replacing them with path separators so they're proper path parts
@@ -192,7 +207,7 @@ class PapyrusProject:
 
             script_paths.extend(scripts)
 
-        return self._unique_list(script_paths)
+        return script_paths
 
     def _parallelize(self, commands: list) -> None:
         p = multiprocessing.Pool(processes=os.cpu_count())
@@ -202,24 +217,21 @@ class PapyrusProject:
 
     def compile_native(self, quiet: bool, time_elapsed: TimeElapsed) -> None:
         commands = self._build_commands_native(quiet)
-
         time_elapsed.start_time = time.time()
-
         self._open_process(commands)
-
         time_elapsed.end_time = time.time()
 
     def compile_custom(self, quiet: bool, time_elapsed: TimeElapsed) -> None:
         commands = self._build_commands(quiet)
-
         time_elapsed.start_time = time.time()
-
         self._parallelize(commands)
-
         time_elapsed.end_time = time.time()
 
     def validate_project(self, time_elapsed: TimeElapsed) -> None:
-        script_paths = self._get_script_paths_scripts_node()
+        script_paths = self._get_script_paths()
+
+        if any(dots in self.output_path.split(os.sep) for dots in ['.', '..']):
+            self.output_path = os.path.join(os.path.dirname(self.input_path), self.output_path)
 
         compiled_script_paths = map(lambda x: os.path.join(self.output_path, x.replace('.psc', '.pex')), script_paths)
 
@@ -227,4 +239,4 @@ class PapyrusProject:
             compiled_script_paths = map(lambda x: os.path.join(self.output_path, os.path.basename(x)), compiled_script_paths)
 
         for compiled_script_path in compiled_script_paths:
-            self.project.validate_script(compiled_script_path, time_elapsed)
+            self.project.validate_script(os.path.abspath(compiled_script_path), time_elapsed)
