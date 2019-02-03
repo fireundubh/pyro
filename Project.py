@@ -3,11 +3,14 @@ import os
 import sys
 
 from GameType import GameType
+from Logger import Logger
 from TimeElapsed import TimeElapsed
 
 
 class Project:
     """Used to pass common data to single-file and project compilation"""
+    log = Logger()
+
     def __init__(self, game_type: GameType, input_path: str):
         self._ini = configparser.ConfigParser()
         self._ini.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'pyro.ini'))
@@ -49,11 +52,19 @@ class Project:
     @staticmethod
     def validate_script(script_path: str, time_elapsed: TimeElapsed):
         if not os.path.exists(script_path):
-            print('[PYRO] Failed to write file: {0} (file does not exist)'.format(script_path))
+            Project.log.pyro('Failed to write file: {0} (file does not exist)'.format(script_path))
         elif time_elapsed.start_time < os.stat(script_path).st_mtime < time_elapsed.end_time:
-            print('[PYRO] Wrote file:', script_path)
+            Project.log.pyro('Wrote file: {0}'.format(script_path))
         else:
-            print('[PYRO] Failed to write file: {0} (not recently modified)'.format(script_path))
+            Project.log.pyro('Failed to write file: {0} (not recently modified)'.format(script_path))
+
+    def get_bsarch_path(self) -> str:
+        path = self._ini['Shared']['BSArchPath']
+
+        if not os.path.isabs(path):
+            path = os.path.join(os.path.dirname(__file__), path)
+
+        return os.path.normpath(path)
 
     def get_compiler_path(self) -> str:
         """Retrieve compiler path from pyro.ini"""

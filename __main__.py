@@ -14,6 +14,7 @@ except ImportError:
     from lxml import etree
 
 from GameType import GameType
+from Logger import Logger
 from PapyrusProject import PapyrusProject
 from Project import Project
 from TimeElapsed import TimeElapsed
@@ -30,8 +31,7 @@ def main():
         compile_project = file_extension == '.ppj'
 
     if not compile_project:
-        sys.tracebacklimit = 0
-        raise ValueError('Single script compilation is no longer supported. Use a PPJ file.')
+        log.error('Single script compilation is no longer supported. Use a PPJ file.')
     else:
         time_elapsed = TimeElapsed()
 
@@ -45,12 +45,17 @@ def main():
         if not args.skip_output_validation:
             ppj.validate_project(time_elapsed)
 
+        if args.use_bsarch:
+            ppj.pack_archive()
+
         time_elapsed.print()
 
 
 if __name__ == '__main__':
+    log = Logger()
+
     if not os.path.exists(os.path.join(os.path.dirname(__file__), 'pyro.ini')):
-        raise FileNotFoundError('Cannot proceed without pyro.ini configuration file')
+        exit(log.error('Cannot proceed without pyro.ini configuration file'))
 
     parser = argparse.ArgumentParser(add_help=False)
 
@@ -62,6 +67,7 @@ if __name__ == '__main__':
     _optional_arguments.add_argument('-f', action='store_true', dest='force', default=False, help='use built-in parser for Fallout 4 projects')
     _optional_arguments.add_argument('-q', action='store_true', dest='quiet', default=False, help='report only compiler failures')
     _optional_arguments.add_argument('-s', action='store_true', dest='skip_output_validation', default=False, help='skip output validation')
+    _optional_arguments.add_argument('-p', action='store_true', dest='use_bsarch', default=False, help='pack scripts into bsa/ba2 (requires bsarch)')
 
     _program_arguments = parser.add_argument_group('program arguments')
     _program_arguments.add_argument('--help', action='store_true', dest='show_help', default=False, help='show help and exit')
@@ -74,11 +80,15 @@ if __name__ == '__main__':
 
     # if required arguments not set, show help
     if args.game is None:
-        print('[ERROR] required argument missing: -g {tesv,fo4,sse}' + os.linesep)
+        log.error('required argument missing: -g {tesv,fo4,sse}' + os.linesep)
         exit(parser.print_help())
 
     if args.input is None:
-        print('[ERROR] required argument missing: -i INPUT' + os.linesep)
+        log.error('required argument missing: -i INPUT' + os.linesep)
+        exit(parser.print_help())
+
+    if args.game == 'fo4' and not args.force and args.use_bsarch:
+        log.error('cannot automatically pack archive without using the built-in parser' + os.linesep)
         exit(parser.print_help())
 
     project = Project(GameType.from_str(args.game), args.input)

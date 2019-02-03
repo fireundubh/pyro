@@ -1,6 +1,7 @@
 import glob
 import multiprocessing
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -15,11 +16,14 @@ except ImportError:
     from lxml import etree
 
 from Arguments import Arguments
+from Logger import Logger
 from Project import Project
 from TimeElapsed import TimeElapsed
 
 
 class PapyrusProject:
+    log = Logger()
+
     def __init__(self, prj: Project):
         self.project = prj
         self.compiler_path = prj.get_compiler_path()
@@ -44,8 +48,7 @@ class PapyrusProject:
         node = PapyrusProject._get_node(parent_node, tag)
 
         if node is None:
-            print('[PYRO] The PPJ file is missing the following tag:', tag)
-            exit()
+            exit(PapyrusProject.log.pyro('The PPJ file is missing the following tag: {0}'.format(tag)))
 
         child_nodes = PapyrusProject._get_node_children(node, tag)
 
@@ -56,7 +59,7 @@ class PapyrusProject:
         return [str(field.text) for field in child_nodes if field.text is not None and field.text != '']
 
     @staticmethod
-    def _open_process(command: list) -> int:
+    def _open_process(command: str, use_bsarch: bool = False) -> int:
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True)
 
         exclusions = ('Starting', 'Assembly', 'Compilation', 'Batch', 'Copyright', 'Papyrus', 'Failed', 'No output')
@@ -64,8 +67,11 @@ class PapyrusProject:
         try:
             while process.poll() is None:
                 line = process.stdout.readline().strip()
-                exclude_lines = not line.startswith(exclusions)
-                print('[COMPILER]', line) if line != '' and exclude_lines and 'error(s)' not in line else None
+                if not use_bsarch:
+                    exclude_lines = not line.startswith(exclusions)
+                    PapyrusProject.log.compiler(line) if line != '' and exclude_lines and 'error(s)' not in line else None
+                else:
+                    PapyrusProject.log.bsarch(line) if line != '' else None
             return 0
 
         except KeyboardInterrupt:
@@ -115,13 +121,32 @@ class PapyrusProject:
 
         return commands
 
-    def _build_commands_native(self, quiet: bool) -> list:
+    def _build_commands_native(self, quiet: bool) -> str:
         arguments = Arguments()
         arguments.append_quoted(os.path.join(self.game_path, self.compiler_path))
         arguments.append_quoted(self.input_path)
 
         if quiet:
             arguments.append('-q')
+
+        return arguments.join()
+
+    def _build_commands_bsarch(self, script_folder: str, archive_path: str) -> str:
+        bsarch_path = self.project.get_bsarch_path()
+
+        arguments = Arguments()
+
+        arguments.append_quoted(bsarch_path)
+        arguments.append('pack')
+        arguments.append_quoted(script_folder)
+        arguments.append_quoted(archive_path)
+
+        if self.project.is_fallout4:
+            arguments.append('-fo4')
+        elif self.project.is_skyrim_special_edition:
+            arguments.append('-sse')
+        else:
+            arguments.append('tes5')
 
         return arguments.join()
 
@@ -141,6 +166,23 @@ class PapyrusProject:
                     script_import_paths.append(test_path)
 
         return self._unique_list(script_import_paths + xml_import_paths)
+
+    def _copy_scripts_to_temp_path(self, script_paths: list, tmp_scripts_path: str) -> None:
+        output_path = self.output_path
+
+        if any(dots in output_path.split(os.sep) for dots in ['.', '..']):
+            output_path = os.path.normpath(os.path.join(os.path.dirname(self.input_path), output_path))
+
+        compiled_script_paths = map(lambda x: os.path.join(output_path, x.replace('.psc', '.pex')), script_paths)
+
+        if not self.project.is_fallout4:
+            compiled_script_paths = map(lambda x: os.path.join(output_path, os.path.basename(x)), compiled_script_paths)
+
+        for compiled_script_path in compiled_script_paths:
+            abs_compiled_script_path = os.path.abspath(compiled_script_path)
+            tmp_destination_path = os.path.join(tmp_scripts_path, os.path.basename(abs_compiled_script_path))
+
+            shutil.copy2(abs_compiled_script_path, tmp_destination_path)
 
     def _get_script_paths(self) -> list:
         """Retrieves script paths both Folders and Scripts nodes"""
@@ -229,16 +271,49 @@ class PapyrusProject:
         self._parallelize(commands)
         time_elapsed.end_time = time.time()
 
+    def pack_archive(self) -> None:
+        # create temporary folder
+        tmp_path = os.path.normpath(os.path.join(os.path.dirname(__file__), self.project._ini['Shared']['TempPath']))
+        tmp_scripts_path = os.path.join(tmp_path, 'Scripts')
+
+        # clear temporary data
+        if os.path.exists(tmp_path):
+            shutil.rmtree(tmp_path)
+
+        # ensure temporary data paths exist
+        if not os.path.exists(tmp_scripts_path):
+            os.makedirs(tmp_scripts_path)
+
+        script_paths = self._get_script_paths()
+
+        self._copy_scripts_to_temp_path(script_paths, tmp_scripts_path)
+
+        archive_path = self.root_node.get('Archive')
+
+        if archive_path is None:
+            return PapyrusProject.log.error('Cannot pack archive because Archive attribute not set')
+
+        commands = self._build_commands_bsarch(*map(lambda x: os.path.normpath(x), [tmp_path, archive_path]))
+
+        self._open_process(commands, use_bsarch=True)
+
+        # clear temporary data
+        if os.path.exists(tmp_path):
+            shutil.rmtree(tmp_path)
+
     def validate_project(self, time_elapsed: TimeElapsed) -> None:
         script_paths = self._get_script_paths()
 
-        if any(dots in self.output_path.split(os.sep) for dots in ['.', '..']):
-            self.output_path = os.path.join(os.path.dirname(self.input_path), self.output_path)
+        output_path = self.output_path
 
-        compiled_script_paths = map(lambda x: os.path.join(self.output_path, x.replace('.psc', '.pex')), script_paths)
+        if any(dots in output_path.split(os.sep) for dots in ['.', '..']):
+            output_path = os.path.join(os.path.dirname(self.input_path), output_path)
+
+        compiled_script_paths = map(lambda x: os.path.join(output_path, x.replace('.psc', '.pex')), script_paths)
 
         if not self.project.is_fallout4:
-            compiled_script_paths = map(lambda x: os.path.join(self.output_path, os.path.basename(x)), compiled_script_paths)
+            compiled_script_paths = map(lambda x: os.path.join(output_path, os.path.basename(x)), compiled_script_paths)
 
         for compiled_script_path in compiled_script_paths:
-            self.project.validate_script(os.path.abspath(compiled_script_path), time_elapsed)
+            abs_compiled_script_path = os.path.abspath(compiled_script_path)
+            self.project.validate_script(abs_compiled_script_path, time_elapsed)
