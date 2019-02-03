@@ -27,25 +27,28 @@ class PapyrusProject:
         self.game_path = prj.get_game_path()
         self.game_type = prj.game_type
         self.input_path = prj.input_path
+
         self.root_node = etree.parse(prj.input_path, etree.XMLParser(remove_blank_text=True)).getroot()
+        self.output_path = self.root_node.get('Output')
+        self.flags_path = self.root_node.get('Flags')
 
     @staticmethod
     def _get_node(parent_node: etree.Element, tag: str, ns: str = 'PapyrusProject.xsd') -> etree.Element:
         return parent_node.find('ns:%s' % tag, {'ns': '%s' % ns})
 
     @staticmethod
-    def _get_children_nodes(parent_node: etree.Element, tag: str, ns: str = 'PapyrusProject.xsd') -> list:
+    def _get_node_children(parent_node: etree.Element, tag: str, ns: str = 'PapyrusProject.xsd') -> list:
         return parent_node.findall('ns:%s' % tag[:-1], {'ns': '%s' % ns})
 
     @staticmethod
-    def _get_children_values(parent_node: etree.Element, tag: str) -> list:
+    def _get_node_children_values(parent_node: etree.Element, tag: str) -> list:
         node = PapyrusProject._get_node(parent_node, tag)
 
         if node is None:
             print('[PYRO] The PPJ file is missing the following tag:', tag)
             exit()
 
-        child_nodes = PapyrusProject._get_children_nodes(node, tag)
+        child_nodes = PapyrusProject._get_node_children(node, tag)
 
         if child_nodes is None or len(child_nodes) == 0:
             sys.tracebacklimit = 0
@@ -75,28 +78,11 @@ class PapyrusProject:
     def _unique_list(items: list) -> list:
         return list(OrderedDict.fromkeys(items))
 
-    def _get_imports_from_script_paths(self) -> list:
-        """Generate list of unique import paths from script paths"""
-        script_paths = self.get_script_paths()
-
-        xml_import_paths = self._get_children_values(self.root_node, 'Imports')
-
-        script_import_paths = list()
-
-        for script_path in script_paths:
-            for xml_import_path in xml_import_paths:
-                test_path = os.path.join(xml_import_path, os.path.dirname(script_path))
-
-                if os.path.exists(test_path):
-                    script_import_paths.append(test_path)
-
-        return self._unique_list(script_import_paths + xml_import_paths)
-
-    def _build_commands(self, output_path: str, quiet: bool) -> list:
+    def _build_commands(self, quiet: bool) -> list:
         commands = list()
 
         unique_imports = self._get_imports_from_script_paths()
-        script_paths = self.get_script_paths()
+        script_paths = self._get_script_paths()
 
         arguments = Arguments()
 
@@ -104,11 +90,11 @@ class PapyrusProject:
             arguments.clear()
             arguments.append_quoted(self.compiler_path)
             arguments.append_quoted(script_path)
-            arguments.append_quoted(output_path, 'o')
+            arguments.append_quoted(self.output_path, 'o')
             arguments.append_quoted(';'.join(unique_imports), 'i')
-            arguments.append_quoted(self.root_node.get('Flags'), 'f')
+            arguments.append_quoted(self.flags_path, 'f')
 
-            if self.game_type == GameType.Fallout4:
+            if self.project.is_fallout4:
                 release = self.root_node.get('Release')
                 if release and release.casefold() == 'true':
                     arguments.append('-release')
@@ -124,7 +110,24 @@ class PapyrusProject:
 
         return commands
 
-    def get_script_paths(self) -> list:
+    def _get_imports_from_script_paths(self) -> list:
+        """Generate list of unique import paths from script paths"""
+        script_paths = self._get_script_paths()
+
+        xml_import_paths = self._get_node_children_values(self.root_node, 'Imports')
+
+        script_import_paths = list()
+
+        for script_path in script_paths:
+            for xml_import_path in xml_import_paths:
+                test_path = os.path.join(xml_import_path, os.path.dirname(script_path))
+
+                if os.path.exists(test_path):
+                    script_import_paths.append(test_path)
+
+        return self._unique_list(script_import_paths + xml_import_paths)
+
+    def _get_script_paths(self) -> list:
         """Retrieves script paths from Folders and Scripts tags"""
         script_paths = list()
 
@@ -135,13 +138,13 @@ class PapyrusProject:
             # defaults to False if the attribute does not exist
             no_recurse = bool(folders_node.get('NoRecurse'))
 
-            for folder in self._get_children_values(self.root_node, 'Folders'):
+            for folder in self._get_node_children_values(self.root_node, 'Folders'):
                 # fix relative paths
                 if folder == '..' or folder == '.':
                     folder = os.path.abspath(os.path.join(os.path.dirname(self.input_path), folder))
                 elif not os.path.isabs(folder):
                     # try to find folder in import paths
-                    for import_path in self._get_children_values(self.root_node, 'Imports'):
+                    for import_path in self._get_node_children_values(self.root_node, 'Imports'):
                         test_path = os.path.join(import_path, folder)
 
                         if os.path.exists(test_path):
@@ -157,16 +160,12 @@ class PapyrusProject:
         scripts_node = PapyrusProject._get_node(self.root_node, 'Scripts')
         if scripts_node is not None:
             # "support" colons by replacing them with path separators so they're proper path parts
-            scripts = map(lambda x: x.replace(':', os.sep), self._get_children_values(self.root_node, 'Scripts'))
+            scripts = map(lambda x: x.replace(':', os.sep), self._get_node_children_values(self.root_node, 'Scripts'))
             script_paths.extend(scripts)
 
         return self._unique_list(script_paths)
 
-    def _parallelize(self, quiet: bool) -> None:
-        output_path = self.root_node.get('Output')
-
-        commands = self._build_commands(output_path, quiet)
-
+    def _parallelize(self, commands: list) -> None:
         p = multiprocessing.Pool(processes=os.cpu_count())
         p.map(self._open_process, commands)
         p.close()
@@ -185,20 +184,21 @@ class PapyrusProject:
         time_elapsed.end_time = time.time()
 
     def compile_custom(self, quiet: bool, time_elapsed: TimeElapsed) -> None:
+        commands = self._build_commands(quiet)
+
         time_elapsed.start_time = time.time()
 
-        self._parallelize(quiet)
+        self._parallelize(commands)
 
         time_elapsed.end_time = time.time()
 
     def validate_project(self, time_elapsed: TimeElapsed) -> None:
-        output_path = self.root_node.get('Output')
-        script_paths = self.get_script_paths()
+        script_paths = self._get_script_paths()
 
-        compiled_script_paths = map(lambda x: os.path.join(output_path, x.replace('.psc', '.pex')), script_paths)
+        compiled_script_paths = map(lambda x: os.path.join(self.output_path, x.replace('.psc', '.pex')), script_paths)
 
         if not self.project.is_fallout4:
-            compiled_script_paths = map(lambda x: os.path.join(output_path, os.path.basename(x)), compiled_script_paths)
+            compiled_script_paths = map(lambda x: os.path.join(self.output_path, os.path.basename(x)), compiled_script_paths)
 
         for compiled_script_path in compiled_script_paths:
             self.project.validate_script(compiled_script_path, time_elapsed)
