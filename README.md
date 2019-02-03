@@ -23,6 +23,7 @@ optional arguments:
   -f                 use built-in parser for Fallout 4 projects
   -q                 report only compiler failures
   -s                 skip output validation
+  -p                 pack scripts into bsa/ba2 (requires bsarch)
 
 program arguments:
   --help             show help and exit
@@ -52,19 +53,34 @@ For Skyrim and Skyrim Special Edition, Pyro:
 * The `<Folders>` tag and `NoRecurse` attribute are supported.
 * The `<Imports>` tag and child elements are required for third-party libraries.
 
+### Supports automatic packaging with BSarch
+
+You can package scripts into BSA and BA2 archives with [BSArch](https://www.nexusmods.com/newvegas/mods/64745).
+
+1. Set the path to `bsarch.exe` in `pyro.ini`.
+2. Use the `-p` argument for TESV and SSE projects or the `-f -p` arguments for FO4 projects.
+3. Add an `Archive` attribute to the `PapyrusProject` root element.
+4. Fill that attribute's value with the absolute path to the destination BSA or BA2 archive.
+5. Compile as normal and the compiled scripts will be automatically packaged.
+
+#### Notes
+
+* A temporary folder will be created and deleted at the `TempPath` specified in `pyro.ini`.
+* The compiled scripts to be packaged will be copied there.
+* The folder will be removed if the procedure is successful.
  
-#### Notes: Release/Final/Optimize
+### Supports Release/Final/Optimize
 
 * The `Release` and `Final` attributes are supported by only the FO4 compiler.
 * The `Optimize` attributed is supported for all games.
-* The custom PPJ parser will ignore unsupported attributes.
+* The built-in PPJ parser will ignore unsupported attributes.
 
 
-#### Notes: Performance 
+### Performance 
 
 The native PPJ compiler for FO4 is on average 70 milliseconds faster per script.
 
-Tested with quad core processor and six scripts.
+Tested with i5-3570k @ 3.4 GHz and six scripts.
 
 
 ## Examples
