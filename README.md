@@ -20,6 +20,7 @@ required arguments:
   -i INPUT           absolute path to input file or folder
 
 optional arguments:
+  -f                 use built-in parser for Fallout 4 projects
   -q                 report only compiler failures
   -s                 skip output validation
 
@@ -43,27 +44,27 @@ Pyro currently uses the native PPJ compiler for Fallout 4 projects.
 
 For Skyrim and Skyrim Special Edition, Pyro:
 
-* Compiles each script individually in parallel
-* Generates imports from both the input path and `<Scripts>`
-* No changes to script names in scripts or plugins are needed
-* Absolute `Output` and `Import` paths are required.
+* Scripts are compiled individually in parallel.
+* Imports are generated from the input path and each script.
+* No changes to script names either in scripts or plugins are needed.
+* Relative paths are supported.
 * The `<Scripts>` tag and child elements are required.
+* The `<Folders>` tag and `NoRecurse` attribute are supported.
 * The `<Imports>` tag and child elements are required for third-party libraries.
-* The `<Folders>` tag is not supported.
 
  
 #### Notes: Release/Final/Optimize
 
-The `Release` and `Final` attributes are supported by only the FO4 compiler.
-
-`Optimize` support was removed. Bethesda Softworks officially recommends against its use.
-
-The custom PPJ parser will ignore unsupported attributes.
+* The `Release` and `Final` attributes are supported by only the FO4 compiler.
+* The `Optimize` attributed is supported for all games.
+* The custom PPJ parser will ignore unsupported attributes.
 
 
 #### Notes: Performance 
 
-The native PPJ compiler for FO4 is around 4 seconds faster, but TESV and SSE do not have a PPJ compiler.
+The native PPJ compiler for FO4 is on average 70 milliseconds faster per script.
+
+Tested with quad core processor and six scripts.
 
 
 ## Examples

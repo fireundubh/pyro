@@ -37,10 +37,10 @@ def main():
 
         ppj = PapyrusProject(project)
 
-        if project.is_fallout4:
-            ppj.compile_native(args.quiet, time_elapsed)
-        else:
+        if not project.is_fallout4 or args.force:
             ppj.compile_custom(args.quiet, time_elapsed)
+        else:
+            ppj.compile_native(args.quiet, time_elapsed)
 
         if not args.skip_output_validation:
             ppj.validate_project(time_elapsed)
@@ -59,6 +59,7 @@ if __name__ == '__main__':
     _required_arguments.add_argument('-i', action='store', dest='input', help='absolute path to input file or folder')
 
     _optional_arguments = parser.add_argument_group('optional arguments')
+    _optional_arguments.add_argument('-f', action='store_true', dest='force', default=False, help='use built-in parser for Fallout 4 projects')
     _optional_arguments.add_argument('-q', action='store_true', dest='quiet', default=False, help='report only compiler failures')
     _optional_arguments.add_argument('-s', action='store_true', dest='skip_output_validation', default=False, help='skip output validation')
 

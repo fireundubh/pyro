@@ -59,11 +59,13 @@ class PapyrusProject:
     def _open_process(command: list) -> int:
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True)
 
+        exclusions = ('Starting', 'Assembly', 'Compilation', 'Batch', 'Copyright', 'Papyrus', 'Failed', 'No output')
+
         try:
             while process.poll() is None:
                 line = process.stdout.readline().strip()
-                exclude_lines = not line.startswith(('Starting', 'Assembly', 'Compilation', 'Batch')) and 'error(s)' not in line
-                print('[COMPILER]', line) if line != '' and exclude_lines else None
+                exclude_lines = not line.startswith(exclusions)
+                print('[COMPILER]', line) if line != '' and exclude_lines and 'error(s)' not in line else None
             return 0
 
         except KeyboardInterrupt:
