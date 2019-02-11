@@ -16,6 +16,7 @@ except ImportError:
     from lxml import etree
 
 from Arguments import Arguments
+from Index import Index
 from Logger import Logger
 from Project import Project
 from TimeElapsed import TimeElapsed
@@ -85,15 +86,18 @@ class PapyrusProject:
     def _unique_list(items: list) -> list:
         return list(OrderedDict.fromkeys(items))
 
-    def _build_commands(self, quiet: bool) -> list:
+    def _build_commands(self, index: Index) -> list:
         commands = list()
 
         unique_imports = self._get_imports_from_script_paths()
-        script_paths = self._get_script_paths()
+        script_paths = self.get_script_paths()
 
         arguments = Arguments()
 
         for script_path in script_paths:
+            if index.compare(script_path):
+                continue
+
             arguments.clear()
             arguments.append_quoted(self.compiler_path)
             arguments.append_quoted(script_path)
@@ -114,22 +118,9 @@ class PapyrusProject:
             if optimize and optimize.casefold() == 'true':
                 arguments.append('-op')
 
-            if quiet:
-                arguments.append('-q')
-
             commands.append(arguments.join())
 
         return commands
-
-    def _build_commands_native(self, quiet: bool) -> str:
-        arguments = Arguments()
-        arguments.append_quoted(os.path.join(self.game_path, self.compiler_path))
-        arguments.append_quoted(self.input_path)
-
-        if quiet:
-            arguments.append('-q')
-
-        return arguments.join()
 
     def _build_commands_bsarch(self, script_folder: str, archive_path: str) -> str:
         bsarch_path = self.project.get_bsarch_path()
@@ -152,7 +143,7 @@ class PapyrusProject:
 
     def _get_imports_from_script_paths(self) -> list:
         """Generate list of unique import paths from script paths"""
-        script_paths = self._get_script_paths()
+        script_paths = self.get_script_paths()
 
         xml_import_paths = self._get_node_children_values(self.root_node, 'Imports')
 
@@ -184,22 +175,15 @@ class PapyrusProject:
 
             shutil.copy2(abs_compiled_script_path, tmp_destination_path)
 
-    def _get_script_paths(self) -> list:
-        """Retrieves script paths both Folders and Scripts nodes"""
-        paths = list()
+    def _get_absolute_script_path(self, script_path: str) -> str:
+        xml_import_paths = self._get_node_children_values(self.root_node, 'Imports')
+        results = [os.path.join(xml_import_path, script_path) for xml_import_path in xml_import_paths]
 
-        # <Folders>
-        folder_paths = self._get_script_paths_from_folders_node()
-        if len(folder_paths) > 0:
-            paths.extend(folder_paths)
+        for absolute_script_path in results:
+            if os.path.exists(absolute_script_path):
+                return absolute_script_path
 
-        script_paths = self._get_script_paths_from_scripts_node()
-        if len(script_paths) > 0:
-            paths.extend(script_paths)
-
-        norm_paths = map(lambda x: os.path.normpath(x), paths)
-
-        return self._unique_list(list(norm_paths))
+        raise FileExistsError('Cannot find absolute path to file:', script_path)
 
     def _get_script_paths_from_folders_node(self) -> list:
         """Retrieves script paths from the Folders node"""
@@ -259,17 +243,33 @@ class PapyrusProject:
         p.close()
         p.join()
 
-    def compile_native(self, quiet: bool, time_elapsed: TimeElapsed) -> None:
-        commands = self._build_commands_native(quiet)
-        time_elapsed.start_time = time.time()
-        self._open_process(commands)
-        time_elapsed.end_time = time.time()
-
-    def compile_custom(self, quiet: bool, time_elapsed: TimeElapsed) -> None:
-        commands = self._build_commands(quiet)
+    def compile_custom(self, index: Index, time_elapsed: TimeElapsed) -> None:
+        commands = self._build_commands(index)
         time_elapsed.start_time = time.time()
         self._parallelize(commands)
         time_elapsed.end_time = time.time()
+
+    def get_script_paths(self, absolute_paths: bool = False) -> list:
+        """Retrieves script paths both Folders and Scripts nodes"""
+        paths = list()
+
+        folders_node_paths = self._get_script_paths_from_folders_node()
+        if len(folders_node_paths) > 0:
+            paths.extend(folders_node_paths)
+
+        scripts_node_paths = self._get_script_paths_from_scripts_node()
+        if len(scripts_node_paths) > 0:
+            paths.extend(scripts_node_paths)
+
+        results = list(map(lambda x: os.path.normpath(x), paths))
+
+        if absolute_paths:
+            # TODO: soooo many loops... :(
+            xml_import_paths = self._get_node_children_values(self.root_node, 'Imports')
+            results = [os.path.join(xml_import_path, script_path) for script_path in results for xml_import_path in xml_import_paths]
+            results = [absolute_script_path for absolute_script_path in results if os.path.exists(absolute_script_path)]
+
+        return self._unique_list(results)
 
     def pack_archive(self) -> None:
         # create temporary folder
@@ -284,7 +284,7 @@ class PapyrusProject:
         if not os.path.exists(tmp_scripts_path):
             os.makedirs(tmp_scripts_path)
 
-        script_paths = self._get_script_paths()
+        script_paths = self.get_script_paths()
 
         self._copy_scripts_to_temp_path(script_paths, tmp_scripts_path)
 
@@ -301,19 +301,28 @@ class PapyrusProject:
         if os.path.exists(tmp_path):
             shutil.rmtree(tmp_path)
 
-    def validate_project(self, time_elapsed: TimeElapsed) -> None:
-        script_paths = self._get_script_paths()
+    def validate_project(self, index: Index, time_elapsed: TimeElapsed) -> None:
+        script_paths = self.get_script_paths()
 
         output_path = self.output_path
-
         if any(dots in output_path.split(os.sep) for dots in ['.', '..']):
             output_path = os.path.join(os.path.dirname(self.input_path), output_path)
 
         compiled_script_paths = map(lambda x: os.path.join(output_path, x.replace('.psc', '.pex')), script_paths)
-
         if not self.project.is_fallout4:
             compiled_script_paths = map(lambda x: os.path.join(output_path, os.path.basename(x)), compiled_script_paths)
 
         for compiled_script_path in compiled_script_paths:
             abs_compiled_script_path = os.path.abspath(compiled_script_path)
-            self.project.validate_script(abs_compiled_script_path, time_elapsed)
+
+            if self.project.validate_script(abs_compiled_script_path, time_elapsed):
+                relpath = os.path.relpath(compiled_script_path.replace('.pex', '.psc'), output_path)
+
+                try:
+                    abs_source_script_path = self._get_absolute_script_path(relpath)
+                except FileExistsError:
+                    abs_source_script_path = ''.join([x for x in self.get_script_paths(True) if x.endswith(relpath)])
+                    if abs_source_script_path == '':
+                        raise
+
+                index.write_file(abs_source_script_path)

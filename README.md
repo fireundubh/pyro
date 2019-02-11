@@ -20,9 +20,6 @@ required arguments:
   -i INPUT           absolute path to input file or folder
 
 optional arguments:
-  -f                 use built-in parser for Fallout 4 projects
-  -q                 report only compiler failures
-  -s                 skip output validation
   -p                 pack scripts into bsa/ba2 (requires bsarch)
 
 program arguments:
@@ -31,6 +28,7 @@ program arguments:
 ```
 
 ## Features
+
 
 ### Supports multiple games
 
@@ -41,10 +39,6 @@ You can also set a path explicitly in `pyro.ini` if you are on a non-Windows pla
 
 ### Supports Papyrus Project XML (PPJ) files
 
-Pyro currently uses the native PPJ compiler for Fallout 4 projects.
-
-For Skyrim and Skyrim Special Edition, Pyro:
-
 * Scripts are compiled individually in parallel.
 * Imports are generated from the input path and each script.
 * No changes to script names either in scripts or plugins are needed.
@@ -53,15 +47,26 @@ For Skyrim and Skyrim Special Edition, Pyro:
 * The `<Folders>` tag and `NoRecurse` attribute are supported.
 * The `<Imports>` tag and child elements are required for third-party libraries.
 
-### Supports automatic packaging with BSarch
+
+### Supports incremental PPJ builds
+
+* After the first run, Pyro builds an index for that project containing the file paths and CRC32 hashes of those files.
+* When generating commands for the next run, the CRC32 hashes of those files are compared with the indexed file records.
+* Commands are not generated for matching records, reducing the work passed on to the compiler.
+* Records are updated for previously indexed scripts that have been modified and successfully compiled.
+* New records are created for new scripts that have been successfully compiled.
+
+
+### Supports automatic packaging with BSArch
 
 You can package scripts into BSA and BA2 archives with [BSArch](https://www.nexusmods.com/newvegas/mods/64745).
 
 1. Set the path to `bsarch.exe` in `pyro.ini`.
-2. Use the `-p` argument for TESV and SSE projects or the `-f -p` arguments for FO4 projects.
+2. Use the `-p` argument for all projects.
 3. Add an `Archive` attribute to the `PapyrusProject` root element.
 4. Fill that attribute's value with the absolute path to the destination BSA or BA2 archive.
 5. Compile as normal and the compiled scripts will be automatically packaged.
+
 
 #### Notes
 
@@ -69,11 +74,12 @@ You can package scripts into BSA and BA2 archives with [BSArch](https://www.nexu
 * The compiled scripts to be packaged will be copied there.
 * The folder will be removed if the procedure is successful.
  
+ 
 ### Supports Release/Final/Optimize
 
 * The `Release` and `Final` attributes are supported by only the FO4 compiler.
 * The `Optimize` attributed is supported for all games.
-* The built-in PPJ parser will ignore unsupported attributes.
+* The PPJ parser will ignore unsupported attributes.
 
 
 ### Performance 
@@ -84,6 +90,7 @@ Tested with i5-3570k @ 3.4 GHz and six scripts.
 
 
 ## Examples
+
 
 ### Master of Disguise.ppj
 
@@ -111,6 +118,7 @@ Tested with i5-3570k @ 3.4 GHz and six scripts.
 
 ## IDE Integration
 
+
 ### UltraEdit
 
 Go to `Advanced > Tool` Configuration and click the Insert button.
@@ -133,12 +141,6 @@ For the command line, you may need to use absolute paths to `python.exe` and `py
 ## TODO
 
 - Add support for using a third-party compiler (i.e., Caprica for FO4)
-- Add support for custom imports in shell (PPJ already supports custom imports)
-- Add support for importing DLC scripts explicitly
-- Add support for importing SKSE and F4SE scripts explicitly
-- Add support for third-party PEX decompilers
-- Add support for packaging compiled and/or source scripts into BA2 archives (FO4 only)
 - Add support for reporting physical lines of code
 - Add support for writing timestamped log files
 - Add support for parsing INI and JSON files instead of, or in addition to, PPJ XML files
-- Add support for parsing custom XML tags in all PPJ files to tell Pyro how to BURN BABY BURN

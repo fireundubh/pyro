@@ -50,29 +50,44 @@ class Project:
         return reg_value
 
     @staticmethod
-    def validate_script(script_path: str, time_elapsed: TimeElapsed):
-        if not os.path.exists(script_path):
-            Project.log.pyro('Failed to write file: {0} (file does not exist)'.format(script_path))
-        elif time_elapsed.start_time < os.stat(script_path).st_mtime < time_elapsed.end_time:
-            Project.log.pyro('Wrote file: {0}'.format(script_path))
-        else:
-            Project.log.pyro('Failed to write file: {0} (not recently modified)'.format(script_path))
+    def _handle_relative_local_path(ini_path: str, default_path: str = ''):
+        """Support absolute INI paths, relative local paths, and other paths"""
+        if os.path.isabs(ini_path):
+            return os.path.normpath(ini_path)
 
-    def get_bsarch_path(self) -> str:
-        path = self._ini['Shared']['BSArchPath']
+        path = os.path.join(os.path.dirname(__file__), ini_path)
 
-        if not os.path.isabs(path):
-            path = os.path.join(os.path.dirname(__file__), path)
+        if not os.path.exists(path) and default_path != '':
+            path = os.path.join(default_path, ini_path)
+
+        if not os.path.exists(path):
+            raise ValueError('Path does not exist:', path)
 
         return os.path.normpath(path)
 
+    @staticmethod
+    def validate_script(script_path: str, time_elapsed: TimeElapsed) -> bool:
+        if not os.path.exists(script_path):
+            Project.log.pyro('Failed to write file: {0} (file does not exist)'.format(script_path))
+            return False
+
+        if time_elapsed.start_time < os.stat(script_path).st_mtime < time_elapsed.end_time:
+            Project.log.pyro('Wrote file: {0}'.format(script_path))
+            return True
+
+        Project.log.pyro('Failed to write file: {0} (not recently modified)'.format(script_path))
+        return False
+
+    def get_bsarch_path(self) -> str:
+        return Project._handle_relative_local_path(self._ini['Shared']['BSArchPath'], self.game_path)
+
     def get_compiler_path(self) -> str:
         """Retrieve compiler path from pyro.ini"""
-        return os.path.join(self.game_path, self._ini['Compiler']['Path'])
+        return Project._handle_relative_local_path(self._ini['Compiler']['Path'], self.game_path)
 
     def get_flags_path(self):
         """Retrieve flags path from pyro.ini"""
-        return os.path.join(self.game_path, self._ini[self.game_type.name]['Flags'])
+        return Project._handle_relative_local_path(self._ini[self.game_type.name]['Flags'], self.game_path)
 
     def get_game_path(self) -> str:
         """Retrieve game path from either pyro.ini or Windows Registry"""
