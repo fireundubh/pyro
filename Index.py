@@ -16,6 +16,8 @@ class Index:
         table_path = os.path.join(os.path.dirname(__file__), 'Database', '{}.json'.format(project_name))
         self.table_path = os.path.normpath(table_path)
 
+        os.makedirs(os.path.dirname(self.table_path), exist_ok=True)
+
         self.checksums = []
 
         # ensure table exists
