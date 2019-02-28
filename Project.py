@@ -11,13 +11,14 @@ class Project:
     """Used to pass common data to single-file and project compilation"""
     log = Logger()
 
-    def __init__(self, game_type: GameType, input_path: str):
+    def __init__(self, game_type: GameType, input_path: str, use_anonymizer: bool):
         self._ini = configparser.ConfigParser()
         self._ini.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'pyro.ini'))
 
         self.game_type = game_type
         self.game_path = self.get_game_path()
         self.input_path = input_path
+        self.use_anonymizer = use_anonymizer
 
     @property
     def is_fallout4(self):
@@ -67,15 +68,17 @@ class Project:
 
     @staticmethod
     def validate_script(script_path: str, time_elapsed: TimeElapsed) -> bool:
+        script_path = os.path.abspath(script_path)
+
         if not os.path.exists(script_path):
-            Project.log.pyro('Failed to write file: {0} (file does not exist)'.format(script_path))
+            Project.log.pyro('ERROR: Failed to write file: {0} (file does not exist)'.format(script_path))
             return False
 
         if time_elapsed.start_time < os.stat(script_path).st_mtime < time_elapsed.end_time:
-            Project.log.pyro('Wrote file: {0}'.format(script_path))
+            Project.log.pyro('INFO: Wrote file: {0}'.format(script_path))
             return True
 
-        Project.log.pyro('Failed to write file: {0} (not recently modified)'.format(script_path))
+        Project.log.pyro('INFO: Failed to write file: {0} (not recently modified)'.format(script_path))
         return False
 
     def get_bsarch_path(self) -> str:

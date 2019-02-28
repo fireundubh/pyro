@@ -31,3 +31,11 @@ class Logger:
     @staticmethod
     def pyro(message: str):
         print('{}[PYRO]{} {}'.format(Logger.BOLD, Logger.ENDC, message))
+
+    @staticmethod
+    def idxr(message: str):
+        print('{}[IDXR]{} {}'.format(Logger.BOLD, Logger.ENDC, message))
+
+    @staticmethod
+    def anon(message: str):
+        print('{}[ANON]{} {}'.format(Logger.BOLD, Logger.ENDC, message))

@@ -15,6 +15,7 @@ except ImportError:
     # noinspection PyUnresolvedReferences
     from lxml import etree
 
+from Anonymizer import Anonymizer
 from Arguments import Arguments
 from Index import Index
 from Logger import Logger
@@ -137,7 +138,7 @@ class PapyrusProject:
         elif self.project.is_skyrim_special_edition:
             arguments.append('-sse')
         else:
-            arguments.append('tes5')
+            arguments.append('-tes5')
 
         return arguments.join()
 
@@ -175,15 +176,19 @@ class PapyrusProject:
 
             shutil.copy2(abs_compiled_script_path, tmp_destination_path)
 
-    def _get_absolute_script_path(self, script_path: str) -> str:
+    def _get_absolute_script_path(self, target_path: str) -> str:
         xml_import_paths = self._get_node_children_values(self.root_node, 'Imports')
-        results = [os.path.join(xml_import_path, script_path) for xml_import_path in xml_import_paths]
 
-        for absolute_script_path in results:
-            if os.path.exists(absolute_script_path):
-                return absolute_script_path
+        script_paths = list()
+        for xml_import_path in xml_import_paths:
+            psc_paths = glob.glob(os.path.join(xml_import_path, '**\*.psc'), recursive=True)
+            script_paths.extend(psc_paths)
 
-        raise FileExistsError('Cannot find absolute path to file:', script_path)
+        for script_path in script_paths:
+            if script_path.endswith(target_path.replace('.pex', '.psc')):
+                return script_path
+
+        raise FileExistsError('Cannot find absolute path to file:', target_path)
 
     def _get_script_paths_from_folders_node(self) -> list:
         """Retrieves script paths from the Folders node"""
@@ -191,51 +196,81 @@ class PapyrusProject:
 
         folders_node = self._get_node(self.root_node, 'Folders')
 
-        if folders_node is not None:
-            # defaults to False if the attribute does not exist
-            no_recurse = bool(folders_node.get('NoRecurse'))
+        if folders_node is None:
+            return script_paths
 
-            for folder in self._get_node_children_values(self.root_node, 'Folders'):
-                # fix relative paths
-                if folder == '..' or folder == '.':
-                    folder = os.path.abspath(os.path.join(os.path.dirname(self.input_path), folder))
-                elif not os.path.isabs(folder):
-                    # try to find folder in import paths
-                    for import_path in self._get_node_children_values(self.root_node, 'Imports'):
-                        test_path = os.path.join(import_path, folder)
+        # defaults to False if the attribute does not exist
+        no_recurse = bool(folders_node.get('NoRecurse'))
 
-                        if os.path.exists(test_path):
-                            folder = test_path
-                            break
+        for folder in self._get_node_children_values(self.root_node, 'Folders'):
+            # fix relative paths
+            if folder == '.' or folder == '..':
+                folder = os.path.join(os.path.dirname(self.input_path), folder)
+            elif not os.path.isabs(folder):
+                folder = self._try_find_folder(folder)
 
-                abs_script_paths = glob.glob(os.path.join(folder, '*.psc'), recursive=not no_recurse)
+            absolute_script_paths = glob.glob(os.path.join(os.path.abspath(folder), '*.psc'), recursive=not no_recurse)
 
-                # we need path parts, not absolute paths - we're assuming namespaces though (critical flaw?)
-                for script_path in abs_script_paths:
-                    namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(script_path), script_path])
-                    script_paths.append(os.path.join(namespace, file_name))
+            # we need path parts, not absolute paths - we're assuming namespaces though (critical flaw?)
+            for script_path in absolute_script_paths:
+                namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(script_path), script_path])
+                script_paths.append(os.path.join(namespace, file_name))
 
-        return script_paths
+        return self._unique_list(script_paths)
+
+    def _try_find_folder(self, folder: str) -> str:
+        """Try to find folder in import paths"""
+        for import_path in self._get_node_children_values(self.root_node, 'Imports'):
+            test_path = os.path.join(import_path, folder)
+            if os.path.exists(test_path):
+                return test_path
 
     def _get_script_paths_from_scripts_node(self) -> list:
         """Retrieves script paths from the Scripts node"""
         script_paths = list()
 
         scripts_node = self._get_node(self.root_node, 'Scripts')
-        if scripts_node is not None:
-            # "support" colons by replacing them with path separators so they're proper path parts
-            # but watch out for absolute paths and use the path parts directly instead
-            def fix_path(script_path):
-                if os.path.isabs(script_path):
-                    namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(script_path), script_path])
-                    return os.path.join(namespace, file_name)
-                return script_path.replace(':', os.sep)
 
-            scripts = map(lambda x: fix_path(x), self._get_node_children_values(self.root_node, 'Scripts'))
+        if scripts_node is None:
+            return script_paths
 
-            script_paths.extend(scripts)
+        # "support" colons by replacing them with path separators so they're proper path parts
+        # but watch out for absolute paths and use the path parts directly instead
+        def fix_path(script_path):
+            if os.path.isabs(script_path):
+                namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(script_path), script_path])
+                return os.path.join(namespace, file_name)
+            return script_path.replace(':', os.sep)
 
-        return script_paths
+        scripts = [fix_path(script_path) for script_path in self._get_node_children_values(self.root_node, 'Scripts')]
+
+        script_paths.extend(scripts)
+
+        return self._unique_list(script_paths)
+
+    def _get_include_paths_from_includes_node(self) -> list:
+        include_paths = list()
+
+        includes = self._get_node(self.root_node, 'Includes')
+        if includes is None:
+            return include_paths
+
+        try:
+            includes.get('Root')
+        except AttributeError:
+            return include_paths
+
+        includes_root = includes.get('Root')
+
+        if not os.path.exists(includes_root) or not os.path.isabs(includes_root):
+            return include_paths
+
+        if includes is not None:
+            include_paths = self._get_node_children_values(self.root_node, 'Includes')
+
+        include_paths = [os.path.join(includes_root, include_path) for include_path in include_paths]
+
+        return self._unique_list(include_paths)
 
     def _parallelize(self, commands: list) -> None:
         p = multiprocessing.Pool(processes=os.cpu_count())
@@ -288,6 +323,18 @@ class PapyrusProject:
 
         self._copy_scripts_to_temp_path(script_paths, tmp_scripts_path)
 
+        # copy includes to archive
+        include_paths = self._get_include_paths_from_includes_node()
+
+        if len(include_paths) > 0:
+            root_path = os.path.dirname(self.output_path)
+
+            for include_path in include_paths:
+                relative_include_path = os.path.relpath(include_path, root_path)
+                target_path = os.path.join(tmp_path, relative_include_path)
+                os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                shutil.copy2(include_path, target_path)
+
         archive_path = self.root_node.get('Archive')
 
         if archive_path is None:
@@ -302,27 +349,40 @@ class PapyrusProject:
             shutil.rmtree(tmp_path)
 
     def validate_project(self, index: Index, time_elapsed: TimeElapsed) -> None:
-        script_paths = self.get_script_paths()
-
         output_path = self.output_path
+
         if any(dots in output_path.split(os.sep) for dots in ['.', '..']):
-            output_path = os.path.join(os.path.dirname(self.input_path), output_path)
+            input_folder = os.path.dirname(self.input_path)
+            output_path = os.path.join(input_folder, output_path)
 
-        compiled_script_paths = map(lambda x: os.path.join(output_path, x.replace('.psc', '.pex')), script_paths)
-        if not self.project.is_fallout4:
-            compiled_script_paths = map(lambda x: os.path.join(output_path, os.path.basename(x)), compiled_script_paths)
+        # only fo4 supports namespaced script names
+        psc_paths = [script_path if self.project.is_fallout4 else os.path.basename(script_path)
+                     for script_path in self.get_script_paths()]
 
-        for compiled_script_path in compiled_script_paths:
-            abs_compiled_script_path = os.path.abspath(compiled_script_path)
+        # return paths to compiled scripts
+        pex_paths = [os.path.join(output_path, script_path).replace('.psc', '.pex') for script_path in psc_paths]
 
-            if self.project.validate_script(abs_compiled_script_path, time_elapsed):
-                relpath = os.path.relpath(compiled_script_path.replace('.pex', '.psc'), output_path)
+        if self.project.use_anonymizer:
+            anon = Anonymizer(self.project)
+            for pex_path in pex_paths:
+                if os.path.exists(pex_path):
+                    self.log.anon('INFO: Anonymizing: ' + pex_path)
+                    anon.anonymize_script(pex_path)
 
-                try:
-                    abs_source_script_path = self._get_absolute_script_path(relpath)
-                except FileExistsError:
-                    abs_source_script_path = ''.join([x for x in self.get_script_paths(True) if x.endswith(relpath)])
-                    if abs_source_script_path == '':
-                        raise
+        # return relative paths to indexable scripts
+        validated_paths = [os.path.relpath(script_path, output_path)
+                           for script_path in pex_paths if self.project.validate_script(script_path, time_elapsed)]
 
-                index.write_file(abs_source_script_path)
+        if len(validated_paths) == 0:
+            self.log.warn('No source scripts were indexed. Possible reason: No source scripts were recently modified.')
+            return
+
+        for relative_path in validated_paths:
+            try:
+                source_path = self._get_absolute_script_path(relative_path)
+            except FileExistsError:
+                source_path = ''.join([x for x in self.get_script_paths(True) if x.endswith(relative_path)])
+                if source_path == '' or not os.path.exists(source_path):
+                    raise
+
+            index.write_file(source_path)

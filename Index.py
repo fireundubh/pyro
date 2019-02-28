@@ -1,6 +1,7 @@
 import binascii
 import json
 import os
+from Logger import Logger
 
 
 class Index:
@@ -8,6 +9,7 @@ class Index:
     The index is used to exclude unchanged scripts from compilation. It does this by writing an
     index of CRC32 hashes after verification and comparing those hashes before compilation.
     """
+    log = Logger()
 
     def __init__(self, project_name: str, script_paths: list):
         self.project_name = project_name
@@ -55,17 +57,24 @@ class Index:
         script_path = ''.join([x for x in self.script_paths if x.endswith(target_path)])
 
         if script_path == '':
+            self.log.idxr(f'Found no results for "{target_path}"')
             return False
 
         table_rows = [x['crc32'] for x in self.checksums if x['file_path'].endswith(target_path)]
 
+        if len(table_rows) == 0:
+            self.log.idxr(f'Found no results for "{target_path}"')
+            return False
+
         # if there is more than one result, the problem was created by the user... right?
-        if len(table_rows) != 1:
+        if len(table_rows) > 1:
+            self.log.idxr(f'Found more than one result for "{target_path}"')
             return False
 
         if table_rows[0] == self._get_crc32(script_path):
             return True
 
+        self.log.idxr(f'No conditions met for "{target_path}"')
         return False
 
     def write_file(self, script_path: str) -> None:
