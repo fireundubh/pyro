@@ -36,6 +36,8 @@ class PapyrusProject:
         self.root_node = etree.parse(prj.input_path, etree.XMLParser(remove_blank_text=True)).getroot()
         self.output_path = self.root_node.get('Output')
         self.flags_path = self.root_node.get('Flags')
+        self.use_bsarch = self.root_node.get('CreateArchive')
+        self.use_anonymizer = self.root_node.get('Anonymize')
 
     @staticmethod
     def _get_node(parent_node: etree.Element, tag: str, ns: str = 'PapyrusProject.xsd') -> etree.Element:
@@ -96,8 +98,9 @@ class PapyrusProject:
         arguments = Arguments()
 
         for script_path in script_paths:
-            if index.compare(script_path):
-                continue
+            if not self.project.disable_indexer:
+                if index.compare(script_path):
+                    continue
 
             arguments.clear()
             arguments.append_quoted(self.compiler_path)
@@ -307,6 +310,14 @@ class PapyrusProject:
         return self._unique_list(results)
 
     def pack_archive(self) -> None:
+        if self.project.disable_bsarch:
+            self.log.warn('BSA/BA2 packing disabled by user.')
+            return
+
+        if not self.use_bsarch:
+            self.log.warn('BSA/BA2 packing not enabled in PPJ.')
+            return
+
         # create temporary folder
         tmp_path = os.path.normpath(os.path.join(os.path.dirname(__file__), self.project._ini['Shared']['TempPath']))
         tmp_scripts_path = os.path.join(tmp_path, 'Scripts')
@@ -362,7 +373,11 @@ class PapyrusProject:
         # return paths to compiled scripts
         pex_paths = [os.path.join(output_path, script_path).replace('.psc', '.pex') for script_path in psc_paths]
 
-        if self.project.use_anonymizer:
+        if self.project.disable_anonymizer:
+            self.log.warn('Anonymizer disabled by user.')
+        elif not self.use_anonymizer:
+            self.log.warn('Anonymizer not enabled in PPJ.')
+        else:
             anon = Anonymizer(self.project)
             for pex_path in pex_paths:
                 if os.path.exists(pex_path):
@@ -375,6 +390,10 @@ class PapyrusProject:
 
         if len(validated_paths) == 0:
             self.log.warn('No source scripts were indexed. Possible reason: No source scripts were recently modified.')
+            return
+
+        if self.project.disable_indexer:
+            self.log.warn('No source scripts were indexed. Indexing disabled by user.')
             return
 
         for relative_path in validated_paths:

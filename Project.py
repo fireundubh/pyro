@@ -11,14 +11,16 @@ class Project:
     """Used to pass common data to single-file and project compilation"""
     log = Logger()
 
-    def __init__(self, game_type: GameType, input_path: str, use_anonymizer: bool):
+    def __init__(self, game_type: GameType, input_path: str, disable_anonymizer: bool, disable_bsarch: bool, disable_indexer: bool):
         self._ini = configparser.ConfigParser()
         self._ini.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'pyro.ini'))
 
         self.game_type = game_type
         self.game_path = self.get_game_path()
         self.input_path = input_path
-        self.use_anonymizer = use_anonymizer
+        self.disable_anonymizer = disable_anonymizer
+        self.disable_bsarch = disable_bsarch
+        self.disable_indexer = disable_indexer
 
     @property
     def is_fallout4(self):
@@ -79,7 +81,7 @@ class Project:
             return True
 
         Project.log.pyro('INFO: Failed to write file: {0} (not recently modified)'.format(script_path))
-        return False
+        return True
 
     def get_bsarch_path(self) -> str:
         return Project._handle_relative_local_path(self._ini['Shared']['BSArchPath'], self.game_path)

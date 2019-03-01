@@ -47,8 +47,7 @@ def main():
 
         ppj.validate_project(project_index, time_elapsed)
 
-        if args.use_bsarch:
-            ppj.pack_archive()
+        ppj.pack_archive()
 
         time_elapsed.print()
 
@@ -66,8 +65,9 @@ if __name__ == '__main__':
     _required_arguments.add_argument('-i', action='store', dest='input', help='absolute path to input file or folder')
 
     _optional_arguments = parser.add_argument_group('optional arguments')
-    _optional_arguments.add_argument('-a', action='store_true', dest='use_anonymizer', default=False, help='anonymize metadata in compiled scripts')
-    _optional_arguments.add_argument('-p', action='store_true', dest='use_bsarch', default=False, help='pack scripts into bsa/ba2 (requires bsarch)')
+    _optional_arguments.add_argument('--disable-anonymizer', action='store_true', default=False, help='do not anonymize script metadata')
+    _optional_arguments.add_argument('--disable-bsarch', action='store_true', default=False, help='do not pack scripts (requires bsarch)')
+    _optional_arguments.add_argument('--disable-indexer', action='store_true', default=False, help='do not index scripts')
 
     _program_arguments = parser.add_argument_group('program arguments')
     _program_arguments.add_argument('--help', action='store_true', dest='show_help', default=False, help='show help and exit')
@@ -91,6 +91,6 @@ if __name__ == '__main__':
         log.warn('Relative input path detected. Using current working directory: ' + os.getcwd())
         args.input = os.path.join(os.getcwd(), args.input.replace('file://', ''))
 
-    project = Project(GameType.from_str(args.game), args.input, args.use_anonymizer)
+    project = Project(GameType.from_str(args.game), args.input, args.disable_anonymizer, args.disable_bsarch, args.disable_indexer)
 
     main()
