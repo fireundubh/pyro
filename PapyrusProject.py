@@ -373,20 +373,20 @@ class PapyrusProject:
         # return paths to compiled scripts
         pex_paths = [os.path.join(output_path, script_path).replace('.psc', '.pex') for script_path in psc_paths]
 
+        # return relative paths to indexable scripts
+        validated_paths = [os.path.relpath(script_path, output_path)
+                           for script_path in pex_paths if self.project.validate_script(script_path, time_elapsed)]
+
         if self.project.disable_anonymizer:
             self.log.warn('Anonymizer disabled by user.')
         elif not self.use_anonymizer:
             self.log.warn('Anonymizer not enabled in PPJ.')
         else:
             anon = Anonymizer(self.project)
-            for pex_path in pex_paths:
-                if os.path.exists(pex_path):
-                    self.log.anon('INFO: Anonymizing: ' + pex_path)
-                    anon.anonymize_script(pex_path)
-
-        # return relative paths to indexable scripts
-        validated_paths = [os.path.relpath(script_path, output_path)
-                           for script_path in pex_paths if self.project.validate_script(script_path, time_elapsed)]
+            for relative_path in validated_paths:
+                pex_path = os.path.join(output_path, relative_path)
+                self.log.anon('INFO: Anonymizing: ' + pex_path)
+                anon.anonymize_script(pex_path)
 
         if len(validated_paths) == 0:
             self.log.warn('No source scripts were indexed. Possible reason: No source scripts were recently modified.')
