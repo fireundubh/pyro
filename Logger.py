@@ -22,20 +22,20 @@ class Logger:
 
     @staticmethod
     def bsarch(message: str):
-        print('{}[BSARCH]{} {}'.format(Logger.BOLD, Logger.ENDC, message))
+        print('[BSAR] INFO: {}'.format(message))
 
     @staticmethod
     def compiler(message: str):
-        print('{}[COMPILER]{} {}'.format(Logger.BOLD, Logger.ENDC, message))
+        print('[CMPL] {}'.format(message))
 
     @staticmethod
     def pyro(message: str):
-        print('{}[PYRO]{} {}'.format(Logger.BOLD, Logger.ENDC, message))
+        print('[PYRO] {}'.format(message))
 
     @staticmethod
     def idxr(message: str):
-        print('{}[IDXR]{} {}'.format(Logger.BOLD, Logger.ENDC, message))
+        print('[IDXR] {}'.format(message))
 
     @staticmethod
     def anon(message: str):
-        print('{}[ANON]{} {}'.format(Logger.BOLD, Logger.ENDC, message))
+        print('[ANON] {}'.format(message))
