@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
     _optional_arguments = parser.add_argument_group('optional arguments')
     _optional_arguments.add_argument('-a', action='store_true', dest='use_anonymizer', default=False, help='anonymize metadata in compiled scripts')
-    _optional_arguments.add_argument('-p', action='store_true', dest='use_bsarch', default=True, help='pack scripts into bsa/ba2 (requires bsarch)')
+    _optional_arguments.add_argument('-p', action='store_true', dest='use_bsarch', default=False, help='pack scripts into bsa/ba2 (requires bsarch)')
 
     _program_arguments = parser.add_argument_group('program arguments')
     _program_arguments.add_argument('--help', action='store_true', dest='show_help', default=False, help='show help and exit')
