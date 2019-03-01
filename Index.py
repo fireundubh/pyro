@@ -63,7 +63,7 @@ class Index:
         table_rows = [x['crc32'] for x in self.checksums if x['file_path'].endswith(target_path)]
 
         if len(table_rows) == 0:
-            self.log.idxr(f'Found no results for "{target_path}"')
+            self.log.idxr(f'Found no results in checksums for "{target_path}"')
             return False
 
         # if there is more than one result, the problem was created by the user... right?
@@ -74,7 +74,6 @@ class Index:
         if table_rows[0] == self._get_crc32(script_path):
             return True
 
-        self.log.idxr(f'No conditions met for "{target_path}"')
         return False
 
     def write_file(self, script_path: str) -> None:
