@@ -81,7 +81,7 @@ class Project:
             return True
 
         Project.log.pyro('INFO: Failed to write file: {0} (not recently modified)'.format(script_path))
-        return True
+        return False
 
     def get_bsarch_path(self) -> str:
         return Project._handle_relative_local_path(self._ini['Shared']['BSArchPath'], self.game_path)

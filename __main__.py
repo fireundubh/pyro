@@ -45,9 +45,13 @@ def main():
 
         ppj.compile_custom(project_index, time_elapsed)
 
-        ppj.validate_project(project_index, time_elapsed)
+        validated_paths = ppj.validate_project(project_index, time_elapsed)
 
-        ppj.pack_archive()
+        if len(validated_paths) > 0:
+            ppj.anonymize_scripts(validated_paths, ppj.output_path)
+
+        if len(validated_paths) > 0:
+            ppj.pack_archive()
 
         time_elapsed.print()
 

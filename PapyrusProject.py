@@ -1,6 +1,7 @@
 import glob
 import multiprocessing
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -68,12 +69,17 @@ class PapyrusProject:
 
         exclusions = ('Starting', 'Assembly', 'Compilation', 'Batch', 'Copyright', 'Papyrus', 'Failed', 'No output')
 
+        line_error = re.compile('\(\d+,\d+\)')
+
         try:
             while process.poll() is None:
                 line = process.stdout.readline().strip()
                 if not use_bsarch:
                     exclude_lines = not line.startswith(exclusions)
                     PapyrusProject.log.compiler(line) if line != '' and exclude_lines and 'error(s)' not in line else None
+                    if line_error.match(line) is not None:
+                        process.terminate()
+                        return -1
                 else:
                     PapyrusProject.log.bsarch(line) if line != '' else None
             return 0
@@ -83,7 +89,7 @@ class PapyrusProject:
                 process.terminate()
             except OSError:
                 pass
-            return 0
+            return -1
 
     @staticmethod
     def _unique_list(items: list) -> list:
@@ -276,10 +282,23 @@ class PapyrusProject:
         return self._unique_list(include_paths)
 
     def _parallelize(self, commands: list) -> None:
+        multiprocessing.freeze_support()
         p = multiprocessing.Pool(processes=os.cpu_count())
-        p.map(self._open_process, commands)
+        p.imap(self._open_process, commands)
         p.close()
         p.join()
+
+    def anonymize_scripts(self, script_paths: list, output_path: str) -> None:
+        if self.project.disable_anonymizer:
+            self.log.warn('Anonymizer disabled by user.')
+        elif not self.use_anonymizer:
+            self.log.warn('Anonymizer not enabled in PPJ.')
+        else:
+            anon = Anonymizer(self.project)
+            for relative_path in script_paths:
+                pex_path = os.path.join(output_path, relative_path)
+                self.log.anon('INFO: Anonymizing: ' + pex_path)
+                anon.anonymize_script(pex_path)
 
     def compile_custom(self, index: Index, time_elapsed: TimeElapsed) -> None:
         commands = self._build_commands(index)
@@ -308,6 +327,17 @@ class PapyrusProject:
             results = [absolute_script_path for absolute_script_path in results if os.path.exists(absolute_script_path)]
 
         return self._unique_list(results)
+
+    def index_scripts(self, script_paths: list, index: Index) -> None:
+        for relative_path in script_paths:
+            try:
+                source_path = self._get_absolute_script_path(relative_path)
+            except FileExistsError:
+                source_path = ''.join([x for x in self.get_script_paths(True) if x.endswith(relative_path)])
+                if source_path == '' or not os.path.exists(source_path):
+                    raise
+
+            index.write_file(source_path)
 
     def pack_archive(self) -> None:
         if self.project.disable_bsarch:
@@ -359,7 +389,7 @@ class PapyrusProject:
         if os.path.exists(tmp_path):
             shutil.rmtree(tmp_path)
 
-    def validate_project(self, index: Index, time_elapsed: TimeElapsed) -> None:
+    def validate_project(self, index: Index, time_elapsed: TimeElapsed) -> list:
         output_path = self.output_path
 
         if any(dots in output_path.split(os.sep) for dots in ['.', '..']):
@@ -377,31 +407,14 @@ class PapyrusProject:
         validated_paths = [os.path.relpath(script_path, output_path)
                            for script_path in pex_paths if self.project.validate_script(script_path, time_elapsed)]
 
-        if self.project.disable_anonymizer:
-            self.log.warn('Anonymizer disabled by user.')
-        elif not self.use_anonymizer:
-            self.log.warn('Anonymizer not enabled in PPJ.')
-        else:
-            anon = Anonymizer(self.project)
-            for relative_path in validated_paths:
-                pex_path = os.path.join(output_path, relative_path)
-                self.log.anon('INFO: Anonymizing: ' + pex_path)
-                anon.anonymize_script(pex_path)
-
         if len(validated_paths) == 0:
             self.log.warn('No source scripts were indexed. Possible reason: No source scripts were recently modified.')
-            return
+            return list()
 
         if self.project.disable_indexer:
             self.log.warn('No source scripts were indexed. Indexing disabled by user.')
-            return
+            return list()
 
-        for relative_path in validated_paths:
-            try:
-                source_path = self._get_absolute_script_path(relative_path)
-            except FileExistsError:
-                source_path = ''.join([x for x in self.get_script_paths(True) if x.endswith(relative_path)])
-                if source_path == '' or not os.path.exists(source_path):
-                    raise
+        self.index_scripts(validated_paths, index)
 
-            index.write_file(source_path)
+        return validated_paths
