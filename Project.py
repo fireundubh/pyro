@@ -1,6 +1,7 @@
 import configparser
 import os
 import sys
+from collections import namedtuple
 
 from GameType import GameType
 from Logger import Logger
@@ -12,34 +13,31 @@ class Project:
     """Used to pass common data to single-file and project compilation"""
     log = Logger()
 
-    def __init__(self, game_type: GameType, input_path: str, disable_anonymizer: bool, disable_bsarch: bool, disable_indexer: bool):
+    def __init__(self, options: namedtuple):
         self._ini = configparser.ConfigParser()
         self._ini.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'pyro.ini'))
 
-        self.game_type = game_type
+        self.options = options
         self.game_path = self.get_game_path()
-        self.input_path = input_path
-        self.disable_anonymizer = disable_anonymizer
-        self.disable_bsarch = disable_bsarch
-        self.disable_indexer = disable_indexer
 
     @property
     def is_fallout4(self):
-        return self.game_type == GameType.Fallout4
+        return self.options.game_type == GameType.Fallout4
 
     @property
     def is_skyrim_special_edition(self):
-        return self.game_type == GameType.SkyrimSpecialEdition
+        return self.options.game_type == GameType.SkyrimSpecialEdition
 
     @property
     def is_skyrim_classic(self):
-        return self.game_type == GameType.SkyrimClassic
+        return self.options.game_type == GameType.SkyrimClassic
 
     def _winreg_get_game_path(self) -> str:
         """Retrieve installed path of game using Windows Registry"""
         import winreg
 
-        key_path, key_value = os.path.split(self._ini[self.game_type.name]['Registry'])
+        game_type = self.options.game_type
+        key_path, key_value = os.path.split(self._ini[game_type.name]['Registry'])
 
         try:
             registry_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path, 0, winreg.KEY_READ)
@@ -93,7 +91,7 @@ class Project:
 
     def get_flags_path(self):
         """Retrieve flags path from pyro.ini"""
-        return Project._handle_relative_local_path(self._ini[self.game_type.name]['Flags'], self.game_path)
+        return Project._handle_relative_local_path(self._ini[self.options.game_type.name]['Flags'], self.game_path)
 
     def get_game_path(self) -> str:
         """Retrieve game path from either pyro.ini or Windows Registry"""

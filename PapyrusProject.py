@@ -22,7 +22,6 @@ from Index import Index
 from Logger import Logger
 from Project import Project
 from TimeElapsed import TimeElapsed
-from ValidationState import ValidationState
 
 
 class PapyrusProject:
@@ -32,10 +31,10 @@ class PapyrusProject:
         self.project = prj
         self.compiler_path = prj.get_compiler_path()
         self.game_path = prj.get_game_path()
-        self.game_type = prj.game_type
-        self.input_path = prj.input_path
+        self.game_type = prj.options.game_type
+        self.input_path = prj.options.input_path
 
-        self.root_node = etree.parse(prj.input_path, etree.XMLParser(remove_blank_text=True)).getroot()
+        self.root_node = etree.parse(prj.options.input_path, etree.XMLParser(remove_blank_text=True)).getroot()
         self.output_path = self.root_node.get('Output')
         self.flags_path = self.root_node.get('Flags')
         self.use_bsarch = self.root_node.get('CreateArchive')
@@ -105,7 +104,7 @@ class PapyrusProject:
         arguments = Arguments()
 
         for script_path in script_paths:
-            if not self.project.disable_indexer:
+            if not self.project.options.disable_indexer:
                 if index.compare(script_path):
                     continue
 
@@ -259,6 +258,8 @@ class PapyrusProject:
         return self._unique_list(script_paths)
 
     def _get_include_paths_from_includes_node(self) -> list:
+        # TODO: support includes for multiple archives
+
         include_paths = list()
 
         includes = self._get_node(self.root_node, 'Includes')
@@ -290,7 +291,7 @@ class PapyrusProject:
         p.join()
 
     def anonymize_scripts(self, script_paths: list, output_path: str) -> None:
-        if self.project.disable_anonymizer:
+        if self.project.options.disable_anonymizer:
             self.log.warn('Anonymizer disabled by user.')
         elif not self.use_anonymizer:
             self.log.warn('Anonymizer not enabled in PPJ.')
@@ -341,7 +342,7 @@ class PapyrusProject:
             index.write_file(source_path)
 
     def pack_archive(self) -> None:
-        if self.project.disable_bsarch:
+        if self.project.options.disable_bsarch:
             self.log.warn('BSA/BA2 packing disabled by user.')
             return
 
@@ -420,7 +421,7 @@ class PapyrusProject:
             self.log.warn('No source scripts were indexed. Possible reason: No source scripts were recently modified.')
             return tuple()
 
-        if self.project.disable_indexer:
+        if self.project.options.disable_indexer:
             self.log.warn('No source scripts were indexed. Indexing disabled by user.')
             return tuple()
 
