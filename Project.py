@@ -5,6 +5,7 @@ import sys
 from GameType import GameType
 from Logger import Logger
 from TimeElapsed import TimeElapsed
+from ValidationState import ValidationState
 
 
 class Project:
@@ -69,19 +70,19 @@ class Project:
         return os.path.normpath(path)
 
     @staticmethod
-    def validate_script(script_path: str, time_elapsed: TimeElapsed) -> bool:
+    def validate_script(script_path: str, time_elapsed: TimeElapsed) -> ValidationState:
         script_path = os.path.abspath(script_path)
 
         if not os.path.exists(script_path):
             Project.log.pyro('ERROR: Failed to write file: {0} (file does not exist)'.format(script_path))
-            return False
+            return ValidationState.FILE_NOT_EXIST
 
         if time_elapsed.start_time < os.stat(script_path).st_mtime < time_elapsed.end_time:
             Project.log.pyro('INFO: Wrote file: {0}'.format(script_path))
-            return True
+            return ValidationState.FILE_MODIFIED
 
-        Project.log.pyro('INFO: Failed to write file: {0} (not recently modified)'.format(script_path))
-        return False
+        Project.log.pyro('INFO: Skipped writing file: {0} (not recently modified)'.format(script_path))
+        return ValidationState.FILE_NOT_MODIFIED
 
     def get_bsarch_path(self) -> str:
         return Project._handle_relative_local_path(self._ini['Shared']['BSArchPath'], self.game_path)

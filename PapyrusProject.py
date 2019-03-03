@@ -22,6 +22,7 @@ from Index import Index
 from Logger import Logger
 from Project import Project
 from TimeElapsed import TimeElapsed
+from ValidationState import ValidationState
 
 
 class PapyrusProject:
@@ -389,7 +390,7 @@ class PapyrusProject:
         if os.path.exists(tmp_path):
             shutil.rmtree(tmp_path)
 
-    def validate_project(self, index: Index, time_elapsed: TimeElapsed) -> list:
+    def validate_project(self, index: Index, time_elapsed: TimeElapsed) -> tuple:
         output_path = self.output_path
 
         if any(dots in output_path.split(os.sep) for dots in ['.', '..']):
@@ -404,17 +405,25 @@ class PapyrusProject:
         pex_paths = [os.path.join(output_path, script_path).replace('.psc', '.pex') for script_path in psc_paths]
 
         # return relative paths to indexable scripts
-        validated_paths = [os.path.relpath(script_path, output_path)
-                           for script_path in pex_paths if self.project.validate_script(script_path, time_elapsed)]
+        validated_paths = list()
+        validation_states = set()
+
+        for script_path in pex_paths:
+            validation_state = self.project.validate_script(script_path, time_elapsed)
+            validation_states.add(validation_state)
+
+            if validation_state.FILE_MODIFIED:
+                relative_script_path = os.path.relpath(script_path, output_path)
+                validated_paths.append(relative_script_path)
 
         if len(validated_paths) == 0:
             self.log.warn('No source scripts were indexed. Possible reason: No source scripts were recently modified.')
-            return list()
+            return tuple()
 
         if self.project.disable_indexer:
             self.log.warn('No source scripts were indexed. Indexing disabled by user.')
-            return list()
+            return tuple()
 
         self.index_scripts(validated_paths, index)
 
-        return validated_paths
+        return validated_paths, validation_states

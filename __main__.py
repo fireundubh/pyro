@@ -19,6 +19,7 @@ from Logger import Logger
 from PapyrusProject import PapyrusProject
 from Project import Project
 from TimeElapsed import TimeElapsed
+from ValidationState import ValidationState
 
 __version__ = 'pyro-1.3 by fireundubh <github.com/fireundubh>'
 
@@ -45,12 +46,23 @@ def main():
 
         ppj.compile_custom(project_index, time_elapsed)
 
-        validated_paths = ppj.validate_project(project_index, time_elapsed)
+        validated_paths, validation_states = ppj.validate_project(project_index, time_elapsed)
+        no_changed_files = len(validation_states) == 1 and ValidationState.FILE_NOT_MODIFIED in validation_states
 
-        if len(validated_paths) > 0:
+        if no_changed_files:
+            log.error('Cannot anonymize compiled scripts because no source scripts were modified')
+        elif len(validated_paths) > 0:
             ppj.anonymize_scripts(validated_paths, ppj.output_path)
 
-        if len(validated_paths) > 0:
+        archive_path = ppj.root_node.get('Archive')
+
+        if len(validated_paths) == 0:
+            log.error('Cannot pack archive because no scripts were found')
+        elif ValidationState.FILE_NOT_EXIST in validation_states:
+            log.error('Cannot pack archive because there are missing scripts')
+        elif os.path.exists(archive_path) and no_changed_files:
+            log.error('Cannot pack archive because archive exists and no source scripts were modified')
+        else:
             ppj.pack_archive()
 
         time_elapsed.print()
