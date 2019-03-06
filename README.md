@@ -99,7 +99,10 @@ Includes | Root | String | absolute path to folder
 
 #### Incremental Build with Parallelized Compilation
 
-What is incremental build? Basically, incremental build means that only the files that need to be compiled will be compiled. Incremental build vastly accelerates the build process by eliminating redundant work.
+What is incremental build? Basically:
+ 
+* Incremental build means that only the scripts that need to be compiled will be compiled.
+* Incremental build _vastly_ accelerates the build process by eliminating redundant work.
 
 Here's how the incremental build system works:
 
