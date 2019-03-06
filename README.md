@@ -71,6 +71,8 @@ You can also set a path explicitly in `pyro.ini` if you are on a non-Windows pla
 
 The PPJ format was introduced with the FO4 version of the Papyrus Compiler, which was not backported to TESV and SSE. Pyro can parse all standard PPJ elements and attributes, in addition to several of its own, for TESV, SSE, and FO4 projects.
 
+##### Elements
+
 Element | Support
 :--- | :---
 `<PapyrusProject>` | This element and its `Flags`, `Output`, `Optimize`, `Release` (FO4 only), and `Final` (FO4 only) attributes are supported. The new `Archive`, `CreateArchive`, and `Anonymize` attributes are also required.
