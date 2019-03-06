@@ -79,12 +79,12 @@ if __name__ == '__main__':
     _parser = argparse.ArgumentParser(add_help=False)
 
     _required_arguments = _parser.add_argument_group('required arguments')
-    _required_arguments.add_argument('-g', action='store', dest='game', choices={'fo4', 'sse', 'tesv'}, help='set compiler version')
+    _required_arguments.add_argument('-g', action='store', dest='game', choices={'fo4', 'tesv', 'sse'}, help='set compiler version')
     _required_arguments.add_argument('-i', action='store', dest='input', help='absolute path to input file or folder')
 
     _optional_arguments = _parser.add_argument_group('optional arguments')
     _optional_arguments.add_argument('--disable-anonymizer', action='store_true', default=False, help='do not anonymize script metadata')
-    _optional_arguments.add_argument('--disable-bsarch', action='store_true', default=False, help='do not pack scripts (requires bsarch)')
+    _optional_arguments.add_argument('--disable-bsarch', action='store_true', default=False, help='do not pack scripts with BSArch')
     _optional_arguments.add_argument('--disable-indexer', action='store_true', default=False, help='do not index scripts')
 
     _program_arguments = _parser.add_argument_group('program arguments')
