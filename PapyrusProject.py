@@ -279,6 +279,12 @@ class PapyrusProject:
         if includes is not None:
             include_paths = self._get_node_children_values(self.root_node, 'Includes')
 
+        # ensure all include paths are relative
+        # TODO: support absolute include paths, requires new XML attribute to specify destination path in archive
+        relative_include_paths = [include_path for include_path in include_paths if not os.path.isabs(include_path)]
+        if len(include_paths) != len(relative_include_paths):
+            self.log.warn('Some include paths were removed. Reason: Only relative paths are supported.')
+
         include_paths = [os.path.join(includes_root, include_path) for include_path in include_paths]
 
         return self._unique_list(include_paths)

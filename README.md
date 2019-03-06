@@ -79,7 +79,7 @@ Element | Support
 `<Imports>` | This element and its children `<Import>` contain absolute paths to a game's base scripts, a mod's user scripts, and third-party SDK scripts.
 `<Scripts>` | This element and its children `<Script>` contain absolute or relative paths to a mod's user scripts.
 `<Folders>` | This element and its children `<Folder>` contain absolute or relative paths to folders containing a mod's user scripts. The parent element's `NoRecurse` attribute is also supported.
-`<Includes>` | This new element and its children `<Include>` contain absolute or relative paths to arbitrary files to be packaged in the mod's BSA or BA2 archive. The parent element has a `Root` attribute that contains the absolute path to the root of the relative Include paths, assuming relative paths are used.
+`<Includes>` | This new element and its children `<Include>` contain relative paths to arbitrary files to be packaged in the mod's BSA or BA2 archive. The parent element has a `Root` attribute that contains the absolute path to the root of the relative Include paths.
 
 ##### Attributes
 
