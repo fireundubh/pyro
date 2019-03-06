@@ -22,7 +22,7 @@ usage: pyro [-g {fo4,tesv,sse}] [-i INPUT] [--disable-anonymizer]
             [--disable-bsarch] [--disable-indexer] [--help] [--version]
 
 required arguments:
-  -g {sse,fo4,tesv}  set compiler version
+  -g {fo4,tesv,sse}  set compiler version
   -i INPUT           absolute path to input file or folder
 
 optional arguments:
