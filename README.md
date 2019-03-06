@@ -1,12 +1,18 @@
 # Pyro
 
-A Python CLI for the Papyrus Compiler with PPJ Support for TESV, SSE, and FO4
+Pyro is a semi-automated incremental build system for _Skyrim Classic_ (TESV), _Skyrim Special Edition_ (SSE), and _Fallout 4_ (FO4) projects. Pyro makes quick work of the process for creating new builds of mods for those games.
+
+Fundamentally, Pyro is a command-line interface (CLI) that parses customized Papyrus Project (PPJ) files into actionable data and passes that data to Bethesda Softworks' Papyrus Compiler and zilav's BSArch.
+
+Pyro automates most build tasks and can play a key role in an automated build and release pipeline. Pyro can also be integrated as an external tool within virtually any IDE, allowing modders to build their projects with a single hotkey.
 
 
 ## Requirements
 
-* Python 3.4+ (Tested with Python 3.7.2)
-* [lxml](http://lxml.de/) module (`python -m pip install lxml`)
+* Python 3.4+ (Tested with Python 3.7.2) - [Download (python.org)](https://www.python.org/downloads/)
+* lxml module (`python3 -m pip install lxml`) - [Documentation (lxml.de)](http://lxml.de/)
+* BSArch (only for automatic BSA/BA2 packaging) - [Download (nexusmods.com)](https://www.nexusmods.com/newvegas/mods/64745)
+* an Extended PPJ XML document for your project - [Examples](https://github.com/fireundubh/pyro#examples)
 
 
 ## Usage
@@ -31,26 +37,54 @@ program arguments:
 
 ## Features
 
+### Overview
 
-### Supports multiple games
+**Current Features**
+
+- Supports multiple games (TESV, SSE, FO4)
+- Supports Extended Papyrus Project XML (PPJ) documents
+- Incremental, parallelized PPJ builds
+- Automatically packages scripts and non-script assets with BSArch
+- Anonymizes compiled scripts
+
+**Future Features**
+
+- Automatic generation of Extended PPJ files
+- Automatic generation of ZIP archives for distribution
+- Automatic, parallelized generation of multiple BSA/BA2 archives
+- Support folder includes for automatically packaging non-script assets
+- XML validation, or move to YAML (undecided)
+
+
+### Feature Details
+
+#### Multiple Game Support
+
+Pyro supports the TESV, SSE, and FO4 compilers.
 
 When the game is switched, all paths are generated using the `Installed Path` key in the Windows Registry for the respective games.
 
 You can also set a path explicitly in `pyro.ini` if you are on a non-Windows platform.
 
 
-### Supports Papyrus Project XML (PPJ) files
+#### Extended Papyrus Project XML (PPJ)
 
-* Scripts are compiled individually in parallel.
-* Imports are generated from the input path and each script.
-* No changes to script names either in scripts or plugins are needed.
-* Absolute and relative paths are supported.
-* The `<Scripts>` tag and child elements are required.
-* The `<Folders>` tag and `NoRecurse` attribute are supported.
-* The `<Imports>` tag and child elements are required for third-party libraries.
+The PPJ format was introduced with the FO4 version of the Papyrus Compiler, which was not backported to TESV and SSE. Pyro can parse all standard PPJ elements and attributes, in addition to several of its own, for TESV, SSE, and FO4 projects.
+
+Element | Support
+:--- | :---
+`<PapyrusProject>` | This element and its Flags, Output, Optimize, Release, and Final attributes are supported. Pyro also supports, if not requires, the new Archive, CreateArchive, and Anonymize attributes.
+`<Imports>` | This element and its children `<Import>` contain absolute paths to a game's base scripts, a mod's user scripts, and third-party SDK scripts.
+`<Scripts>` | This element and its children `<Script>` contain absolute or relative paths to a mod's user scripts.
+`<Folders>` | This element and its children `<Folder>` contain absolute or relative paths to folders containing a mod's user scripts. The parent element's `NoRecurse` attribute is also supported.
+`<Includes>` | This new element and its children `<Include>` contain absolute or relative paths to arbitrary files to be packaged in the mod's BSA or BA2 archive. The parent element has a `Root` attribute that contains the absolute path to the root of the relative Include paths, assuming relative paths are used.
 
 
-### Supports incremental PPJ builds
+#### Incremental Build with Parallelized Compilation
+
+What is incremental build? Basically, incremental build means that only the files that need to be compiled will be compiled. Incremental build vastly accelerates the build process by eliminating redundant work.
+
+Here's how the incremental build system works:
 
 * After the first run, Pyro builds an index for that project containing the file paths and CRC32 hashes of those files.
 * When generating commands for the next run, the CRC32 hashes of those files are compared with the indexed file records.
@@ -58,8 +92,10 @@ You can also set a path explicitly in `pyro.ini` if you are on a non-Windows pla
 * Records are updated for previously indexed scripts that have been modified and successfully compiled.
 * New records are created for new scripts that have been successfully compiled.
 
+In addition, Pyro will spawn multiple instances of the Papyrus Compiler in parallel to further reduce build times.
 
-### Supports automatic packaging with BSArch
+
+#### Automatic BSA/BA2 Packaging 
 
 You can package scripts into BSA and BA2 archives with [BSArch](https://www.nexusmods.com/newvegas/mods/64745).
 
@@ -68,10 +104,7 @@ You can package scripts into BSA and BA2 archives with [BSArch](https://www.nexu
 3. Add the `CreateArchive` attribute to the `PapyrusProject` root element. Set the value to `True`.
 4. Compile as normal and the compiled scripts will be automatically packaged.
 
-
-#### Supports packaging arbitrary files
-
-Add the following block before the `</PapyrusProject>` end tag:
+To package arbitrary files, add the following block before the `</PapyrusProject>` end tag:
 
 ```xml
 <Includes Root="{absolute path to project root}">
@@ -80,10 +113,16 @@ Add the following block before the `</PapyrusProject>` end tag:
 </Includes>
 ```
 
-Currently, directory includes are not supported.
+Currently, folder includes are not supported.
+
+##### Notes
+
+* A temporary folder will be created and deleted at the `TempPath` specified in `pyro.ini`.
+* The compiled scripts and any arbitrary includes to be packaged will be copied there.
+* The folder will be removed if the procedure is successful.
 
 
-### Supports anonymizing compiled scripts
+### Script Anonymization
 
 When a script is compiled, your system username and computer name are embedded in the binary header. This information can be revealed with a hex editor or decompiler. If your username is your real name, or you are concerned about targeted attacks using your system login, leaving this information intact can present security and/or privacy risks.
 
@@ -92,25 +131,9 @@ Pyro replaces those strings in compiled scripts with random letters, effectively
 Simply add the `Anonymize` attribute to the `PapyrusProject` root element. Set the value to `True`.
 
 
-#### Notes
+### Benchmarks 
 
-* A temporary folder will be created and deleted at the `TempPath` specified in `pyro.ini`.
-* The compiled scripts to be packaged will be copied there.
-* The folder will be removed if the procedure is successful.
- 
- 
-### Supports the Release/Final/Optimize attributes
-
-* The `Release` and `Final` attributes are supported by only the FO4 compiler.
-* The `Optimize` attribute is supported for all games.
-* The PPJ parser will ignore unsupported attributes.
-
-
-### Performance 
-
-The native PPJ compiler for FO4 is on average 70 milliseconds faster per script.
-
-Tested with i5-3570k @ 3.4 GHz and six scripts.
+* The native PPJ compiler for FO4 is on average 70 milliseconds faster per script. Tested with i5-3570k @ 3.4 GHz and 6 scripts.
 
 
 ## Examples
