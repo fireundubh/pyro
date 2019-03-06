@@ -73,11 +73,26 @@ The PPJ format was introduced with the FO4 version of the Papyrus Compiler, whic
 
 Element | Support
 :--- | :---
-`<PapyrusProject>` | This element and its Flags, Output, Optimize, Release, and Final attributes are supported. Pyro also supports, if not requires, the new Archive, CreateArchive, and Anonymize attributes.
+`<PapyrusProject>` | This element and its `Flags`, `Output`, `Optimize`, `Release` (FO4 only), and `Final` (FO4 only) attributes are supported. The new `Archive`, `CreateArchive`, and `Anonymize` attributes are also required.
 `<Imports>` | This element and its children `<Import>` contain absolute paths to a game's base scripts, a mod's user scripts, and third-party SDK scripts.
 `<Scripts>` | This element and its children `<Script>` contain absolute or relative paths to a mod's user scripts.
 `<Folders>` | This element and its children `<Folder>` contain absolute or relative paths to folders containing a mod's user scripts. The parent element's `NoRecurse` attribute is also supported.
 `<Includes>` | This new element and its children `<Include>` contain absolute or relative paths to arbitrary files to be packaged in the mod's BSA or BA2 archive. The parent element has a `Root` attribute that contains the absolute path to the root of the relative Include paths, assuming relative paths are used.
+
+##### Attributes
+
+Element | Attribute | Data Type | Value
+:--- | :--- | :--- | :---
+PapyrusProject | Flags | String | file name with extension
+PapyrusProject | Output | String | absolute path to folder
+PapyrusProject | Optimize | Boolean | true or false
+PapyrusProject | Release | Boolean | true or false
+PapyrusProject | Final | Boolean | true or false
+PapyrusProject | Archive | String | absolute path to file name with extension
+PapyrusProject | CreateArchive | Boolean | true or false
+PapyrusProject | Anonymize | Boolean | true or false
+Folders | NoRecurse | Boolean | true or false
+Includes | Root | String | absolute path to folder
 
 
 #### Incremental Build with Parallelized Compilation
