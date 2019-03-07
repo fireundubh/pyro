@@ -48,22 +48,25 @@ def main():
 
     ppj.compile_custom(project_index, time_elapsed)
 
-    validated_paths, validation_states = ppj.validate_project(project_index, time_elapsed)
-    no_changed_files = len(validation_states) == 1 and ValidationState.FILE_NOT_MODIFIED in validation_states
+    no_scripts_modified = False
+    missing_scripts_found = False
 
-    if no_changed_files:
+    if _options.disable_indexer:
+        pex_paths = ppj.get_script_paths_compiled()
+    else:
+        pex_paths, validation_states = ppj.validate_project(project_index, time_elapsed)
+        no_scripts_modified = len(validation_states) == 1 and ValidationState.FILE_NOT_MODIFIED in validation_states
+        missing_scripts_found = ValidationState.FILE_NOT_EXIST in validation_states
+
+    if _options.disable_anonymizer:
+        log.warn('Anonymization disabled by user.')
+    elif no_scripts_modified:
         log.error('Cannot anonymize compiled scripts because no source scripts were modified')
-    elif len(validated_paths) > 0:
-        ppj.anonymize_scripts(validated_paths, ppj.output_path)
+    else:
+        ppj.anonymize_scripts(pex_paths, ppj.output_path)
 
-    archive_path = ppj.root_node.get('Archive')
-
-    if len(validated_paths) == 0:
-        log.error('Cannot pack archive because no scripts were found')
-    elif ValidationState.FILE_NOT_EXIST in validation_states:
+    if missing_scripts_found:
         log.error('Cannot pack archive because there are missing scripts')
-    elif os.path.exists(archive_path) and no_changed_files:
-        log.error('Cannot pack archive because archive exists and no source scripts were modified')
     else:
         ppj.pack_archive()
 

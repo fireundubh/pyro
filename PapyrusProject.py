@@ -314,6 +314,15 @@ class PapyrusProject:
         self._parallelize(commands)
         time_elapsed.end_time = time.time()
 
+    def get_output_path(self) -> str:
+        output_path = self.output_path
+
+        if any(dots in output_path.split(os.sep) for dots in ['.', '..']):
+            input_folder = os.path.dirname(self.input_path)
+            output_path = os.path.join(input_folder, output_path)
+
+        return output_path
+
     def get_script_paths(self, absolute_paths: bool = False) -> list:
         """Retrieves script paths both Folders and Scripts nodes"""
         paths = list()
@@ -335,6 +344,18 @@ class PapyrusProject:
             results = [absolute_script_path for absolute_script_path in results if os.path.exists(absolute_script_path)]
 
         return self._unique_list(results)
+
+    def get_script_paths_compiled(self) -> list:
+        output_path = self.get_output_path()
+
+        # only fo4 supports namespaced script names
+        psc_paths = [script_path if self.project.is_fallout4 else os.path.basename(script_path)
+                     for script_path in self.get_script_paths()]
+
+        # return paths to compiled scripts
+        pex_paths = [os.path.join(output_path, script_path).replace('.psc', '.pex') for script_path in psc_paths]
+
+        return [os.path.normpath(pex_path) for pex_path in pex_paths if os.path.exists(pex_path)]
 
     def index_scripts(self, script_paths: list, index: Index) -> None:
         for relative_path in script_paths:
@@ -398,18 +419,9 @@ class PapyrusProject:
             shutil.rmtree(tmp_path)
 
     def validate_project(self, index: Index, time_elapsed: TimeElapsed) -> tuple:
-        output_path = self.output_path
+        output_path = self.get_output_path()
 
-        if any(dots in output_path.split(os.sep) for dots in ['.', '..']):
-            input_folder = os.path.dirname(self.input_path)
-            output_path = os.path.join(input_folder, output_path)
-
-        # only fo4 supports namespaced script names
-        psc_paths = [script_path if self.project.is_fallout4 else os.path.basename(script_path)
-                     for script_path in self.get_script_paths()]
-
-        # return paths to compiled scripts
-        pex_paths = [os.path.join(output_path, script_path).replace('.psc', '.pex') for script_path in psc_paths]
+        pex_paths = self.get_script_paths_compiled()
 
         # return relative paths to indexable scripts
         validated_paths = list()
