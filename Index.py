@@ -57,13 +57,13 @@ class Index:
         script_path = ''.join([x for x in self.script_paths if x.endswith(target_path)])
 
         if script_path == '':
-            self.log.idxr(f'Found no results for "{target_path}"')
+            # self.log.idxr(f'Found no results for "{target_path}"')
             return False
 
         table_rows = [x['crc32'] for x in self.checksums if x['file_path'].endswith(target_path)]
 
         if len(table_rows) == 0:
-            self.log.idxr(f'Found no results in checksums for "{target_path}"')
+            # self.log.idxr(f'Found no results in checksums for "{target_path}"')
             return False
 
         # if there is more than one result, the problem was created by the user... right?
