@@ -1,10 +1,10 @@
 import configparser
 import os
 import sys
-from collections import namedtuple
 
 from GameType import GameType
 from Logger import Logger
+from ProjectOptions import ProjectOptions
 from TimeElapsed import TimeElapsed
 from ValidationState import ValidationState
 
@@ -13,23 +13,23 @@ class Project:
     """Used to pass common data to single-file and project compilation"""
     log = Logger()
 
-    def __init__(self, options: namedtuple):
-        self._ini = configparser.ConfigParser()
+    def __init__(self, options: ProjectOptions):
+        self._ini: configparser.ConfigParser = configparser.ConfigParser()
         self._ini.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'pyro.ini'))
 
-        self.options = options
-        self.game_path = self.get_game_path()
+        self.options: ProjectOptions = options
+        self.game_path: str = self.get_game_path()
 
     @property
-    def is_fallout4(self):
+    def is_fallout4(self) -> bool:
         return self.options.game_type == GameType.Fallout4
 
     @property
-    def is_skyrim_special_edition(self):
+    def is_skyrim_special_edition(self) -> bool:
         return self.options.game_type == GameType.SkyrimSpecialEdition
 
     @property
-    def is_skyrim_classic(self):
+    def is_skyrim_classic(self) -> bool:
         return self.options.game_type == GameType.SkyrimClassic
 
     def _winreg_get_game_path(self) -> str:
@@ -52,7 +52,7 @@ class Project:
         return reg_value
 
     @staticmethod
-    def _handle_relative_local_path(ini_path: str, default_path: str = ''):
+    def _handle_relative_local_path(ini_path: str, default_path: str = '') -> str:
         """Support absolute INI paths, relative local paths, and other paths"""
         if os.path.isabs(ini_path):
             return os.path.normpath(ini_path)
@@ -89,7 +89,7 @@ class Project:
         """Retrieve compiler path from pyro.ini"""
         return Project._handle_relative_local_path(self._ini['Compiler']['Path'], self.game_path)
 
-    def get_flags_path(self):
+    def get_flags_path(self) -> str:
         """Retrieve flags path from pyro.ini"""
         return Project._handle_relative_local_path(self._ini[self.options.game_type.name]['Flags'], self.game_path)
 

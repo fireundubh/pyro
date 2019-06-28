@@ -45,7 +45,7 @@ class Anonymizer:
         if not (len(file_name) > 0 and file_name.endswith('.psc') and len(user_name) > 0 and len(sys_name) > 0):
             return
 
-        def write_random_name(data: BinaryIO, name: str, uppercase: bool = False):
+        def write_random_name(data: BinaryIO, name: str, uppercase: bool = False) -> None:
             result = Anonymizer._randomize_str(len(name), uppercase)
             data.write(bytes(result, encoding='ascii'))
 

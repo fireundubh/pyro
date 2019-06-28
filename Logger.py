@@ -8,34 +8,34 @@ class Logger:
     BOLD = '\033[1m'
     UNDR = '\033[4m'
 
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     @staticmethod
-    def error(message: str):
+    def error(message: str) -> int:
         print('{}[ERRO] {}{}'.format(Logger.FAIL, message, Logger.ENDC))
         return 1
 
     @staticmethod
-    def warn(message: str):
+    def warn(message: str) -> None:
         print('{}[WARN] {}{}'.format(Logger.WARN, message, Logger.ENDC))
 
     @staticmethod
-    def bsarch(message: str):
+    def bsarch(message: str) -> None:
         print('[BSAR] INFO: {}'.format(message))
 
     @staticmethod
-    def compiler(message: str):
+    def compiler(message: str) -> None:
         print('[CMPL] {}'.format(message))
 
     @staticmethod
-    def pyro(message: str):
+    def pyro(message: str) -> None:
         print('[PYRO] {}'.format(message))
 
     @staticmethod
-    def idxr(message: str):
+    def idxr(message: str) -> None:
         print('[IDXR] {}'.format(message))
 
     @staticmethod
-    def anon(message: str):
+    def anon(message: str) -> None:
         print('[ANON] {}'.format(message))

@@ -1,9 +1,9 @@
 class Arguments(list):
-    def __init__(self):
+    def __init__(self) -> None:
         super(Arguments, self).__init__()
 
-    def append_quoted(self, value, name=None):
-        self.append('-%s="%s"' % (name, value) if name is not None else '"%s"' % value)
+    def append_quoted(self, value: str, name: str = '') -> None:
+        self.append('-%s="%s"' % (name, value) if name else '"%s"' % value)
 
-    def join(self, delimiter=' '):
+    def join(self, delimiter: str = ' ') -> str:
         return delimiter.join(self)

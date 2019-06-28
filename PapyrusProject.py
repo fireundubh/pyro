@@ -92,16 +92,16 @@ class PapyrusProject:
             return -1
 
     @staticmethod
-    def _unique_list(items: list) -> list:
-        return list(OrderedDict.fromkeys(items))
+    def _unique_list(items: list) -> tuple:
+        return tuple(OrderedDict.fromkeys(items))
 
-    def _build_commands(self, index: Index) -> list:
-        commands = list()
+    def _build_commands(self, index: Index) -> tuple:
+        commands: list = list()
 
-        unique_imports = self._get_imports_from_script_paths()
-        script_paths = self.get_script_paths()
+        unique_imports: tuple = self._get_imports_from_script_paths()
+        script_paths: tuple = self.get_script_paths()
 
-        arguments = Arguments()
+        arguments: Arguments = Arguments()
 
         for script_path in script_paths:
             if not self.project.options.disable_indexer:
@@ -130,7 +130,7 @@ class PapyrusProject:
 
             commands.append(arguments.join())
 
-        return commands
+        return tuple(commands)
 
     def _build_commands_bsarch(self, script_folder: str, archive_path: str) -> str:
         bsarch_path = self.project.get_bsarch_path()
@@ -151,11 +151,11 @@ class PapyrusProject:
 
         return arguments.join()
 
-    def _get_imports_from_script_paths(self) -> list:
+    def _get_imports_from_script_paths(self) -> tuple:
         """Generate list of unique import paths from script paths"""
-        script_paths = self.get_script_paths()
+        script_paths: tuple = self.get_script_paths()
 
-        xml_import_paths = self._get_node_children_values(self.root_node, 'Imports')
+        xml_import_paths: list = self._get_node_children_values(self.root_node, 'Imports')
 
         script_import_paths = list()
 
@@ -168,16 +168,16 @@ class PapyrusProject:
 
         return self._unique_list(script_import_paths + xml_import_paths)
 
-    def _copy_scripts_to_temp_path(self, script_paths: list, tmp_scripts_path: str) -> None:
+    def _copy_scripts_to_temp_path(self, script_paths: tuple, tmp_scripts_path: str) -> None:
         output_path = self.output_path
 
         if any(dots in output_path.split(os.sep) for dots in ['.', '..']):
             output_path = os.path.normpath(os.path.join(os.path.dirname(self.input_path), output_path))
 
-        compiled_script_paths = map(lambda x: os.path.join(output_path, x.replace('.psc', '.pex')), script_paths)
+        compiled_script_paths: list = [os.path.join(output_path, script_path.replace('.psc', '.pex')) for script_path in script_paths]
 
         if not self.project.is_fallout4:
-            compiled_script_paths = map(lambda x: os.path.join(output_path, os.path.basename(x)), compiled_script_paths)
+            compiled_script_paths = [os.path.join(output_path, os.path.basename(script_path)) for script_path in compiled_script_paths]
 
         for compiled_script_path in compiled_script_paths:
             abs_compiled_script_path = os.path.abspath(compiled_script_path)
@@ -190,23 +190,24 @@ class PapyrusProject:
 
         script_paths = list()
         for xml_import_path in xml_import_paths:
-            psc_paths = glob.glob(os.path.join(xml_import_path, '**\*.psc'), recursive=True)
-            script_paths.extend(psc_paths)
+            source_paths = glob.glob(os.path.join(xml_import_path, '**\*.psc'), recursive=True)
+            script_paths.extend(source_paths)
 
         for script_path in script_paths:
-            if script_path.endswith(target_path.replace('.pex', '.psc')):
+            source_path = target_path.replace('.pex', '.psc')
+            if script_path.endswith(source_path):
                 return script_path
 
         raise FileExistsError('Cannot find absolute path to file:', target_path)
 
-    def _get_script_paths_from_folders_node(self) -> list:
+    def _get_script_paths_from_folders_node(self) -> tuple:
         """Retrieves script paths from the Folders node"""
-        script_paths = list()
+        script_paths: list = list()
 
         folders_node = self._get_node(self.root_node, 'Folders')
 
         if folders_node is None:
-            return script_paths
+            return ()
 
         # defaults to False if the attribute does not exist
         no_recurse = bool(folders_node.get('NoRecurse'))
@@ -214,6 +215,7 @@ class PapyrusProject:
         for folder in self._get_node_children_values(self.root_node, 'Folders'):
             # fix relative paths
             if folder == '.' or folder == '..':
+                # TODO: may not have parity with how the Papyrus Compiler handles these paths
                 folder = os.path.join(os.path.dirname(self.input_path), folder)
             elif not os.path.isabs(folder):
                 folder = self._try_find_folder(folder)
@@ -233,19 +235,20 @@ class PapyrusProject:
             test_path = os.path.join(import_path, folder)
             if os.path.exists(test_path):
                 return test_path
+        return folder
 
-    def _get_script_paths_from_scripts_node(self) -> list:
+    def _get_script_paths_from_scripts_node(self) -> tuple:
         """Retrieves script paths from the Scripts node"""
-        script_paths = list()
+        script_paths: list = list()
 
         scripts_node = self._get_node(self.root_node, 'Scripts')
 
         if scripts_node is None:
-            return script_paths
+            return ()
 
         # "support" colons by replacing them with path separators so they're proper path parts
         # but watch out for absolute paths and use the path parts directly instead
-        def fix_path(script_path):
+        def fix_path(script_path: str) -> str:
             if os.path.isabs(script_path):
                 namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(script_path), script_path])
                 return os.path.join(namespace, file_name)
@@ -257,24 +260,24 @@ class PapyrusProject:
 
         return self._unique_list(script_paths)
 
-    def _get_include_paths_from_includes_node(self) -> list:
+    def _get_include_paths_from_includes_node(self) -> tuple:
         # TODO: support includes for multiple archives
 
-        include_paths = list()
+        include_paths: list = list()
 
         includes = self._get_node(self.root_node, 'Includes')
         if includes is None:
-            return include_paths
+            return ()
 
         try:
             includes.get('Root')
         except AttributeError:
-            return include_paths
+            return ()
 
         includes_root = includes.get('Root')
 
         if not os.path.exists(includes_root) or not os.path.isabs(includes_root):
-            return include_paths
+            return ()
 
         if includes is not None:
             include_paths = self._get_node_children_values(self.root_node, 'Includes')
@@ -289,14 +292,14 @@ class PapyrusProject:
 
         return self._unique_list(include_paths)
 
-    def _parallelize(self, commands: list) -> None:
+    def _parallelize(self, commands: tuple) -> None:
         multiprocessing.freeze_support()
         p = multiprocessing.Pool(processes=os.cpu_count())
         p.imap(self._open_process, commands)
         p.close()
         p.join()
 
-    def anonymize_scripts(self, script_paths: list, output_path: str) -> None:
+    def anonymize_scripts(self, script_paths: tuple, output_path: str) -> None:
         if self.project.options.disable_anonymizer:
             self.log.warn('Anonymizer disabled by user.')
         elif not self.use_anonymizer:
@@ -323,9 +326,9 @@ class PapyrusProject:
 
         return output_path
 
-    def get_script_paths(self, absolute_paths: bool = False) -> list:
+    def get_script_paths(self, absolute_paths: bool = False) -> tuple:
         """Retrieves script paths both Folders and Scripts nodes"""
-        paths = list()
+        paths: list = list()
 
         folders_node_paths = self._get_script_paths_from_folders_node()
         if len(folders_node_paths) > 0:
@@ -345,7 +348,7 @@ class PapyrusProject:
 
         return self._unique_list(results)
 
-    def get_script_paths_compiled(self) -> list:
+    def get_script_paths_compiled(self) -> tuple:
         output_path = self.get_output_path()
 
         # only fo4 supports namespaced script names
@@ -355,9 +358,9 @@ class PapyrusProject:
         # return paths to compiled scripts
         pex_paths = [os.path.join(output_path, script_path).replace('.psc', '.pex') for script_path in psc_paths]
 
-        return [os.path.normpath(pex_path) for pex_path in pex_paths if os.path.exists(pex_path)]
+        return tuple(os.path.normpath(pex_path) for pex_path in pex_paths if os.path.exists(pex_path))
 
-    def index_scripts(self, script_paths: list, index: Index) -> None:
+    def index_scripts(self, script_paths: tuple, index: Index) -> None:
         for relative_path in script_paths:
             try:
                 source_path = self._get_absolute_script_path(relative_path)
@@ -366,7 +369,7 @@ class PapyrusProject:
                 if source_path == '' or not os.path.exists(source_path):
                     raise
 
-            index.write_file(source_path)
+            index.write_row(source_path)
 
     def pack_archive(self) -> None:
         if self.project.options.disable_bsarch:
@@ -408,7 +411,8 @@ class PapyrusProject:
         archive_path = self.root_node.get('Archive')
 
         if archive_path is None:
-            return PapyrusProject.log.error('Cannot pack archive because Archive attribute not set')
+            PapyrusProject.log.error('Cannot pack archive because Archive attribute not set')
+            return
 
         commands = self._build_commands_bsarch(*map(lambda x: os.path.normpath(x), [tmp_path, archive_path]))
 
@@ -443,6 +447,6 @@ class PapyrusProject:
             self.log.warn('No source scripts were indexed. Indexing disabled by user.')
             return tuple()
 
-        self.index_scripts(validated_paths, index)
+        self.index_scripts(tuple(validated_paths), index)
 
         return validated_paths, validation_states
