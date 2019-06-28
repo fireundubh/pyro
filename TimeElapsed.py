@@ -1,12 +1,12 @@
 class TimeElapsed:
-    def __init__(self):
+    def __init__(self) -> None:
         self._start_time = 0.0
         self._end_time = 0.0
 
-    def __repr__(self):
-        return self._diff()
+    def __repr__(self) -> str:
+        return str(self._diff())
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '{0:.2f}s'.format(self._diff())
 
     def _diff(self) -> float:
@@ -28,5 +28,5 @@ class TimeElapsed:
     def end_time(self, value: float) -> None:
         self._end_time = value
 
-    def print(self):
+    def print(self) -> None:
         print('[PYRO] Time elapsed:', str(self))

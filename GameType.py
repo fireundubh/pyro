@@ -8,10 +8,11 @@ class GameType(enum.Enum):
     SkyrimClassic = 2
 
     @staticmethod
-    def from_str(alias):
+    def from_str(alias: str) -> enum.Enum:
         if alias == 'fo4':
             return GameType.Fallout4
         if alias == 'sse':
             return GameType.SkyrimSpecialEdition
         if alias == 'tes5':
             return GameType.SkyrimClassic
+        raise NotImplementedError()
