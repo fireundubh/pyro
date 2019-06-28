@@ -1,18 +1,6 @@
-#!/usr/bin/env python3
-# coding=utf-8
-
 import argparse
 import os
-import subprocess
-import sys
 from collections import namedtuple
-
-try:
-    from lxml import etree
-except ImportError:
-    subprocess.call([sys.executable, '-m', 'pip', 'install', 'lxml'])
-    # noinspection PyUnresolvedReferences
-    from lxml import etree
 
 from GameType import GameType
 from Index import Index
