@@ -1,7 +1,16 @@
 import binascii
 import json
 import os
+import posixpath
+
 from Logger import Logger
+
+
+class Checksum:
+    def __init__(self, file_path: str, crc32: str):
+        # use only forward slashes in json
+        self.file_path: str = posixpath.join(*file_path.split('\\')) if '\\' in file_path else file_path
+        self.crc32: str = crc32
 
 
 class Index:
@@ -9,30 +18,29 @@ class Index:
     The index is used to exclude unchanged scripts from compilation. It does this by writing an
     index of CRC32 hashes after verification and comparing those hashes before compilation.
     """
-    log = Logger()
+    logger = Logger()
 
-    def __init__(self, project_name: str, script_paths: list):
-        self.project_name = project_name
-        self.script_paths = script_paths
+    def __init__(self, project_name: str, script_paths: tuple):
+        self.project_name: str = project_name
+        self.script_paths: tuple = script_paths
 
-        table_path = os.path.join(os.path.dirname(__file__), 'Database', '{}.json'.format(project_name))
-        self.table_path = os.path.normpath(table_path)
+        table_path: str = os.path.join(os.path.dirname(__file__), 'Database', '{}.json'.format(project_name))
+        self.table_path: str = os.path.normpath(table_path)
 
         os.makedirs(os.path.dirname(self.table_path), exist_ok=True)
 
-        self.checksums = []
+        self.checksums: list = []
 
-        # ensure table exists
+        # ensure table file exists
         if not os.path.exists(self.table_path):
-            open(self.table_path, mode='w').close()
+            open(self.table_path, mode='wb').close()
 
-        # ensure table has a checksums list
+        # ensure table file has a checksums list
         with open(self.table_path, mode='r') as f:
             try:
                 json.load(f)
             except json.decoder.JSONDecodeError:
-                with open(self.table_path, mode='w') as o:
-                    json.dump({'checksums': list()}, o, indent=4)
+                self._create_table_file()
 
         # load checksums list
         with open(self.table_path, mode='r') as f:
@@ -40,45 +48,62 @@ class Index:
             self.checksums = table['checksums']
 
     @staticmethod
+    def _compare_paths(source_path: str, target_path: str) -> bool:
+        if source_path == target_path:
+            return True
+        if os.path.normpath(source_path) == os.path.normpath(target_path):
+            return True
+        if posixpath.normpath(source_path) == posixpath.normpath(target_path):
+            return True
+        if not os.path.isabs(target_path):
+            if os.path.normpath(source_path).endswith(os.path.normpath(target_path)):
+                return True
+            if posixpath.normpath(source_path).endswith(posixpath.normpath(target_path)):
+                return True
+        return False
+
+    def _create_table_file(self) -> None:
+        with open(self.table_path, mode='w') as o:
+            json.dump({'checksums': []}, o, indent=4)
+
+    @staticmethod
     def _get_crc32(file_path: str) -> str:
-        buffer = open(file_path, 'rb').read()
-        buffer = (binascii.crc32(buffer) & 0xFFFFFFFF)
-        return "{:08X}".format(buffer)
+        buffer: bytes = open(file_path, 'rb').read()
+        return "{:08X}".format(binascii.crc32(buffer) & 0xFFFFFFFF)
 
     @staticmethod
     def _find_file(rows: list, file_path: str) -> tuple:
         for i, row in enumerate(rows):
-            if row['file_path'] == file_path:
+            if Index._compare_paths(row['file_path'], file_path):
                 return i, row
-        return None, None
+        raise FileNotFoundError(f'Cannot find file at path: {file_path}')
 
     def compare(self, target_path: str) -> bool:
         """Returns True if the checksum matches"""
-        script_path = ''.join([x for x in self.script_paths if x.endswith(target_path)])
+        script_path: str = ''.join([x for x in self.script_paths if Index._compare_paths(x, target_path)])
 
-        if script_path == '':
+        if not script_path:
             # self.log.idxr(f'Found no results for "{target_path}"')
             return False
 
-        table_rows = [x['crc32'] for x in self.checksums if x['file_path'].endswith(target_path)]
+        row_hashes: list = [row['crc32'] for row in self.checksums if Index._compare_paths(row['file_path'], target_path)]
 
-        if len(table_rows) == 0:
+        if len(row_hashes) == 0:
             # self.log.idxr(f'Found no results in checksums for "{target_path}"')
             return False
 
         # if there is more than one result, the problem was created by the user... right?
-        if len(table_rows) > 1:
-            self.log.idxr(f'Found more than one result for "{target_path}"')
+        if len(row_hashes) > 1:
+            self.logger.idxr(f'Found more than one result for "{target_path}"')
             return False
 
-        if table_rows[0] == self._get_crc32(script_path):
+        if row_hashes[0] == self._get_crc32(script_path):
             return True
 
         return False
 
-    def write_file(self, script_path: str) -> None:
-        crc32 = self._get_crc32(script_path)
-        new_row = {'file_path': script_path, 'crc32': crc32}
+    def write_row(self, script_path: str) -> None:
+        new_row: Checksum = Checksum(script_path, self._get_crc32(script_path))
 
         os.makedirs(os.path.dirname(self.table_path), exist_ok=True)
 
@@ -87,35 +112,33 @@ class Index:
             try:
                 json.load(f)
             except json.decoder.JSONDecodeError:
-                with open(self.table_path, mode='w') as o:
-                    json.dump({'checksums': list()}, o, indent=4)
+                self._create_table_file()
 
         with open(self.table_path, mode='r') as f:
-            table = json.load(f)
+            table: dict = json.load(f)
 
             # check if there's an existing row for the file path
-            row_index, row_data = self._find_file(table['checksums'], new_row['file_path'])
-
-            # if there isn't an existing row, add one
-            if row_data is None:
-                table['checksums'].append(new_row)
+            try:
+                row_index, row_data = self._find_file(table['checksums'], new_row.file_path)
+            except FileNotFoundError:
+                # if there isn't an existing row, add one
+                table['checksums'].append(new_row.__dict__)
 
             # if there is an existing row, update the crc32
             # this will never run unless Project.validate_script() returns True in PapyrusProject.validate_project()
             # that is, this will run when a previously indexed script has been changed and compiled
             else:
-                if row_data['crc32'] != new_row['crc32']:
-                    table['checksums'][row_index]['crc32'] = new_row['crc32']
+                if row_data['crc32'] != new_row.crc32:
+                    table['checksums'][row_index]['crc32'] = new_row.crc32
 
             with open(self.table_path, mode='w') as o:
                 json.dump(table, o, indent=4)
 
     def write(self) -> None:
-        results = list()
+        def checksum_dict(script_path: str) -> dict:
+            return Checksum(posixpath.normpath(script_path), self._get_crc32(script_path)).__dict__
 
-        for script_path in map(lambda x: os.path.normpath(x), self.script_paths):
-            crc32 = self._get_crc32(script_path)
-            results.append({'file_path': script_path, 'crc32': crc32})
+        results: list = [checksum_dict(script_path) for script_path in [os.path.normpath(x) for x in self.script_paths]]
 
         os.makedirs(os.path.dirname(self.table_path), exist_ok=True)
 
