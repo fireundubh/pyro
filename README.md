@@ -7,33 +7,23 @@ Fundamentally, Pyro is a command-line interface (CLI) that parses customized Pap
 Pyro automates most build tasks and can play a key role in an automated build and release pipeline. Pyro can also be integrated as an external tool within virtually any IDE, allowing modders to build their projects with a single hotkey.
 
 
-## Requirements
+## Table of Contents
 
-* Python 3.4+ (Tested with Python 3.7.2) - [Download (python.org)](https://www.python.org/downloads/)
-* lxml module (`python3 -m pip install lxml`) - [Documentation (lxml.de)](http://lxml.de/)
-* BSArch (only for automatic BSA/BA2 packaging) - [Download (nexusmods.com)](https://www.nexusmods.com/newvegas/mods/64745)
-* an Extended PPJ XML document for your project - [Examples](https://github.com/fireundubh/pyro#examples)
+- [Features](#features)
+  - [Overview](#overview)
+  - [Multiple Game Support](#multiple-game-support)
+  - [Extended PPJ Format](#extended-ppj-format)
+  - [Incremental Build with Parallelized Compilation](#incremental-build-with-parallelized-compilation)
+  - [Automatic BSA/BA2 Packaging](#automatic-bsaba2-packaging)
+  - [Script Anonymization](#script-anonymization)
+- [Resources](#resources)
+  - [Example PPJ Files](#example-ppj-files)
+  - [IDE Integration](#ide-integration)
+- [Contributing](#contributing)
+  - [License](#license)
+  - [Packages](#packages)
+  - [Compiling](#compiling)
 
-
-## Usage
-
-```
-usage: pyro [-g {fo4,tesv,sse}] [-i INPUT] [--disable-anonymizer]
-            [--disable-bsarch] [--disable-indexer] [--help] [--version]
-
-required arguments:
-  -g {fo4,tesv,sse}  set compiler version
-  -i INPUT           absolute path to input file or folder
-
-optional arguments:
-  --disable-anonymizer  do not anonymize script metadata
-  --disable-bsarch      do not pack scripts with BSArch
-  --disable-indexer     do not index scripts
-
-program arguments:
-  --help             show help and exit
-  --version          show program's version number and exit
-```
 
 ## Features
 
@@ -44,21 +34,20 @@ program arguments:
 - Supports multiple games (TESV, SSE, FO4)
 - Supports Extended Papyrus Project XML (PPJ) documents
 - Incremental, parallelized PPJ builds
-- Automatically packages scripts and non-script assets with BSArch
+- Automatically packages scripts _and_ non-script assets with BSArch
 - Anonymizes compiled scripts
 
 **Future Features**
 
-- Automatic generation of Extended PPJ files
+- Automatic generation of Extended PPJ files from folders and ZIP archives
 - Automatic generation of ZIP archives for distribution
-- Automatic, parallelized generation of multiple BSA/BA2 archives
+- Automatic parallelized generation of multiple BSA/BA2 archives
+- Support automated test assets
 - Support folder includes for automatically packaging non-script assets
-- XML validation, or move to YAML (undecided)
+- Support YAML project files
 
 
-### Feature Details
-
-#### Multiple Game Support
+### Multiple Game Support
 
 Pyro supports the TESV, SSE, and FO4 compilers.
 
@@ -67,11 +56,12 @@ When the game is switched, all paths are generated using the `Installed Path` ke
 You can also set a path explicitly in `pyro.ini` if you are on a non-Windows platform.
 
 
-#### Extended Papyrus Project XML (PPJ)
+### Extended PPJ Format
 
 The PPJ format was introduced with the FO4 version of the Papyrus Compiler, which was not backported to TESV and SSE. Pyro can parse all standard PPJ elements and attributes, in addition to several of its own, for TESV, SSE, and FO4 projects.
 
-##### Elements
+
+#### Elements
 
 Element | Support
 :--- | :---
@@ -81,7 +71,8 @@ Element | Support
 `<Folders>` | This element and its children `<Folder>` contain absolute or relative paths to folders containing a mod's user scripts. The parent element's `NoRecurse` attribute is also supported.
 `<Includes>` | This new element and its children `<Include>` contain relative paths to arbitrary files to be packaged in the mod's BSA or BA2 archive. The parent element has a `Root` attribute that contains the absolute path to the root of the relative Include paths.
 
-##### Attributes
+
+#### Attributes
 
 Element | Attribute | Data Type | Value
 :--- | :--- | :--- | :---
@@ -97,25 +88,29 @@ Folders | NoRecurse | Boolean | true or false
 Includes | Root | String | absolute path to folder
 
 
-#### Incremental Build with Parallelized Compilation
+### Incremental Build with Parallelized Compilation
 
-What is incremental build? Basically:
- 
-* Incremental build means that only the scripts that need to be compiled will be compiled.
-* Incremental build _vastly_ accelerates the build process by eliminating redundant work.
+Incremental build _vastly_ accelerates builds by compiling only scripts that need to be compiled.
 
 Here's how the incremental build system works:
 
-* After the first run, Pyro builds an index for that project containing the file paths and CRC32 hashes of those files.
-* When generating commands for the next run, the CRC32 hashes of those files are compared with the indexed file records.
-* Commands are not generated for matching records, reducing the work passed on to the compiler.
-* Records are updated for previously indexed scripts that have been modified and successfully compiled.
-* New records are created for new scripts that have been successfully compiled.
+1. After the first successful run, Pyro builds an index for that project containing the file paths and CRC32 hashes of those files.
+2. When generating commands for the next run, the CRC32 hashes of those files are compared with the indexed file records.
+3. Commands are not generated for matching records, reducing the work passed on to the compiler.
+4. Checksum records are updated for previously indexed scripts that have been modified and successfully compiled.
+5. New checksum records are created for new scripts that have been successfully compiled.
 
 In addition, Pyro will spawn multiple instances of the Papyrus Compiler in parallel to further reduce build times.
 
 
-#### Automatic BSA/BA2 Packaging 
+#### Benchmarks
+
+The native PPJ compiler for FO4 is on average 70 ms faster per script. Tested with i5-3570k @ 3.4 GHz and 6 scripts.
+
+However, there is no native PPJ compiler for TESV and SSE. Pyro fills that role.
+
+
+### Automatic BSA/BA2 Packaging
 
 You can package scripts into BSA and BA2 archives with [BSArch](https://www.nexusmods.com/newvegas/mods/64745).
 
@@ -135,11 +130,12 @@ To package arbitrary files, add the following block before the `</PapyrusProject
 
 Currently, folder includes are not supported.
 
-##### Notes
+
+#### Notes
 
 * A temporary folder will be created and deleted at the `TempPath` specified in `pyro.ini`.
-* The compiled scripts and any arbitrary includes to be packaged will be copied there.
-* The folder will be removed if the procedure is successful.
+* The compiled scripts and any arbitrary includes to be packaged will be copied to the temporary folder.
+* The temporary folder will be removed if the procedure is successful.
 
 
 ### Script Anonymization
@@ -151,19 +147,34 @@ Pyro replaces those strings in compiled scripts with random letters, effectively
 Simply add the `Anonymize` attribute to the `PapyrusProject` root element. Set the value to `True`.
 
 
-### Benchmarks 
+## Resources
 
-* The native PPJ compiler for FO4 is on average 70 milliseconds faster per script. Tested with i5-3570k @ 3.4 GHz and 6 scripts.
-
-
-## Examples
+### Example PPJ Files
 
 * [Auto Loot.ppj](https://gist.github.com/fireundubh/7eecf97135b8da74e59133842f0b60f9)
 * [Better Favor Jobs SSE.ppj](https://gist.github.com/fireundubh/398a28227d220f0b45cbdb5fa618b75c)
 * [Master of Disguise SSE.ppj](https://gist.github.com/fireundubh/cb3094ed851f74326090a681a78d5c5e)
 
 
-## IDE Integration
+### IDE Integration
 
 * [PyCharm](https://i.imgur.com/dxk5ZfL.jpg)
 * [UltraEdit](https://gist.github.com/fireundubh/cca1f4132ca4b000f094294f3f036fa0)
+
+
+## Contributing
+
+### License
+
+Pyro is open source and licensed under the MIT License.
+
+
+### Packages
+
+- API: The `pyro` package includes all the necessary functionality for the CLI.
+- CLI: The `pyro_cli` package can be executed directly on the command line.
+
+
+### Compiling
+
+Just use [Nuitka](https://nuitka.net/).

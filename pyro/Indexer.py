@@ -3,9 +3,9 @@ import json
 import os
 import posixpath
 
-from Pyro.Logger import Logger
-from Pyro.PathHelper import PathHelper
-from Pyro.Project import Project
+from pyro.Logger import Logger
+from pyro.PathHelper import PathHelper
+from pyro.Project import Project
 
 
 class Checksum:

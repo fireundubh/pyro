@@ -1,6 +1,6 @@
 from enum import Enum
 
-from Pyro.Enums import GameType
+from pyro.enums import GameType
 
 
 class ProjectOptions:

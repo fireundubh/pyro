@@ -2,11 +2,11 @@ import configparser
 import os
 import sys
 
-from Pyro.Logger import Logger
-from Pyro.PathHelper import PathHelper
-from Pyro.ProjectOptions import ProjectOptions
-from Pyro.TimeElapsed import TimeElapsed
-from Pyro.Enums import GameType, ValidationState
+from pyro.Logger import Logger
+from pyro.PathHelper import PathHelper
+from pyro.ProjectOptions import ProjectOptions
+from pyro.TimeElapsed import TimeElapsed
+from pyro.enums import GameType, ValidationState
 
 
 class Project:

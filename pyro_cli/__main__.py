@@ -1,15 +1,13 @@
 import argparse
 import os
 
-from Pyro.Indexer import Indexer
-from Pyro.Logger import Logger
-from Pyro.PapyrusProject import PapyrusProject
-from Pyro.Project import Project
-from Pyro.ProjectOptions import ProjectOptions
-from Pyro.TimeElapsed import TimeElapsed
-from Pyro.Enums import GameType, ValidationState
-
-__version__ = 'pyro-1.3.2 by fireundubh <github.com/fireundubh>'
+from pyro.Indexer import Indexer
+from pyro.Logger import Logger
+from pyro.PapyrusProject import PapyrusProject
+from pyro.Project import Project
+from pyro.ProjectOptions import ProjectOptions
+from pyro.TimeElapsed import TimeElapsed
+from pyro.enums import GameType, ValidationState
 
 
 class Application:
@@ -94,9 +92,10 @@ class Application:
 
 
 if __name__ == '__main__':
-    _parser = argparse.ArgumentParser(add_help=False)
+    _parser = argparse.ArgumentParser(add_help=False, description='Pyro CLI by fireundubh')
 
     _required_arguments = _parser.add_argument_group('required arguments')
+
     _required_arguments.add_argument('-g', dest='game',
                                      action='store', choices={'fo4', 'tesv', 'sse'},
                                      help='set compiler version')
@@ -108,6 +107,7 @@ if __name__ == '__main__':
                                      help='absolute path to pyro.ini')
 
     _optional_arguments = _parser.add_argument_group('optional arguments')
+
     _optional_arguments.add_argument('--disable-anonymizer',
                                      action='store_true', default=False,
                                      help='do not anonymize script metadata')
@@ -119,10 +119,10 @@ if __name__ == '__main__':
                                      help='do not index scripts')
 
     _program_arguments = _parser.add_argument_group('program arguments')
+
     _program_arguments.add_argument('--help', dest='show_help',
                                     action='store_true', default=False,
                                     help='show help and exit')
-    _program_arguments.add_argument('--version', action='version', version='%s' % __version__)
 
 
     def print_help() -> int:

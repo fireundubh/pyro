@@ -10,13 +10,13 @@ from collections import OrderedDict
 
 from lxml import etree
 
-from Pyro.Anonymizer import Anonymizer
-from Pyro.Arguments import Arguments
-from Pyro.Indexer import Indexer
-from Pyro.Logger import Logger
-from Pyro.PathHelper import PathHelper
-from Pyro.Project import Project
-from Pyro.TimeElapsed import TimeElapsed
+from pyro.Anonymizer import Anonymizer
+from pyro.Arguments import Arguments
+from pyro.Indexer import Indexer
+from pyro.Logger import Logger
+from pyro.PathHelper import PathHelper
+from pyro.Project import Project
+from pyro.TimeElapsed import TimeElapsed
 
 
 class PapyrusProject:

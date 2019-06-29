@@ -2,7 +2,7 @@ import random
 import string
 from typing import BinaryIO
 
-from Pyro.Project import Project
+from pyro.Project import Project
 
 
 class Anonymizer:
