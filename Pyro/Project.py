@@ -2,11 +2,11 @@ import configparser
 import os
 import sys
 
-from GameType import GameType
-from Logger import Logger
-from ProjectOptions import ProjectOptions
-from TimeElapsed import TimeElapsed
-from ValidationState import ValidationState
+from Pyro.Logger import Logger
+from Pyro.PathHelper import PathHelper
+from Pyro.ProjectOptions import ProjectOptions
+from Pyro.TimeElapsed import TimeElapsed
+from Pyro.Enums import GameType, ValidationState
 
 
 class Project:
@@ -15,7 +15,7 @@ class Project:
 
     def __init__(self, options: ProjectOptions):
         self._ini: configparser.ConfigParser = configparser.ConfigParser()
-        self._ini.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'pyro.ini'))
+        self._ini.read(options.pyro_cfg_path)
 
         self.options: ProjectOptions = options
         self.game_path: str = self.get_game_path()
@@ -52,22 +52,6 @@ class Project:
         return reg_value
 
     @staticmethod
-    def _handle_relative_local_path(ini_path: str, default_path: str = '') -> str:
-        """Support absolute INI paths, relative local paths, and other paths"""
-        if os.path.isabs(ini_path):
-            return os.path.normpath(ini_path)
-
-        path = os.path.join(os.path.dirname(__file__), ini_path)
-
-        if not os.path.exists(path) and default_path != '':
-            path = os.path.join(default_path, ini_path)
-
-        if not os.path.exists(path):
-            raise ValueError('Path does not exist:', path)
-
-        return os.path.normpath(path)
-
-    @staticmethod
     def validate_script(script_path: str, time_elapsed: TimeElapsed) -> ValidationState:
         script_path = os.path.abspath(script_path)
 
@@ -83,15 +67,15 @@ class Project:
         return ValidationState.FILE_NOT_MODIFIED
 
     def get_bsarch_path(self) -> str:
-        return Project._handle_relative_local_path(self._ini['Shared']['BSArchPath'], self.game_path)
+        return PathHelper.parse(self._ini['Pyro']['BSArchPath'], self.game_path)
 
     def get_compiler_path(self) -> str:
         """Retrieve compiler path from pyro.ini"""
-        return Project._handle_relative_local_path(self._ini['Compiler']['Path'], self.game_path)
+        return PathHelper.parse(self._ini['Compiler']['Path'], self.game_path)
 
     def get_flags_path(self) -> str:
         """Retrieve flags path from pyro.ini"""
-        return Project._handle_relative_local_path(self._ini[self.options.game_type.name]['Flags'], self.game_path)
+        return PathHelper.parse(self._ini[self.options.game_type.name]['Flags'], self.game_path)
 
     def get_game_path(self) -> str:
         """Retrieve game path from either pyro.ini or Windows Registry"""

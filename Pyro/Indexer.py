@@ -3,7 +3,9 @@ import json
 import os
 import posixpath
 
-from Logger import Logger
+from Pyro.Logger import Logger
+from Pyro.PathHelper import PathHelper
+from Pyro.Project import Project
 
 
 class Checksum:
@@ -13,18 +15,19 @@ class Checksum:
         self.crc32: str = crc32
 
 
-class Index:
+class Indexer:
     """
     The index is used to exclude unchanged scripts from compilation. It does this by writing an
     index of CRC32 hashes after verification and comparing those hashes before compilation.
     """
     logger = Logger()
 
-    def __init__(self, project_name: str, script_paths: tuple):
+    def __init__(self, project: Project, project_name: str, script_paths: tuple):
+        self.project: Project = project
         self.project_name: str = project_name
         self.script_paths: tuple = script_paths
 
-        table_path: str = os.path.join(os.path.dirname(__file__), 'Database', '{}.json'.format(project_name))
+        table_path: str = os.path.join(PathHelper.parse(self.project._ini['Pyro']['CachePath']), '{}.json'.format(project_name))
         self.table_path: str = os.path.normpath(table_path)
 
         os.makedirs(os.path.dirname(self.table_path), exist_ok=True)
@@ -47,21 +50,6 @@ class Index:
             table = json.load(f)
             self.checksums = table['checksums']
 
-    @staticmethod
-    def _compare_paths(source_path: str, target_path: str) -> bool:
-        if source_path == target_path:
-            return True
-        if os.path.normpath(source_path) == os.path.normpath(target_path):
-            return True
-        if posixpath.normpath(source_path) == posixpath.normpath(target_path):
-            return True
-        if not os.path.isabs(target_path):
-            if os.path.normpath(source_path).endswith(os.path.normpath(target_path)):
-                return True
-            if posixpath.normpath(source_path).endswith(posixpath.normpath(target_path)):
-                return True
-        return False
-
     def _create_table_file(self) -> None:
         with open(self.table_path, mode='w') as o:
             json.dump({'checksums': []}, o, indent=4)
@@ -74,19 +62,19 @@ class Index:
     @staticmethod
     def _find_file(rows: list, file_path: str) -> tuple:
         for i, row in enumerate(rows):
-            if Index._compare_paths(row['file_path'], file_path):
+            if PathHelper.compare(row['file_path'], file_path):
                 return i, row
         raise FileNotFoundError(f'Cannot find file at path: {file_path}')
 
     def compare(self, target_path: str) -> bool:
         """Returns True if the checksum matches"""
-        script_path: str = ''.join([x for x in self.script_paths if Index._compare_paths(x, target_path)])
+        script_path: str = ''.join([x for x in self.script_paths if PathHelper.compare(x, target_path)])
 
         if not script_path:
             # self.log.idxr(f'Found no results for "{target_path}"')
             return False
 
-        row_hashes: list = [row['crc32'] for row in self.checksums if Index._compare_paths(row['file_path'], target_path)]
+        row_hashes: list = [row['crc32'] for row in self.checksums if PathHelper.compare(row['file_path'], target_path)]
 
         if len(row_hashes) == 0:
             # self.log.idxr(f'Found no results in checksums for "{target_path}"')

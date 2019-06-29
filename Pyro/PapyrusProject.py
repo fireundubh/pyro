@@ -6,22 +6,17 @@ import shutil
 import subprocess
 import sys
 import time
-
 from collections import OrderedDict
 
-try:
-    from lxml import etree
-except ImportError:
-    subprocess.call([sys.executable, '-m', 'pip', 'install', 'lxml'])
-    # noinspection PyUnresolvedReferences
-    from lxml import etree
+from lxml import etree
 
-from Anonymizer import Anonymizer
-from Arguments import Arguments
-from Index import Index
-from Logger import Logger
-from Project import Project
-from TimeElapsed import TimeElapsed
+from Pyro.Anonymizer import Anonymizer
+from Pyro.Arguments import Arguments
+from Pyro.Indexer import Indexer
+from Pyro.Logger import Logger
+from Pyro.PathHelper import PathHelper
+from Pyro.Project import Project
+from Pyro.TimeElapsed import TimeElapsed
 
 
 class PapyrusProject:
@@ -95,7 +90,7 @@ class PapyrusProject:
     def _unique_list(items: list) -> tuple:
         return tuple(OrderedDict.fromkeys(items))
 
-    def _build_commands(self, index: Index) -> tuple:
+    def _build_commands(self, index: Indexer) -> tuple:
         commands: list = list()
 
         unique_imports: tuple = self._get_imports_from_script_paths()
@@ -311,7 +306,7 @@ class PapyrusProject:
                 self.log.anon('INFO: Anonymizing: ' + pex_path)
                 anon.anonymize_script(pex_path)
 
-    def compile_custom(self, index: Index, time_elapsed: TimeElapsed) -> None:
+    def compile_custom(self, index: Indexer, time_elapsed: TimeElapsed) -> None:
         commands = self._build_commands(index)
         time_elapsed.start_time = time.time()
         self._parallelize(commands)
@@ -360,7 +355,7 @@ class PapyrusProject:
 
         return tuple(os.path.normpath(pex_path) for pex_path in pex_paths if os.path.exists(pex_path))
 
-    def index_scripts(self, script_paths: tuple, index: Index) -> None:
+    def index_scripts(self, script_paths: tuple, index: Indexer) -> None:
         for relative_path in script_paths:
             try:
                 source_path = self._get_absolute_script_path(relative_path)
@@ -381,16 +376,15 @@ class PapyrusProject:
             return
 
         # create temporary folder
-        tmp_path = os.path.normpath(os.path.join(os.path.dirname(__file__), self.project._ini['Shared']['TempPath']))
+        tmp_path: str = PathHelper.parse(self.project._ini['Pyro']['TempPath'])
         tmp_scripts_path = os.path.join(tmp_path, 'Scripts')
 
         # clear temporary data
         if os.path.exists(tmp_path):
             shutil.rmtree(tmp_path)
 
-        # ensure temporary data paths exist
-        if not os.path.exists(tmp_scripts_path):
-            os.makedirs(tmp_scripts_path)
+        os.makedirs(tmp_path, exist_ok=True)
+        os.makedirs(tmp_scripts_path, exist_ok=True)
 
         script_paths = self.get_script_paths()
 
@@ -422,7 +416,7 @@ class PapyrusProject:
         if os.path.exists(tmp_path):
             shutil.rmtree(tmp_path)
 
-    def validate_project(self, index: Index, time_elapsed: TimeElapsed) -> tuple:
+    def validate_project(self, index: Indexer, time_elapsed: TimeElapsed) -> tuple:
         output_path = self.get_output_path()
 
         pex_paths = self.get_script_paths_compiled()

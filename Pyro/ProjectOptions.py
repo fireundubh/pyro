@@ -1,9 +1,10 @@
 from enum import Enum
 
-from GameType import GameType
+from Pyro.Enums import GameType
 
 
 class ProjectOptions:
+    pyro_cfg_path: str = ''
     game_type: Enum = GameType.Fallout4
     input_path: str = ''
     disable_anonymizer: bool = False
