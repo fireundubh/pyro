@@ -6,7 +6,7 @@ import sys
 import zipfile
 from glob import glob
 
-from pyro_cli.setup import version
+version='1.3.3'
 
 class Application:
     def __init__(self, args: argparse.Namespace) -> None:
