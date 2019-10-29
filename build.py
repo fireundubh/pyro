@@ -30,7 +30,9 @@ class Application:
             'select.pyd',
             'unicodedata.pyd',
             'etree.pyd',
-            '_elementpath.pyd'
+            '_elementpath.pyd',
+            '_queue.pyd',
+            '_multiprocessing.pyd'
         )
 
         if not os.path.exists(path):
@@ -75,6 +77,7 @@ class Application:
             '--python-flag=nosite',
             '--python-for-scons=%s' % sys.executable,
             '--assume-yes-for-downloads',
+            '--plugin-enable=multiprocessing',
             '--show-progress'
         ]
 
@@ -85,8 +88,9 @@ class Application:
         if retcode != 0:
             return retcode
 
-        print('Cleaning up dist folder...')
-        self._clean_dist_folder(dist_folder)
+# It seems like we need just about everything
+#        print('Cleaning up dist folder...')
+#        self._clean_dist_folder(dist_folder)
 
         print('Building archive...')
         shutil.copyfile(os.path.join('pyro_cli','pyro.ini'),os.path.join(dist_folder,'pyro.ini'))
