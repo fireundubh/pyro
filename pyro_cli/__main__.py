@@ -93,7 +93,10 @@ class Application:
 
 
 if __name__ == '__main__':
-    _parser = argparse.ArgumentParser(add_help=False, description='Pyro CLI by fireundubh')
+    _parser = argparse.ArgumentParser(add_help=False,
+        description='Pyro CLI by fireundubh. '
+            'This utility will take an extended .PPJ file and compile all Sources in parallel. '
+            'See https://github.com/fireundubh/pyro for more details on the extended PPJ format.')
 
     _required_arguments = _parser.add_argument_group('required arguments')
 
