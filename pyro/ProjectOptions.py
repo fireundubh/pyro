@@ -10,3 +10,4 @@ class ProjectOptions:
     disable_anonymizer: bool = False
     disable_bsarch: bool = False
     disable_indexer: bool = False
+    disable_parallel: bool = False

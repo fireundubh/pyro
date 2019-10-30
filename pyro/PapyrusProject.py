@@ -293,15 +293,17 @@ class PapyrusProject:
         p.imap(self._open_process, commands)
         p.close()
         p.join()
-        # emergency deparallelize just for debugging and such
-        # for command in commands:
-        #     print("Executing: " + command)
-        #     f = os.popen(command, 'r')
-        #     s = True
-        #     while s:
-        #         s = f.read()
-        #         print(s)
-        #     f.close()
+
+    def _unparallelize(self, commands: tuple) -> None:
+        """emergency deparallelize just for debugging and such"""
+        for command in commands:
+            print("Executing: " + command)
+            f = os.popen(command, 'r')
+            s = True
+            while s:
+                s = f.read()
+                print(s)
+            f.close()
 
     def anonymize_scripts(self, script_paths: tuple, output_path: str) -> None:
         if self.project.options.disable_anonymizer:
@@ -318,7 +320,10 @@ class PapyrusProject:
     def compile_custom(self, index: Indexer, time_elapsed: TimeElapsed) -> None:
         commands = self._build_commands(index)
         time_elapsed.start_time = time.time()
-        self._parallelize(commands)
+        if self.project.options.disable_parallel:
+            self._unparallelize(commands)
+        else:
+            self._parallelize(commands)
         time_elapsed.end_time = time.time()
 
     def get_output_path(self) -> str:
