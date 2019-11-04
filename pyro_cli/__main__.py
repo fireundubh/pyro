@@ -24,9 +24,9 @@ class Application:
             return print_help()
 
         # if required arguments not set, show help
-        if args.game is None:
-            logger.error('required argument missing: -g {tesv,fo4,sse}' + os.linesep)
-            return print_help()
+        # if args.game is None:
+        #    logger.error('required argument missing: -g {tesv,fo4,sse}' + os.linesep)
+        #    return print_help()
 
         input_path = args.input
 
@@ -99,17 +99,14 @@ if __name__ == '__main__':
             'See https://github.com/fireundubh/pyro for more details on the extended PPJ format.')
 
     _required_arguments = _parser.add_argument_group('required arguments')
-
-    _required_arguments.add_argument('-g', dest='game',
-                                     action='store', choices={'fo4', 'tesv', 'sse'},
-                                     help='set compiler version')
-
     _required_arguments.add_argument('-i', dest='input',
                                      action='store',
                                      help='absolute path to input ppj file')
 
     _optional_arguments = _parser.add_argument_group('optional arguments')
-
+    _optional_arguments.add_argument('-g', dest='game',
+                                     action='store', choices={'fo4', 'tesv', 'sse'},
+                                     help='set compiler version')
     _optional_arguments.add_argument('-c', dest='conf',
                                      action='store', default=os.path.join(os.path.dirname(__file__), 'pyro.ini'),
                                      help='absolute path to pyro.ini')

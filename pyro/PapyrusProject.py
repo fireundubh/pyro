@@ -17,6 +17,7 @@ from pyro.Logger import Logger
 from pyro.PathHelper import PathHelper
 from pyro.Project import Project
 from pyro.TimeElapsed import TimeElapsed
+from pyro.enums import GameType
 
 
 class PapyrusProject:
@@ -24,16 +25,37 @@ class PapyrusProject:
 
     def __init__(self, prj: Project):
         self.project = prj
-        self.compiler_path = prj.get_compiler_path()
-        self.game_path = prj.get_game_path()
-        self.game_type = prj.options.game_type
-        self.input_path = prj.options.input_path
 
         self.root_node = etree.parse(prj.options.input_path, etree.XMLParser(remove_blank_text=True)).getroot()
         self.output_path = self.root_node.get('Output')
         self.flags_path = self.root_node.get('Flags')
+        self.game_attr = self.root_node.get('Game')
         self.use_bsarch = self.root_node.get('CreateArchive')
         self.use_anonymizer = self.root_node.get('Anonymize')
+
+        self.game_type = prj.options.game_type
+
+        if self.game_type == GameType.none:
+            flagsfile = os.path.basename(self.flags_path)
+            if self.game_attr:
+                self.game_type = GameType.from_str(self.game_attr)
+                self.log.pyro("Game type set by Game attribute in PPJ to " + self.game_attr)
+            elif flagsfile.startswith('Institute'):
+                self.game_type = GameType.Fallout4
+                self.log.warn("Game type inferred from flags file to be Fallout 4")
+            elif flagsfile.startswith('TESV'):
+                self.game_type = GameType.SkyrimSpecialEdition
+                self.log.warn("Game type guessed from flags file to be Skyrim Special Edition but can't tell for sure.")
+            else:
+                self.log.error("Can't determine game type. Please add Game attribute to PPJ or specify in options.")
+
+        prj.options.game_type = self.game_type
+        prj.game_type = self.game_type
+        self.game_path = prj.get_game_path()
+        self.compiler_path = prj.get_compiler_path()
+        self.input_path = prj.options.input_path
+
+
 
     @staticmethod
     def _get_node(parent_node: etree.Element, tag: str, ns: str = 'PapyrusProject.xsd') -> etree.Element:

@@ -9,6 +9,7 @@ nuitka = "==0.6.5"
 
 [packages]
 lxml = "==4.3.4"
+pywin32 = "*"
 
 [requires]
 python_version = "3.7"
