@@ -16,9 +16,9 @@ class Project:
     def __init__(self, options: ProjectOptions):
         self._ini: configparser.ConfigParser = configparser.ConfigParser()
         self._ini.read(options.pyro_cfg_path)
+        self.game_path = None
 
         self.options: ProjectOptions = options
-        self.game_path: str = self.get_game_path()
 
     @property
     def is_fallout4(self) -> bool:
@@ -67,25 +67,30 @@ class Project:
         return ValidationState.FILE_NOT_MODIFIED
 
     def get_bsarch_path(self) -> str:
-        return PathHelper.parse(self._ini['Pyro']['BSArchPath'], self.game_path)
+        return PathHelper.parse(self._ini['Pyro']['BSArchPath'], self.get_game_path())
 
     def get_compiler_path(self) -> str:
         """Retrieve compiler path from pyro.ini"""
-        return PathHelper.parse(self._ini['Compiler']['Path'], self.game_path)
+        return PathHelper.parse(self._ini['Compiler']['Path'], self.get_game_path())
 
     def get_flags_path(self) -> str:
         """Retrieve flags path from pyro.ini"""
-        return PathHelper.parse(self._ini[self.options.game_type.name]['Flags'], self.game_path)
+        return PathHelper.parse(self._ini[self.options.game_type.name]['Flags'], self.get_game_path())
 
     def get_game_path(self) -> str:
         """Retrieve game path from either pyro.ini or Windows Registry"""
+        if self.game_path:
+            return self.game_path
         game_path = self._ini['Shared']['GamePath']
 
         if len(game_path) > 0 and os.path.exists(game_path):
+            self.game_path = game_path
             return game_path
 
         if sys.platform == 'win32':
-            return self._winreg_get_game_path()
+            game_path = self._winreg_get_game_path()
+            self.game_path = game_path
+            return game_path
 
         raise ValueError('Cannot retrieve game path from pyro.ini or Windows Registry')
 

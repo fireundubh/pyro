@@ -24,14 +24,14 @@ class Application:
             return print_help()
 
         # if required arguments not set, show help
-        if args.game is None:
-            logger.error('required argument missing: -g {tesv,fo4,sse}' + os.linesep)
-            return print_help()
+        # if args.game is None:
+        #    logger.error('required argument missing: -g {tesv,fo4,sse}' + os.linesep)
+        #    return print_help()
 
         input_path = args.input
 
         if input_path is None:
-            logger.error('required argument missing: -i INPUT' + os.linesep)
+            logger.error('required argument missing: -i INPUT.ppj' + os.linesep)
             return print_help()
 
         if not input_path.endswith('.ppj'):
@@ -48,6 +48,7 @@ class Application:
         project_options.disable_anonymizer = args.disable_anonymizer
         project_options.disable_bsarch = args.disable_bsarch
         project_options.disable_indexer = args.disable_indexer
+        project_options.disable_parallel = args.disable_parallel
         project_options.game_type = GameType.from_str(args.game)
         project_options.input_path = input_path
 
@@ -92,31 +93,35 @@ class Application:
 
 
 if __name__ == '__main__':
-    _parser = argparse.ArgumentParser(add_help=False, description='Pyro CLI by fireundubh')
+    _parser = argparse.ArgumentParser(add_help=False,
+        description='Pyro CLI by fireundubh. '
+            'This utility will take an extended .PPJ file and compile all Sources in parallel. '
+            'See https://github.com/fireundubh/pyro for more details on the extended PPJ format.')
 
     _required_arguments = _parser.add_argument_group('required arguments')
-
-    _required_arguments.add_argument('-g', dest='game',
-                                     action='store', choices={'fo4', 'tesv', 'sse'},
-                                     help='set compiler version')
     _required_arguments.add_argument('-i', dest='input',
                                      action='store',
-                                     help='absolute path to input file or folder')
-    _required_arguments.add_argument('-c', dest='conf',
-                                     action='store', default=os.path.join(os.path.dirname(__file__), 'pyro.ini'),
-                                     help='absolute path to pyro.ini')
+                                     help='absolute path to input ppj file')
 
     _optional_arguments = _parser.add_argument_group('optional arguments')
-
+    _optional_arguments.add_argument('-g', dest='game',
+                                     action='store', choices={'fo4', 'tesv', 'sse'},
+                                     help='set compiler version')
+    _optional_arguments.add_argument('-c', dest='conf',
+                                     action='store', default=os.path.join(os.path.dirname(__file__), 'pyro.ini'),
+                                     help='absolute path to pyro.ini')
     _optional_arguments.add_argument('--disable-anonymizer',
                                      action='store_true', default=False,
-                                     help='do not anonymize script metadata')
+                                     help='do not anonymize script metadata (if configured in ppj)')
     _optional_arguments.add_argument('--disable-bsarch',
                                      action='store_true', default=False,
-                                     help='do not pack scripts with BSArch')
+                                     help='do not pack scripts with BSArch (if configured in ppj)')
     _optional_arguments.add_argument('--disable-indexer',
                                      action='store_true', default=False,
                                      help='do not index scripts')
+    _optional_arguments.add_argument('--disable-parallel',
+                                     action='store_true', default=False,
+                                     help='disable parallellization (for debugging)')
 
     _program_arguments = _parser.add_argument_group('program arguments')
 

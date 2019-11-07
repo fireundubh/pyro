@@ -77,6 +77,7 @@ Element | Support
 Element | Attribute | Data Type | Value
 :--- | :--- | :--- | :---
 PapyrusProject | Flags | String | file name with extension
+PapyrusProject | Game | String | game this is for: fo4, sse, or tesv
 PapyrusProject | Output | String | absolute path to folder
 PapyrusProject | Optimize | Boolean | true or false
 PapyrusProject | Release | Boolean | true or false

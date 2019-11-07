@@ -5,8 +5,9 @@ from pyro.enums import GameType
 
 class ProjectOptions:
     pyro_cfg_path: str = ''
-    game_type: Enum = GameType.Fallout4
+    game_type: Enum = GameType.none
     input_path: str = ''
     disable_anonymizer: bool = False
     disable_bsarch: bool = False
     disable_indexer: bool = False
+    disable_parallel: bool = False

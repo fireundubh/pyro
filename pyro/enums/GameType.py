@@ -3,9 +3,10 @@ import enum
 
 @enum.unique
 class GameType(enum.Enum):
-    Fallout4 = 0
-    SkyrimSpecialEdition = 1
-    SkyrimClassic = 2
+    none = 0
+    Fallout4 = 1
+    SkyrimSpecialEdition = 2
+    SkyrimClassic = 3
 
     @staticmethod
     def from_str(alias: str) -> enum.Enum:
@@ -15,4 +16,5 @@ class GameType(enum.Enum):
             return GameType.SkyrimSpecialEdition
         if alias == 'tes5':
             return GameType.SkyrimClassic
-        raise NotImplementedError()
+        else:
+            return GameType.none
