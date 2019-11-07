@@ -293,6 +293,15 @@ class PapyrusProject:
         p.imap(self._open_process, commands)
         p.close()
         p.join()
+        # emergency deparallelize just for debugging and such
+        # for command in commands:
+        #     print("Executing: " + command)
+        #     f = os.popen(command, 'r')
+        #     s = True
+        #     while s:
+        #         s = f.read()
+        #         print(s)
+        #     f.close()
 
     def anonymize_scripts(self, script_paths: tuple, output_path: str) -> None:
         if self.project.options.disable_anonymizer:

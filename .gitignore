@@ -3,3 +3,6 @@
 __pycache__/
 Database/
 Tools/
+pyro_cli.build/
+pyro_cli.dist/
+bin/

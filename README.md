@@ -177,4 +177,20 @@ Pyro is open source and licensed under the MIT License.
 
 ### Compiling
 
-Just use [Nuitka](https://nuitka.net/).
+Install pipenv if you don't already have it:
+
+`pip install pipenv`
+or
+`conda install -c conda-forge pipenv` (if using anaconda)
+
+Set up the pipenv environment:
+
+`pipenv install`
+
+The build process uses [Nuitka](https://nuitka.net/) which will be installed in your pipenv environment by pipenv. Nuitka will need either **clang**, **mingw**, or **MSVC**. If you want to use MSVC then you'll need to run the next command from a MSVC developer shell.
+
+Run the build script:
+
+`pipenv run python build.py`
+
+This will create a `pyro_cli.dist` directory with the exe and all the stuff needed to run it, and it will place a zip archive of this directory in a `bin` directory.
