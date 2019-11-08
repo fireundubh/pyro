@@ -319,13 +319,8 @@ class PapyrusProject:
     def _unparallelize(self, commands: tuple) -> None:
         """emergency deparallelize just for debugging and such"""
         for command in commands:
-            print("Executing: " + command)
-            f = os.popen(command, 'r')
-            s = True
-            while s:
-                s = f.read()
-                print(s)
-            f.close()
+            print('Executing: %s' % command)
+            self._open_process(command, self.use_bsarch)
 
     def anonymize_scripts(self, script_paths: tuple, output_path: str) -> None:
         if self.project.options.disable_anonymizer:
