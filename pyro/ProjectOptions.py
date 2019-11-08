@@ -11,3 +11,11 @@ class ProjectOptions:
     disable_bsarch: bool = False
     disable_indexer: bool = False
     disable_parallel: bool = False
+
+    def __init__(self, options: dict = None):
+        if not options:
+            return
+
+        for key in options:
+            if key in options:
+                setattr(self, key, options[key])

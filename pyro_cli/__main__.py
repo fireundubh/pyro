@@ -24,11 +24,6 @@ class Application:
         if args.show_help:
             return print_help()
 
-        # if required arguments not set, show help
-        # if args.game is None:
-        #    logger.error('required argument missing: -g {tesv,fo4,sse}' + os.linesep)
-        #    return print_help()
-
         input_path = args.input
 
         if input_path is None:
@@ -44,14 +39,15 @@ class Application:
             input_path = os.path.join(os.getcwd(), input_path.replace('file://', ''))
             logger.warn('Using input path: ' + input_path)
 
-        project_options = ProjectOptions()
-        project_options.pyro_cfg_path = args.conf
-        project_options.disable_anonymizer = args.disable_anonymizer
-        project_options.disable_bsarch = args.disable_bsarch
-        project_options.disable_indexer = args.disable_indexer
-        project_options.disable_parallel = args.disable_parallel
-        project_options.game_type = GameType.from_str(args.game)
-        project_options.input_path = input_path
+        project_options = ProjectOptions({
+            'pyro_cfg_path': args.conf,
+            'disable_anonymizer': args.disable_anonymizer,
+            'disable_bsarch': args.disable_bsarch,
+            'disable_indexer': args.disable_indexer,
+            'disable_parallel': args.disable_parallel,
+            'game_type': GameType.from_str(args.game),
+            'input_path': input_path
+        })
 
         project = Project(project_options)
 
@@ -133,10 +129,8 @@ if __name__ == '__main__':
                                     action='store_true', default=False,
                                     help='show help and exit')
 
-
     def print_help() -> int:
         _parser.print_help()
         return 1
-
 
     Application.run(_parser.parse_args())
