@@ -16,7 +16,7 @@ class Project:
     def __init__(self, options: ProjectOptions):
         self._ini: configparser.ConfigParser = configparser.ConfigParser()
         self._ini.read(options.pyro_cfg_path)
-        self.game_path = None
+        self.game_path: str = ''
 
         self.options: ProjectOptions = options
 
@@ -88,9 +88,8 @@ class Project:
             return game_path
 
         if sys.platform == 'win32':
-            game_path = self._winreg_get_game_path()
-            self.game_path = game_path
-            return game_path
+            self.game_path = self._winreg_get_game_path()
+            return self.game_path
 
         raise ValueError('Cannot retrieve game path from pyro.ini or Windows Registry')
 
