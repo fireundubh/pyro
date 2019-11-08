@@ -8,6 +8,7 @@ from pyro.Project import Project
 from pyro.ProjectOptions import ProjectOptions
 from pyro.TimeElapsed import TimeElapsed
 from pyro.enums import GameType, ValidationState
+from pyro_cli.PyroArgumentParser import PyroArgumentParser
 
 
 class Application:
@@ -93,10 +94,13 @@ class Application:
 
 
 if __name__ == '__main__':
-    _parser = argparse.ArgumentParser(add_help=False,
-        description='Pyro CLI by fireundubh. '
-            'This utility will take an extended .PPJ file and compile all Sources in parallel. '
-            'See https://github.com/fireundubh/pyro for more details on the extended PPJ format.')
+    _parser = PyroArgumentParser(add_help=False,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter,
+                                 description=os.linesep.join([
+                                     'Pyro CLI by fireundubh',
+                                     'A semi-automated incremental build system for TESV, SSE, and FO4 projects'
+                                 ]),
+                                 epilog='For more help, visit: github.com/fireundubh/pyro')
 
     _required_arguments = _parser.add_argument_group('required arguments')
     _required_arguments.add_argument('-i', dest='input',
@@ -121,7 +125,7 @@ if __name__ == '__main__':
                                      help='do not index scripts')
     _optional_arguments.add_argument('--disable-parallel',
                                      action='store_true', default=False,
-                                     help='disable parallellization (for debugging)')
+                                     help='do not parallelize compilation')
 
     _program_arguments = _parser.add_argument_group('program arguments')
 
