@@ -35,19 +35,19 @@ class PapyrusProject:
 
         self.game_type = prj.options.game_type
 
-        if self.game_type == GameType.none:
-            flagsfile = os.path.basename(self.flags_path)
+        if self.game_type == GameType.Unknown:
+            flags_file = os.path.basename(self.flags_path)
             if self.game_attr:
                 self.game_type = GameType.from_str(self.game_attr)
                 self.log.pyro("Game type set by Game attribute in PPJ to " + self.game_attr)
-            elif flagsfile.startswith('Institute'):
+            elif flags_file.startswith('Institute'):
                 self.game_type = GameType.Fallout4
                 self.log.warn("Game type inferred from flags file to be Fallout 4")
-            elif flagsfile.startswith('TESV'):
+            elif flags_file.startswith('TESV'):
                 self.game_type = GameType.SkyrimSpecialEdition
                 self.log.warn("Game type guessed from flags file to be Skyrim Special Edition but can't tell for sure.")
             else:
-                self.log.error("Can't determine game type. Please add Game attribute to PPJ or specify in options.")
+                self.log.error("Cannot determine game type. Please add Game attribute to PPJ or specify in options.")
 
         prj.options.game_type = self.game_type
         prj.game_type = self.game_type
