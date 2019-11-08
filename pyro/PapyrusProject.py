@@ -55,8 +55,6 @@ class PapyrusProject:
         self.compiler_path = prj.get_compiler_path()
         self.input_path = prj.options.input_path
 
-
-
     @staticmethod
     def _get_node(parent_node: etree.Element, tag: str, ns: str = 'PapyrusProject.xsd') -> etree.Element:
         return parent_node.find('ns:%s' % tag, {'ns': '%s' % ns})
