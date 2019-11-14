@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 
 from pyro.BuildFacade import BuildFacade
 from pyro.Logger import Logger
@@ -8,6 +9,7 @@ from pyro.Project import Project
 from pyro.ProjectOptions import ProjectOptions
 from pyro.TimeElapsed import TimeElapsed
 from pyro_cli.PyroArgumentParser import PyroArgumentParser
+from pyro_cli.PyroRawDescriptionHelpFormatter import PyroRawDescriptionHelpFormatter
 
 
 class Application:
@@ -52,7 +54,7 @@ class Application:
 
 if __name__ == '__main__':
     _parser = PyroArgumentParser(add_help=False,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter,
+                                 formatter_class=PyroRawDescriptionHelpFormatter,
                                  description=os.linesep.join([
                                      'Pyro CLI by fireundubh',
                                      'A semi-automated incremental build system for TESV, SSE, and FO4 projects'
@@ -60,12 +62,13 @@ if __name__ == '__main__':
                                  epilog='For more help, visit: github.com/fireundubh/pyro')
 
     _required_arguments = _parser.add_argument_group('required arguments')
-    _required_arguments.add_argument('-g', dest='game_type',
-                                     action='store', choices={'fo4', 'tesv', 'sse'},
-                                     help='set compiler version')
-    _required_arguments.add_argument('-i', dest='input_path',
-                                     action='store',
-                                     help='absolute path to input ppj file')
+    _required_arguments.add_argument('-g', '--game-type',
+                                     action='store', type=str,
+                                     choices={'fo4', 'tesv', 'sse'},
+                                     help='set game type (choices: fo4, tesv, sse)')
+    _required_arguments.add_argument('-i', '--input-path',
+                                     action='store', type=str,
+                                     help='relative or absolute path to input ppj file')
 
     _optional_arguments = _parser.add_argument_group('optional arguments')
     _optional_arguments.add_argument('--disable-anonymizer',
@@ -78,14 +81,50 @@ if __name__ == '__main__':
                                      action='store_true', default=False,
                                      help='do not parallelize compilation')
 
-    _program_arguments = _parser.add_argument_group('program arguments')
+    _compiler_arguments = _parser.add_argument_group('compiler arguments')
+    _compiler_arguments.add_argument('--compiler-path',
+                                     action='store', type=str,
+                                     help='relative path from game to PapyrusCompiler.exe')
+    _compiler_arguments.add_argument('--flags-path',
+                                     action='store', type=str,
+                                     help='relative path from game to Papyrus flags file')
+    _compiler_arguments.add_argument('--source-path',
+                                     action='store', type=str,
+                                     help='relative path from game to script sources folder')
+    _compiler_arguments.add_argument('--base-path',
+                                     action='store', type=str,
+                                     help='relative path from game to base script sources folder')
+    _compiler_arguments.add_argument('--user-path',
+                                     action='store', type=str,
+                                     help='relative path from game to user script sources folder')
 
+    _game_arguments = _parser.add_argument_group('game arguments')
+    _game_arguments.add_argument('--game-path',
+                                 action='store', type=str,
+                                 help='absolute path to installation directory for game')
+
+    if sys.platform == 'win32':
+        _game_arguments.add_argument('--registry-path',
+                                     action='store', type=str,
+                                     help='path to Installed Path key for game in Windows Registry')
+
+    _tool_arguments = _parser.add_argument_group('tool arguments')
+    _tool_arguments.add_argument('--bsarch-path',
+                                 action='store', type=str,
+                                 help='relative or absolute path to BSArch.exe')
+
+    _program_arguments = _parser.add_argument_group('program arguments')
+    _program_arguments.add_argument('--temp-path',
+                                    action='store', type=str,
+                                    help='relative or absolute path to temp folder')
     _program_arguments.add_argument('--help', dest='show_help',
                                     action='store_true', default=False,
                                     help='show help and exit')
 
+
     def print_help() -> int:
         _parser.print_help()
         return 1
+
 
     Application.run(_parser.parse_args())
