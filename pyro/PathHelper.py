@@ -1,33 +1,23 @@
 import os
-import posixpath
 
 
 class PathHelper:
     @staticmethod
-    def compare(source_path: str, target_path: str) -> bool:
-        if source_path == target_path:
-            return True
-        if os.path.normpath(source_path) == os.path.normpath(target_path):
-            return True
-        if posixpath.normpath(source_path) == posixpath.normpath(target_path):
-            return True
-        if not os.path.isabs(target_path):
-            if os.path.normpath(source_path).endswith(os.path.normpath(target_path)):
-                return True
-            if posixpath.normpath(source_path).endswith(posixpath.normpath(target_path)):
-                return True
-        return False
+    def nsify(path: str) -> str:
+        """Converts absolute paths to relative namespace paths"""
+        namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(path), path])
+        return os.path.join(namespace, file_name)
 
     @staticmethod
-    def parse(ini_path: str, default_path: str = '') -> str:
+    def parse(path: str, default_path: str = '') -> str:
         """Support absolute INI paths, relative local paths, and other paths"""
-        if os.path.isabs(ini_path):
-            return os.path.normpath(ini_path)
+        if os.path.isabs(path):
+            return os.path.normpath(path)
 
         # realpath supports curdir and pardir
-        path = os.path.realpath(os.path.join(os.path.dirname(__file__), ini_path))
+        path = os.path.realpath(os.path.join(os.path.dirname(__file__), path))
 
         if not os.path.exists(path) and default_path:
-            path = os.path.join(default_path, ini_path)
+            path = os.path.join(default_path, path)
 
         return os.path.normpath(path)

@@ -1,23 +1,18 @@
 import glob
-import multiprocessing
 import os
 import re
 import shutil
 import subprocess
 import sys
-import time
 from collections import OrderedDict
 
 from lxml import etree
 
-from pyro.Anonymizer import Anonymizer
 from pyro.Arguments import Arguments
-from pyro.Indexer import Indexer
 from pyro.Logger import Logger
 from pyro.PathHelper import PathHelper
+from pyro.PexReader import PexReader
 from pyro.Project import Project
-from pyro.TimeElapsed import TimeElapsed
-from pyro.enums import GameType
 
 
 class PapyrusProject:
@@ -25,35 +20,22 @@ class PapyrusProject:
 
     def __init__(self, prj: Project):
         self.project = prj
+        self.options = prj.options
+        self.pex_reader = PexReader(prj)
 
-        self.root_node = etree.parse(prj.options.input_path, etree.XMLParser(remove_blank_text=True)).getroot()
+        self.root_node = etree.parse(self.options.input_path, etree.XMLParser(remove_blank_text=True)).getroot()
         self.output_path = self.root_node.get('Output')
         self.flags_path = self.root_node.get('Flags')
-        self.game_attr = self.root_node.get('Game')
         self.use_bsarch = self.root_node.get('CreateArchive')
         self.use_anonymizer = self.root_node.get('Anonymize')
 
-        self.game_type = prj.options.game_type
+        # allow xml to set game type but defer to passed argument
+        if not self.options.game_type and self.root_node.get('Game'):
+            self.options.game_type = self.root_node.get('Game').lower()
 
-        if self.game_type == GameType.Unknown:
-            flags_file = os.path.basename(self.flags_path)
-            if self.game_attr:
-                self.game_type = GameType.from_str(self.game_attr)
-                self.log.pyro("Game type set by Game attribute in PPJ to " + self.game_attr)
-            elif flags_file.startswith('Institute'):
-                self.game_type = GameType.Fallout4
-                self.log.warn("Game type inferred from flags file to be Fallout 4")
-            elif flags_file.startswith('TESV'):
-                self.game_type = GameType.SkyrimSpecialEdition
-                self.log.warn("Game type guessed from flags file to be Skyrim Special Edition but can't tell for sure.")
-            else:
-                self.log.error("Cannot determine game type. Please add Game attribute to PPJ or specify in options.")
-
-        prj.options.game_type = self.game_type
-        prj.game_type = self.game_type
         self.game_path = prj.get_game_path()
         self.compiler_path = prj.get_compiler_path()
-        self.input_path = prj.options.input_path
+        self.input_path = self.options.input_path
 
     @staticmethod
     def _get_node(parent_node: etree.Element, tag: str, ns: str = 'PapyrusProject.xsd') -> etree.Element:
@@ -110,27 +92,33 @@ class PapyrusProject:
     def _unique_list(items: list) -> tuple:
         return tuple(OrderedDict.fromkeys(items))
 
-    def _build_commands(self, index: Indexer) -> tuple:
+    def _build_commands(self) -> tuple:
         commands: list = list()
 
         unique_imports: tuple = self._get_imports_from_script_paths()
-        script_paths: tuple = self.get_script_paths()
+        real_psc_paths: tuple = self.get_script_paths(True)
+        script_paths_compiled: tuple = self.get_script_paths_compiled()
 
         arguments: Arguments = Arguments()
 
-        for script_path in script_paths:
-            if not self.project.options.disable_indexer:
-                if index.compare(script_path):
+        for real_psc_path in real_psc_paths:
+            script_name: str = os.path.splitext(os.path.basename(real_psc_path))[0]
+
+            # if pex exists, compare time_t in pex header with psc's last modified timestamp
+            pex_path: str = [s for s in script_paths_compiled if s.endswith('%s.pex' % script_name)][0]
+            if os.path.exists(pex_path):
+                compiled_time = self.pex_reader.get_compilation_time(pex_path)
+                if os.path.getmtime(real_psc_path) < compiled_time:
                     continue
 
             arguments.clear()
             arguments.append_quoted(self.compiler_path)
-            arguments.append_quoted(script_path)
+            arguments.append_quoted(PathHelper.nsify(real_psc_path))
             arguments.append_quoted(self.output_path, 'o')
             arguments.append_quoted(';'.join(unique_imports), 'i')
             arguments.append_quoted(self.flags_path, 'f')
 
-            if self.project.is_fallout4:
+            if self.options.game_type == 'fo4':
                 release = self.root_node.get('Release')
                 if release and release.casefold() == 'true':
                     arguments.append('-release')
@@ -157,9 +145,9 @@ class PapyrusProject:
         arguments.append_quoted(script_folder)
         arguments.append_quoted(archive_path)
 
-        if self.project.is_fallout4:
+        if self.options.game_type == 'fo4':
             arguments.append('-fo4')
-        elif self.project.is_skyrim_special_edition:
+        elif self.options.game_type == 'sse':
             arguments.append('-sse')
         else:
             arguments.append('-tes5')
@@ -191,7 +179,7 @@ class PapyrusProject:
 
         compiled_script_paths: list = [os.path.join(output_path, script_path.replace('.psc', '.pex')) for script_path in script_paths]
 
-        if not self.project.is_fallout4:
+        if self.options.game_type != 'fo4':
             compiled_script_paths = [os.path.join(output_path, os.path.basename(script_path)) for script_path in compiled_script_paths]
 
         for compiled_script_path in compiled_script_paths:
@@ -307,40 +295,6 @@ class PapyrusProject:
 
         return self._unique_list(include_paths)
 
-    def _parallelize(self, commands: tuple) -> None:
-        multiprocessing.freeze_support()
-        p = multiprocessing.Pool(processes=os.cpu_count())
-        p.imap(self._open_process, commands)
-        p.close()
-        p.join()
-
-    def _unparallelize(self, commands: tuple) -> None:
-        """emergency deparallelize just for debugging and such"""
-        for command in commands:
-            print('Executing: %s' % command)
-            self._open_process(command, self.use_bsarch)
-
-    def anonymize_scripts(self, script_paths: tuple, output_path: str) -> None:
-        if self.project.options.disable_anonymizer:
-            self.log.warn('Anonymizer disabled by user.')
-        elif not self.use_anonymizer:
-            self.log.warn('Anonymizer not enabled in PPJ.')
-        else:
-            anon = Anonymizer(self.project)
-            for relative_path in script_paths:
-                pex_path = os.path.join(output_path, relative_path)
-                self.log.anon('INFO: Anonymizing: ' + pex_path)
-                anon.anonymize_script(pex_path)
-
-    def compile_custom(self, index: Indexer, time_elapsed: TimeElapsed) -> None:
-        commands = self._build_commands(index)
-        time_elapsed.start_time = time.time()
-        if self.project.options.disable_parallel:
-            self._unparallelize(commands)
-        else:
-            self._parallelize(commands)
-        time_elapsed.end_time = time.time()
-
     def get_output_path(self) -> str:
         output_path = self.output_path
 
@@ -376,7 +330,7 @@ class PapyrusProject:
         output_path = self.get_output_path()
 
         # only fo4 supports namespaced script names
-        psc_paths = [script_path if self.project.is_fallout4 else os.path.basename(script_path)
+        psc_paths = [script_path if self.options.game_type == 'fo4' else os.path.basename(script_path)
                      for script_path in self.get_script_paths()]
 
         # return paths to compiled scripts
@@ -384,19 +338,8 @@ class PapyrusProject:
 
         return tuple(os.path.normpath(pex_path) for pex_path in pex_paths if os.path.exists(pex_path))
 
-    def index_scripts(self, script_paths: tuple, index: Indexer) -> None:
-        for relative_path in script_paths:
-            try:
-                source_path = self._get_absolute_script_path(relative_path)
-            except FileExistsError:
-                source_path = ''.join([x for x in self.get_script_paths(True) if x.endswith(relative_path)])
-                if source_path == '' or not os.path.exists(source_path):
-                    raise
-
-            index.write_row(source_path)
-
     def pack_archive(self) -> None:
-        if self.project.options.disable_bsarch:
+        if self.options.disable_bsarch:
             self.log.warn('BSA/BA2 packing disabled by user.')
             return
 
@@ -405,7 +348,7 @@ class PapyrusProject:
             return
 
         # create temporary folder
-        tmp_path: str = PathHelper.parse(self.project._ini['Pyro']['TempPath'])
+        tmp_path: str = PathHelper.parse(self.options.temp_path)
         tmp_scripts_path = os.path.join(tmp_path, 'Scripts')
 
         # clear temporary data
@@ -444,32 +387,3 @@ class PapyrusProject:
         # clear temporary data
         if os.path.exists(tmp_path):
             shutil.rmtree(tmp_path)
-
-    def validate_project(self, index: Indexer, time_elapsed: TimeElapsed) -> tuple:
-        output_path = self.get_output_path()
-
-        pex_paths = self.get_script_paths_compiled()
-
-        # return relative paths to indexable scripts
-        validated_paths = list()
-        validation_states = set()
-
-        for script_path in pex_paths:
-            validation_state = self.project.validate_script(script_path, time_elapsed)
-            validation_states.add(validation_state)
-
-            if validation_state.FILE_MODIFIED:
-                relative_script_path = os.path.relpath(script_path, output_path)
-                validated_paths.append(relative_script_path)
-
-        if len(validated_paths) == 0:
-            self.log.warn('No source scripts were indexed. Possible reason: No source scripts were recently modified.')
-            return tuple()
-
-        if self.project.options.disable_indexer:
-            self.log.warn('No source scripts were indexed. Indexing disabled by user.')
-            return tuple()
-
-        self.index_scripts(tuple(validated_paths), index)
-
-        return validated_paths, validation_states
