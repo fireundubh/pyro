@@ -22,7 +22,7 @@ class BuildFacade:
         modified_scripts = []
 
         for psc_path in self.psc_paths:
-            script_name = os.path.splitext(os.path.basename(psc_path))[0]
+            script_name, _ = os.path.splitext(os.path.basename(psc_path))
 
             # if pex exists, compare time_t in pex header with psc's last modified timestamp
             pex_path: str = [pex_path for pex_path in self.pex_paths if pex_path.endswith('%s.pex' % script_name)][0]
@@ -52,7 +52,7 @@ class BuildFacade:
 
         if self.ppj.options.disable_anonymizer:
             self.logger.warn('Anonymization disabled by user.')
-        elif len(modified_scripts) == 0:
+        elif not modified_scripts:
             self.logger.error('Cannot anonymize compiled scripts because no source scripts were modified')
         else:
             anonymizer = Anonymizer(self.ppj.project)
@@ -63,7 +63,7 @@ class BuildFacade:
                 anonymizer.anonymize_script(pex_path)
 
     def try_compile(self, time_elapsed: TimeElapsed) -> None:
-        commands = self.ppj._build_commands()
+        commands: tuple = self.ppj._build_commands()
 
         time_elapsed.start_time = time.time()
 
@@ -83,7 +83,7 @@ class BuildFacade:
     def try_pack(self):
         missing_scripts: list = self.find_missing_scripts()
 
-        if len(missing_scripts) == 0:
+        if not missing_scripts:
             self.ppj.pack_archive()
             return
 

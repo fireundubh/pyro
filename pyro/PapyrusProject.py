@@ -102,14 +102,16 @@ class PapyrusProject:
         arguments: Arguments = Arguments()
 
         for real_psc_path in real_psc_paths:
-            script_name: str = os.path.splitext(os.path.basename(real_psc_path))[0]
+            script_name, _ = os.path.splitext(os.path.basename(real_psc_path))
 
             # if pex exists, compare time_t in pex header with psc's last modified timestamp
             pex_path: str = [s for s in script_paths_compiled if s.endswith('%s.pex' % script_name)][0]
-            if os.path.exists(pex_path):
-                compiled_time = self.pex_reader.get_compilation_time(pex_path)
-                if os.path.getmtime(real_psc_path) < compiled_time:
-                    continue
+            if not os.path.exists(pex_path):
+                continue
+
+            compiled_time = self.pex_reader.get_compilation_time(pex_path)
+            if os.path.getmtime(real_psc_path) < compiled_time:
+                continue
 
             arguments.clear()
             arguments.append_quoted(self.compiler_path)
@@ -191,7 +193,7 @@ class PapyrusProject:
     def _get_absolute_script_path(self, target_path: str) -> str:
         xml_import_paths = self._get_node_children_values(self.root_node, 'Imports')
 
-        script_paths = list()
+        script_paths = []
         for xml_import_path in xml_import_paths:
             source_paths = glob.glob(os.path.join(xml_import_path, '**\*.psc'), recursive=True)
             script_paths.extend(source_paths)
@@ -205,11 +207,11 @@ class PapyrusProject:
 
     def _get_script_paths_from_folders_node(self) -> tuple:
         """Retrieves script paths from the Folders node"""
-        script_paths: list = list()
+        script_paths = []
 
         folders_node = self._get_node(self.root_node, 'Folders')
 
-        if folders_node is None:
+        if not folders_node:
             return ()
 
         # defaults to False if the attribute does not exist
@@ -242,7 +244,7 @@ class PapyrusProject:
 
     def _get_script_paths_from_scripts_node(self) -> tuple:
         """Retrieves script paths from the Scripts node"""
-        script_paths: list = list()
+        script_paths = []
 
         scripts_node = self._get_node(self.root_node, 'Scripts')
 
@@ -266,7 +268,7 @@ class PapyrusProject:
     def _get_include_paths_from_includes_node(self) -> tuple:
         # TODO: support includes for multiple archives
 
-        include_paths: list = list()
+        include_paths = []
 
         includes = self._get_node(self.root_node, 'Includes')
         if includes is None:
@@ -309,11 +311,11 @@ class PapyrusProject:
         paths: list = list()
 
         folders_node_paths = self._get_script_paths_from_folders_node()
-        if len(folders_node_paths) > 0:
+        if folders_node_paths and len(folders_node_paths) > 0:
             paths.extend(folders_node_paths)
 
         scripts_node_paths = self._get_script_paths_from_scripts_node()
-        if len(scripts_node_paths) > 0:
+        if scripts_node_paths and len(scripts_node_paths) > 0:
             paths.extend(scripts_node_paths)
 
         results = list(map(lambda x: os.path.normpath(x), paths))
@@ -365,7 +367,7 @@ class PapyrusProject:
         # copy includes to archive
         include_paths = self._get_include_paths_from_includes_node()
 
-        if len(include_paths) > 0:
+        if include_paths and len(include_paths) > 0:
             root_path = os.path.dirname(self.output_path)
 
             for include_path in include_paths:
@@ -376,7 +378,7 @@ class PapyrusProject:
 
         archive_path = self.root_node.get('Archive')
 
-        if archive_path is None:
+        if not archive_path:
             PapyrusProject.log.error('Cannot pack archive because Archive attribute not set')
             return
 

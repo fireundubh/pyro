@@ -10,7 +10,7 @@ class PathHelper:
 
     @staticmethod
     def parse(path: str, default_path: str = '') -> str:
-        """Support absolute INI paths, relative local paths, and other paths"""
+        """Support absolute paths, relative paths, and other paths"""
         if os.path.isabs(path):
             return os.path.normpath(path)
 
