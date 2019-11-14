@@ -13,34 +13,46 @@ from pyro.TimeElapsed import TimeElapsed
 
 
 class Application:
-    @staticmethod
-    def run(args: argparse.Namespace) -> int:
-        """Determine arguments and pass arguments to compiler"""
+    log = Logger()
 
-        logger = Logger()
+    def __init__(self, args: argparse.Namespace):
+        self.args = args
+        self._validate_args()
 
-        if args.show_help:
-            return print_help()
+    def _validate_args(self) -> None:
+        if self.args.show_help:
+            exit(print_help())
 
-        if not args.input_path:
-            logger.error('required argument missing: -i INPUT.ppj' + os.linesep)
-            return print_help()
+        if not self.args.input_path:
+            self.log.error('required argument missing: -i INPUT.ppj')
+            exit(print_help())
 
-        if not args.input_path.endswith('.ppj'):
-            logger.error('Single script compilation is no longer supported. Use a PPJ file.')
-            return print_help()
+        if not self.args.input_path.endswith('.ppj'):
+            self.log.error('Single script compilation is no longer supported. Use a PPJ file.')
+            exit(print_help())
 
-        if not os.path.isabs(args.input_path):
-            logger.warn('Relative input path detected. Using current working directory: ' + os.getcwd())
-            args.input_path = os.path.join(os.getcwd(), args.input_path.replace('file://', ''))
-            logger.warn('Using input path: ' + args.input_path)
+        if not os.path.isabs(self.args.input_path):
+            self.log.warn('Relative input path detected. Using current working directory: ' + os.getcwd())
+            self.args.input_path = os.path.join(os.getcwd(), self.args.input_path.replace('file://', ''))
+            self.log.warn('Using input path: ' + self.args.input_path)
 
-        project_options = ProjectOptions(args)
+    def run(self) -> int:
+        project_options = ProjectOptions(self.args)
         project = Project(project_options)
 
-        time_elapsed = TimeElapsed()
-
         ppj = PapyrusProject(project)
+
+        # allow xml to set game type but defer to passed argument
+        if not ppj.options.game_type:
+            game_type = ppj.root_node.get('Game')
+            if game_type:
+                ppj.options.game_type = game_type
+                ppj.game_path = ppj.project.get_game_path()
+            else:
+                self.log.error('Cannot determine game type from arguments or Papyrus Project')
+                exit(print_help())
+
+        time_elapsed = TimeElapsed()
 
         build = BuildFacade(ppj)
         build.try_compile(time_elapsed)
@@ -62,25 +74,21 @@ if __name__ == '__main__':
                                  epilog='For more help, visit: github.com/fireundubh/pyro')
 
     _required_arguments = _parser.add_argument_group('required arguments')
-    _required_arguments.add_argument('-g', '--game-type',
-                                     action='store', type=str,
-                                     choices={'fo4', 'tesv', 'sse'},
-                                     help='set game type (choices: fo4, tesv, sse)')
     _required_arguments.add_argument('-i', '--input-path',
                                      action='store', type=str,
                                      help='relative or absolute path to input ppj file')
 
     _optional_arguments = _parser.add_argument_group('optional arguments')
-    _optional_arguments.add_argument('--disable-anonymizer',
+    _optional_arguments.add_argument('--no-anonymize',
                                      action='store_true', default=False,
-                                     help='do not anonymize script metadata (if configured in ppj)')
-    _optional_arguments.add_argument('--disable-bsarch',
+                                     help='do not anonymize metadata (if configured in ppj)')
+    _optional_arguments.add_argument('--no-bsarch',
                                      action='store_true', default=False,
                                      help='do not pack scripts with BSArch (if configured in ppj)')
-    _optional_arguments.add_argument('--disable-incremental-build',
+    _optional_arguments.add_argument('--no-incremental-build',
                                      action='store_true', default=False,
                                      help='do not build incrementally')
-    _optional_arguments.add_argument('--disable-parallel',
+    _optional_arguments.add_argument('--no-parallel',
                                      action='store_true', default=False,
                                      help='do not parallelize compilation')
 
@@ -102,14 +110,19 @@ if __name__ == '__main__':
                                      help='relative path from game to user script sources folder')
 
     _game_arguments = _parser.add_argument_group('game arguments')
-    _game_arguments.add_argument('--game-path',
+    _game_arguments.add_argument('-g', '--game-type',
                                  action='store', type=str,
-                                 help='absolute path to installation directory for game')
+                                 choices={'fo4', 'tesv', 'sse'},
+                                 help='set game type (choices: fo4, tesv, sse)')
 
+    _game_path_arguments = _game_arguments.add_mutually_exclusive_group()
+    _game_path_arguments.add_argument('--game-path',
+                                      action='store', type=str,
+                                      help='absolute path to installation directory for game')
     if sys.platform == 'win32':
-        _game_arguments.add_argument('--registry-path',
-                                     action='store', type=str,
-                                     help='path to Installed Path key for game in Windows Registry')
+        _game_path_arguments.add_argument('--registry-path',
+                                          action='store', type=str,
+                                          help='path to game Installed Path key in Windows Registry')
 
     _tool_arguments = _parser.add_argument_group('tool arguments')
     _tool_arguments.add_argument('--bsarch-path',
@@ -130,4 +143,4 @@ if __name__ == '__main__':
         return 1
 
 
-    Application.run(_parser.parse_args())
+    Application(_parser.parse_args()).run()

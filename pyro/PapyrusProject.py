@@ -29,11 +29,6 @@ class PapyrusProject:
         self.use_bsarch = self.root_node.get('CreateArchive')
         self.use_anonymizer = self.root_node.get('Anonymize')
 
-        # allow xml to set game type but defer to passed argument
-        if not self.options.game_type and self.root_node.get('Game'):
-            self.options.game_type = self.root_node.get('Game').lower()
-
-        self.game_path = prj.get_game_path()
         self.compiler_path = prj.get_compiler_path()
         self.input_path = self.options.input_path
 
@@ -102,7 +97,7 @@ class PapyrusProject:
         arguments: Arguments = Arguments()
 
         for real_psc_path in real_psc_paths:
-            if not self.options.disable_incremental_build:
+            if not self.options.no_incremental_build:
                 script_name, _ = os.path.splitext(os.path.basename(real_psc_path))
 
                 # if pex exists, compare time_t in pex header with psc's last modified timestamp
@@ -342,7 +337,7 @@ class PapyrusProject:
         return tuple(os.path.normpath(pex_path) for pex_path in pex_paths if os.path.exists(pex_path))
 
     def pack_archive(self) -> None:
-        if self.options.disable_bsarch:
+        if self.options.no_bsarch:
             self.log.warn('BSA/BA2 packing disabled by user.')
             return
 

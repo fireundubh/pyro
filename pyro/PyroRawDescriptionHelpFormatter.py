@@ -3,7 +3,6 @@ import argparse
 
 class PyroRawDescriptionHelpFormatter(argparse.RawDescriptionHelpFormatter):
     def __init__(self, prog: str, indent_increment: int = 2, max_help_position: int = 35, width: int = 80):
-        self.usage_width = 120
         super().__init__(prog, indent_increment, max_help_position, width)
 
     def _format_action_invocation(self, action: argparse.Action) -> str:

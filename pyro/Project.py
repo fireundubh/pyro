@@ -12,7 +12,6 @@ class Project:
 
     def __init__(self, options: ProjectOptions):
         self.options: ProjectOptions = options
-        self.options.game_path = self.get_game_path()
 
     def _winreg_get_game_path(self) -> str:
         """Retrieve installed path of game using Windows Registry"""

@@ -50,9 +50,9 @@ class BuildFacade:
     def try_anonymize(self):
         modified_scripts: list = self.find_modified_scripts()
 
-        if self.ppj.options.disable_anonymizer:
+        if self.ppj.options.no_anonymize:
             self.logger.warn('Anonymization disabled by user.')
-        elif not modified_scripts and not self.ppj.options.disable_incremental_build:
+        elif not modified_scripts and not self.ppj.options.no_incremental_build:
             self.logger.error('Cannot anonymize compiled scripts because no source scripts were modified')
         else:
             anonymizer = Anonymizer(self.ppj.project)
@@ -67,7 +67,7 @@ class BuildFacade:
 
         time_elapsed.start_time = time.time()
 
-        if self.ppj.options.disable_parallel:
+        if self.ppj.options.no_parallel:
             for command in commands:
                 print('Executing: %s' % command)
                 self.ppj._open_process(command, self.ppj.use_bsarch)

@@ -9,14 +9,13 @@ class ProjectOptions:
     args: Namespace = field(repr=False, default_factory=Namespace)
 
     # required arguments
-    game_type: str = field(init=False, default_factory=lambda: '')
     input_path: str = field(init=False, default_factory=lambda: '')
 
     # optional arguments
-    disable_anonymizer: bool = field(init=False, default_factory=bool)
-    disable_bsarch: bool = field(init=False, default_factory=bool)
-    disable_incremental_build: bool = field(init=False, default_factory=bool)
-    disable_parallel: bool = field(init=False, default_factory=bool)
+    no_anonymize: bool = field(init=False, default_factory=bool)
+    no_bsarch: bool = field(init=False, default_factory=bool)
+    no_incremental_build: bool = field(init=False, default_factory=bool)
+    no_parallel: bool = field(init=False, default_factory=bool)
 
     # compiler arguments
     compiler_path: str = field(init=False, default_factory=lambda: r'Papyrus Compiler\PapyrusCompiler.exe')
@@ -27,6 +26,7 @@ class ProjectOptions:
 
     # game arguments
     game_path: str = field(init=False, default_factory=lambda: '')
+    game_type: str = field(init=False, default_factory=lambda: '')
     registry_path: str = field(init=False, default_factory=lambda: '')
 
     # tool arguments
@@ -53,4 +53,8 @@ class ProjectOptions:
             # normpath converts empty paths to os.curdir which we don't want
             if value == '.':
                 value = ''
+
+        if key == 'game_type':
+            value = value.lower()
+
         super(ProjectOptions, self).__setattr__(key, value)
