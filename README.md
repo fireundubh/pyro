@@ -21,7 +21,6 @@ Pyro automates most build tasks and can play a key role in an automated build an
   - [IDE Integration](#ide-integration)
 - [Contributing](#contributing)
   - [License](#license)
-  - [Packages](#packages)
   - [Compiling](#compiling)
 
 
@@ -53,7 +52,7 @@ Pyro supports the TESV, SSE, and FO4 compilers.
 
 When the game is switched, all paths are generated using the `Installed Path` key in the Windows Registry for the respective games.
 
-You can also set a path explicitly in `pyro.ini` if you are on a non-Windows platform.
+You can also set a path explicitly with the `--game-path` argument if you are on a non-Windows platform.
 
 
 ### Extended PPJ Format
@@ -77,7 +76,7 @@ Element | Support
 Element | Attribute | Data Type | Value
 :--- | :--- | :--- | :---
 PapyrusProject | Flags | String | file name with extension
-PapyrusProject | Game | String | game this is for: fo4, sse, or tesv
+PapyrusProject | Game | String | game type: fo4, tesv, sse
 PapyrusProject | Output | String | absolute path to folder
 PapyrusProject | Optimize | Boolean | true or false
 PapyrusProject | Release | Boolean | true or false
@@ -93,15 +92,9 @@ Includes | Root | String | absolute path to folder
 
 Incremental build _vastly_ accelerates builds by compiling only scripts that need to be compiled.
 
-Here's how the incremental build system works:
+The incremental build system determines which PSC files to compile by comparing the last modified timestamp on PSC files with the compilation timestamps encoded in PEX files by the Papyrus Compiler.
 
-1. After the first successful run, Pyro builds an index for that project containing the file paths and CRC32 hashes of those files.
-2. When generating commands for the next run, the CRC32 hashes of those files are compared with the indexed file records.
-3. Commands are not generated for matching records, reducing the work passed on to the compiler.
-4. Checksum records are updated for previously indexed scripts that have been modified and successfully compiled.
-5. New checksum records are created for new scripts that have been successfully compiled.
-
-In addition, Pyro will spawn multiple instances of the Papyrus Compiler in parallel to further reduce build times.
+Pyro then builds commands to be passed to the Papyrus Compiler and spawn multiple instances of the Papyrus Compiler in parallel to further reduce build times.
 
 
 #### Benchmarks
@@ -115,10 +108,11 @@ However, there is no native PPJ compiler for TESV and SSE. Pyro fills that role.
 
 You can package scripts into BSA and BA2 archives with [BSArch](https://www.nexusmods.com/newvegas/mods/64745).
 
-1. Set the path to `bsarch.exe` in `pyro.ini`.
-2. Add the `Archive` attribute to the `PapyrusProject` root element. Set the value to the absolute path to the destination BSA or BA2 archive.
-3. Add the `CreateArchive` attribute to the `PapyrusProject` root element. Set the value to `True`.
-4. Compile as normal and the compiled scripts will be automatically packaged.
+1. Copy `bsarch.exe` to the `pyro\tools` folder, if the file does not exist.
+2. The path to `bsarch.exe` should be automatically detected. If not, use the `--bsarch-path` argument to set the path.
+3. Add the `Archive` attribute to the `PapyrusProject` root element. Set the value to the absolute path to the destination BSA or BA2 archive.
+4. Add the `CreateArchive` attribute to the `PapyrusProject` root element. Set the value to `True`.
+5. Compile as normal and the compiled scripts will be automatically packaged.
 
 To package arbitrary files, add the following block before the `</PapyrusProject>` end tag:
 
@@ -134,7 +128,7 @@ Currently, folder includes are not supported.
 
 #### Notes
 
-* A temporary folder will be created and deleted at the `TempPath` specified in `pyro.ini`.
+* A temporary folder will be created and deleted at a default temporary path or path specified by `--temp-path`.
 * The compiled scripts and any arbitrary includes to be packaged will be copied to the temporary folder.
 * The temporary folder will be removed if the procedure is successful.
 
@@ -169,12 +163,7 @@ Simply add the `Anonymize` attribute to the `PapyrusProject` root element. Set t
 
 Pyro is open source and licensed under the MIT License.
 
-
-### Packages
-
-- API: The `pyro` package includes all the necessary functionality for the CLI.
-- CLI: The `pyro_cli` package can be executed directly on the command line.
-
+BSArch is licensed under the MPL-2.0 license. The binary included in this repository and distributions of Pyro was compiled from the original unmodified source code available [here](https://github.com/ElminsterAU/xEdit/tree/master/Tools/BSArchive).
 
 ### Compiling
 
@@ -196,4 +185,4 @@ Using the Developer Command Prompt, or any shell with access to development tool
 
 `pipenv run python build.py`
 
-Executing this command will create a `pyro_cli.dist` directory that contains the executable and required libraries and modules. A ZIP archive will be created in the `bin` folder.
+Executing this command will create a `pyro.dist` directory that contains the executable and required libraries and modules. A ZIP archive will be created in the `bin` folder.
