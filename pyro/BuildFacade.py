@@ -4,8 +4,8 @@ import time
 
 from pyro.Anonymizer import Anonymizer
 from pyro.Logger import Logger
-from pyro.PexReader import PexReader
 from pyro.PapyrusProject import PapyrusProject
+from pyro.PexReader import PexReader
 from pyro.TimeElapsed import TimeElapsed
 
 
@@ -52,7 +52,7 @@ class BuildFacade:
 
         if self.ppj.options.disable_anonymizer:
             self.logger.warn('Anonymization disabled by user.')
-        elif not modified_scripts:
+        elif not modified_scripts and not self.ppj.options.disable_incremental_build:
             self.logger.error('Cannot anonymize compiled scripts because no source scripts were modified')
         else:
             anonymizer = Anonymizer(self.ppj.project)

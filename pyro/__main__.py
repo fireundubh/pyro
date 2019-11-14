@@ -7,9 +7,9 @@ from pyro.Logger import Logger
 from pyro.PapyrusProject import PapyrusProject
 from pyro.Project import Project
 from pyro.ProjectOptions import ProjectOptions
+from pyro.PyroArgumentParser import PyroArgumentParser
+from pyro.PyroRawDescriptionHelpFormatter import PyroRawDescriptionHelpFormatter
 from pyro.TimeElapsed import TimeElapsed
-from pyro_cli.PyroArgumentParser import PyroArgumentParser
-from pyro_cli.PyroRawDescriptionHelpFormatter import PyroRawDescriptionHelpFormatter
 
 
 class Application:
@@ -77,6 +77,9 @@ if __name__ == '__main__':
     _optional_arguments.add_argument('--disable-bsarch',
                                      action='store_true', default=False,
                                      help='do not pack scripts with BSArch (if configured in ppj)')
+    _optional_arguments.add_argument('--disable-incremental-build',
+                                     action='store_true', default=False,
+                                     help='do not build incrementally')
     _optional_arguments.add_argument('--disable-parallel',
                                      action='store_true', default=False,
                                      help='do not parallelize compilation')

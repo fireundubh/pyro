@@ -102,16 +102,17 @@ class PapyrusProject:
         arguments: Arguments = Arguments()
 
         for real_psc_path in real_psc_paths:
-            script_name, _ = os.path.splitext(os.path.basename(real_psc_path))
+            if not self.options.disable_incremental_build:
+                script_name, _ = os.path.splitext(os.path.basename(real_psc_path))
 
-            # if pex exists, compare time_t in pex header with psc's last modified timestamp
-            pex_path: str = [s for s in script_paths_compiled if s.endswith('%s.pex' % script_name)][0]
-            if not os.path.exists(pex_path):
-                continue
+                # if pex exists, compare time_t in pex header with psc's last modified timestamp
+                pex_path: str = [s for s in script_paths_compiled if s.endswith('%s.pex' % script_name)][0]
+                if not os.path.exists(pex_path):
+                    continue
 
-            compiled_time = self.pex_reader.get_compilation_time(pex_path)
-            if os.path.getmtime(real_psc_path) < compiled_time:
-                continue
+                compiled_time = self.pex_reader.get_compilation_time(pex_path)
+                if os.path.getmtime(real_psc_path) < compiled_time:
+                    continue
 
             arguments.clear()
             arguments.append_quoted(self.compiler_path)
@@ -355,7 +356,7 @@ class PapyrusProject:
 
         # clear temporary data
         if os.path.exists(tmp_path):
-            shutil.rmtree(tmp_path)
+            shutil.rmtree(tmp_path, ignore_errors=True)
 
         os.makedirs(tmp_path, exist_ok=True)
         os.makedirs(tmp_scripts_path, exist_ok=True)
@@ -388,4 +389,4 @@ class PapyrusProject:
 
         # clear temporary data
         if os.path.exists(tmp_path):
-            shutil.rmtree(tmp_path)
+            shutil.rmtree(tmp_path, ignore_errors=True)

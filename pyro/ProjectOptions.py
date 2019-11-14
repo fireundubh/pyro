@@ -15,6 +15,7 @@ class ProjectOptions:
     # optional arguments
     disable_anonymizer: bool = field(init=False, default_factory=bool)
     disable_bsarch: bool = field(init=False, default_factory=bool)
+    disable_incremental_build: bool = field(init=False, default_factory=bool)
     disable_parallel: bool = field(init=False, default_factory=bool)
 
     # compiler arguments
