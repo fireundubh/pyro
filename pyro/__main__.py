@@ -21,15 +21,15 @@ class Application:
 
     def _validate_args(self) -> None:
         if self.args.show_help:
-            exit(print_help())
+            sys.exit(print_help())
 
         if not self.args.input_path:
             self.log.error('required argument missing: -i INPUT.ppj')
-            exit(print_help())
+            sys.exit(print_help())
 
         if not self.args.input_path.endswith('.ppj'):
             self.log.error('Single script compilation is no longer supported. Use a PPJ file.')
-            exit(print_help())
+            sys.exit(print_help())
 
         if not os.path.isabs(self.args.input_path):
             self.log.warn('Relative input path detected. Using current working directory: ' + os.getcwd())
@@ -50,7 +50,7 @@ class Application:
                 ppj.game_path = ppj.project.get_game_path()
             else:
                 self.log.error('Cannot determine game type from arguments or Papyrus Project')
-                exit(print_help())
+                sys.exit(print_help())
 
         time_elapsed = TimeElapsed()
 

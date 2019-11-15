@@ -45,7 +45,7 @@ class PapyrusProject:
         node = PapyrusProject._get_node(parent_node, tag)
 
         if node is None:
-            exit(PapyrusProject.log.pyro('The PPJ file is missing the following tag: {0}'.format(tag)))
+            sys.exit(PapyrusProject.log.pyro('The PPJ file is missing the following tag: {0}'.format(tag)))
 
         child_nodes = PapyrusProject._get_node_children(node, tag)
 

@@ -41,11 +41,11 @@ class Project:
             reg_value, reg_type = winreg.QueryValueEx(registry_key, key_value)
             winreg.CloseKey(registry_key)
         except WindowsError:
-            exit(self.log.error('Game does not exist in Windows Registry. Run the game launcher once, then try again.'))
+            sys.exit(self.log.error('Game does not exist in Windows Registry. Run the game launcher once, then try again.'))
 
         # noinspection PyUnboundLocalVariable
         if not os.path.exists(reg_value):
-            exit(self.log.error('Directory does not exist: %s' % reg_value))
+            sys.exit(self.log.error('Directory does not exist: %s' % reg_value))
 
         return reg_value
 
