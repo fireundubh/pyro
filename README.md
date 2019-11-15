@@ -6,6 +6,11 @@ Fundamentally, Pyro is a command-line interface (CLI) that parses customized Pap
 
 Pyro automates most build tasks and can play a key role in an automated build and release pipeline. Pyro can also be integrated as an external tool within virtually any IDE, allowing modders to build their projects with a single hotkey.
 
+## Binaries
+
+Latest build: [![](https://github.com/fireundubh/pyro/workflows/GitHub%20CI/badge.svg)](https://github.com/fireundubh/pyro/actions)
+
+Or build Pyro from source. Refer to the [Compiling](#compiling) section for details.
 
 ## Table of Contents
 
@@ -186,3 +191,13 @@ Using the Developer Command Prompt, or any shell with access to development tool
 `pipenv run python build.py`
 
 Executing this command will create a `pyro.dist` directory that contains the executable and required libraries and modules. A ZIP archive will be created in the `bin` folder.
+
+#### Build Script
+
+The build script has three arguments.
+
+Short Argument | Long Argument |  Help
+:--- | :--- | :---
+`-p` | `--package-name` | Specifies package/executable name. Default: `pyro`.
+&mdash; | `--loose` | Skips ZIP generation. Useful for CI.
+&mdash; | `--mingw64` | Forces Nuitka to use mingw64. Not tested.
