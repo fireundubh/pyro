@@ -1,0 +1,37 @@
+name: GitHub CI
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Visual Studio environment
+      if: success()
+      uses: seanmiddleditch/gha-setup-vsdevenv@v1
+    - name: Set up Python 3.7.5 (x64)
+      if: success()
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7.5
+        architecture: x64
+    - uses: dschep/install-pipenv-action@v1
+      if: success()
+    - name: Install dependencies
+      if: success()
+      run: pipenv install
+    - name: Run build script
+      if: success()
+      run: python D:\a\pyro\pyro\build.py --loose
+    - name: Upload artifact
+      if: success()
+      uses: actions/upload-artifact@v1
+      with:
+        name: pyro
+        path: D:\a\pyro\pyro\pyro.dist
