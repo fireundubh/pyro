@@ -2,12 +2,12 @@ import random
 import string
 from typing import BinaryIO
 
-from pyro.Project import Project
+from pyro.ProjectOptions import ProjectOptions
 
 
 class Anonymizer:
-    def __init__(self, prj: Project):
-        self.project = prj
+    def __init__(self, options: ProjectOptions) -> None:
+        self.options: ProjectOptions = options
 
     @staticmethod
     def _randomize_str(length: int, uppercase: bool = False) -> str:
@@ -15,7 +15,7 @@ class Anonymizer:
 
     def _get_metadata(self, file_path: str) -> list:
         with open(file_path, mode='rb') as data:
-            offset = 17 if self.project.options.game_type != 'fo4' else 16
+            offset = 17 if self.options.game_type != 'fo4' else 16
             data.seek(offset)
             file_name = self._read_fixed_length_str(data)
             user_name = self._read_fixed_length_str(data)
@@ -28,13 +28,13 @@ class Anonymizer:
             return ''
 
         # skip null byte
-        if self.project.options.game_type == 'fo4':
+        if self.options.game_type == 'fo4':
             data.read(1)
 
         str_data = data.read(str_length).decode(encoding='ascii')
 
         # skip null byte
-        if self.project.options.game_type != 'fo4':
+        if self.options.game_type != 'fo4':
             data.read(1)
 
         return str_data

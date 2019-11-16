@@ -2,7 +2,11 @@
 .mypy_cache/
 .vscode/
 __pycache__/
-tools/test.bat
+bin/
+logs/
+pyro/dist/
+pyro/temp/
+pyro/tools/
 pyro.build/
 pyro.dist/
-bin/
+tools/test.bat

@@ -1,3 +1,6 @@
+from typing import Callable
+
+
 class TimeElapsed:
     def __init__(self) -> None:
         self._start_time = 0.0
@@ -28,5 +31,7 @@ class TimeElapsed:
     def end_time(self, value: float) -> None:
         self._end_time = value
 
-    def print(self) -> None:
-        print('[PYRO] Time elapsed:', str(self))
+    def print(self, *, callback_func: Callable = None) -> None:
+        if not callback_func:
+            callback_func = print
+        callback_func('Compilation time: %s' % self)

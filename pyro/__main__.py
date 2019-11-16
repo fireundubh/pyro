@@ -5,7 +5,6 @@ import sys
 from pyro.BuildFacade import BuildFacade
 from pyro.Logger import Logger
 from pyro.PapyrusProject import PapyrusProject
-from pyro.Project import Project
 from pyro.ProjectOptions import ProjectOptions
 from pyro.PyroArgumentParser import PyroArgumentParser
 from pyro.PyroRawDescriptionHelpFormatter import PyroRawDescriptionHelpFormatter
@@ -15,7 +14,7 @@ from pyro.TimeElapsed import TimeElapsed
 class Application:
     log = Logger()
 
-    def __init__(self, args: argparse.Namespace):
+    def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
         self._validate_args()
 
@@ -37,29 +36,30 @@ class Application:
             self.log.warn('Using input path: ' + self.args.input_path)
 
     def run(self) -> int:
-        project_options = ProjectOptions(self.args)
-        project = Project(project_options)
-
-        ppj = PapyrusProject(project)
+        options = ProjectOptions(self.args)
+        ppj = PapyrusProject(options)
 
         # allow xml to set game type but defer to passed argument
         if not ppj.options.game_type:
             game_type = ppj.root_node.get('Game')
             if game_type:
                 ppj.options.game_type = game_type
-                ppj.game_path = ppj.project.get_game_path()
-            else:
-                self.log.error('Cannot determine game type from arguments or Papyrus Project')
-                sys.exit(print_help())
+
+        ppj.options.game_path = ppj.get_game_path()
+
+        if not ppj.options.game_path:
+            self.log.error('Cannot determine game type from arguments or Papyrus Project')
+            sys.exit(print_help())
 
         time_elapsed = TimeElapsed()
 
         build = BuildFacade(ppj)
+        build.try_setup()
         build.try_compile(time_elapsed)
         build.try_anonymize()
         build.try_pack()
 
-        time_elapsed.print()
+        time_elapsed.print(callback_func=self.log.pyro)
 
         return 0
 
@@ -78,36 +78,30 @@ if __name__ == '__main__':
                                      action='store', type=str,
                                      help='relative or absolute path to input ppj file')
 
-    _optional_arguments = _parser.add_argument_group('optional arguments')
-    _optional_arguments.add_argument('--no-anonymize',
-                                     action='store_true', default=False,
-                                     help='do not anonymize metadata (if configured in ppj)')
-    _optional_arguments.add_argument('--no-bsarch',
-                                     action='store_true', default=False,
-                                     help='do not pack scripts with BSArch (if configured in ppj)')
-    _optional_arguments.add_argument('--no-incremental-build',
-                                     action='store_true', default=False,
-                                     help='do not build incrementally')
-    _optional_arguments.add_argument('--no-parallel',
-                                     action='store_true', default=False,
-                                     help='do not parallelize compilation')
+    _build_arguments = _parser.add_argument_group('build arguments')
+    _build_arguments.add_argument('--no-anonymize',
+                                  action='store_true', default=False,
+                                  help='do not anonymize metadata (if configured in ppj)')
+    _build_arguments.add_argument('--no-bsarch',
+                                  action='store_true', default=False,
+                                  help='do not pack scripts with BSArch (if configured in ppj)')
+    _build_arguments.add_argument('--no-incremental-build',
+                                  action='store_true', default=False,
+                                  help='do not build incrementally')
+    _build_arguments.add_argument('--no-parallel',
+                                  action='store_true', default=False,
+                                  help='do not parallelize compilation')
 
     _compiler_arguments = _parser.add_argument_group('compiler arguments')
     _compiler_arguments.add_argument('--compiler-path',
                                      action='store', type=str,
-                                     help='relative path from game to PapyrusCompiler.exe')
+                                     help='relative or absolute path to PapyrusCompiler.exe')
     _compiler_arguments.add_argument('--flags-path',
                                      action='store', type=str,
-                                     help='relative path from game to Papyrus flags file')
-    _compiler_arguments.add_argument('--source-path',
+                                     help='relative or absolute path to Papyrus Flags file')
+    _compiler_arguments.add_argument('--output-path',
                                      action='store', type=str,
-                                     help='relative path from game to script sources folder')
-    _compiler_arguments.add_argument('--base-path',
-                                     action='store', type=str,
-                                     help='relative path from game to base script sources folder')
-    _compiler_arguments.add_argument('--user-path',
-                                     action='store', type=str,
-                                     help='relative path from game to user script sources folder')
+                                     help='relative or absolute path to output folder')
 
     _game_arguments = _parser.add_argument_group('game arguments')
     _game_arguments.add_argument('-g', '--game-type',
@@ -118,21 +112,27 @@ if __name__ == '__main__':
     _game_path_arguments = _game_arguments.add_mutually_exclusive_group()
     _game_path_arguments.add_argument('--game-path',
                                       action='store', type=str,
-                                      help='absolute path to installation directory for game')
+                                      help='relative or absolute path to game install directory')
     if sys.platform == 'win32':
         _game_path_arguments.add_argument('--registry-path',
                                           action='store', type=str,
-                                          help='path to game Installed Path key in Windows Registry')
+                                          help='path to Installed Path key for game in Windows Registry')
 
-    _tool_arguments = _parser.add_argument_group('tool arguments')
-    _tool_arguments.add_argument('--bsarch-path',
-                                 action='store', type=str,
-                                 help='relative or absolute path to BSArch.exe')
+    _bsarch_arguments = _parser.add_argument_group('bsarch arguments')
+    _bsarch_arguments.add_argument('--bsarch-path',
+                                   action='store', type=str,
+                                   help='relative or absolute path to bsarch.exe')
+    _bsarch_arguments.add_argument('--archive-path',
+                                   action='store', type=str,
+                                   help='relative or absolute path to zip file')
+    _bsarch_arguments.add_argument('--temp-path',
+                                   action='store', type=str,
+                                   help='relative or absolute path to temp folder')
 
     _program_arguments = _parser.add_argument_group('program arguments')
-    _program_arguments.add_argument('--temp-path',
+    _program_arguments.add_argument('--log-path',
                                     action='store', type=str,
-                                    help='relative or absolute path to temp folder')
+                                    help='relative or absolute path to log folder')
     _program_arguments.add_argument('--help', dest='show_help',
                                     action='store_true', default=False,
                                     help='show help and exit')
