@@ -1,5 +1,6 @@
 import glob
 import os
+import sys
 from collections import OrderedDict
 
 from lxml import etree
@@ -29,7 +30,7 @@ class PapyrusProject(ProjectBase):
         return tuple(OrderedDict.fromkeys(items))
 
     def _get_imports_from_script_paths(self) -> tuple:
-        """Generate list of unique import paths from script paths"""
+        """Returns unique import paths from script paths"""
         script_paths: tuple = self.get_script_paths()
 
         xml_import_paths: list = ElementHelper.get_child_values(self.root_node, 'Imports')
@@ -46,7 +47,7 @@ class PapyrusProject(ProjectBase):
         return self._unique_list(psc_import_paths + xml_import_paths)
 
     def _get_script_paths_from_folders_node(self) -> tuple:
-        """Retrieves script paths from the Folders element array"""
+        """Returns script paths from the Folders element array"""
         script_paths = []
 
         folders_node = ElementHelper.get(self.root_node, 'Folders')
@@ -60,9 +61,9 @@ class PapyrusProject(ProjectBase):
 
         for folder in ElementHelper.get_child_values(self.root_node, 'Folders'):
             # fix relative paths
-            if folder == '.' or folder == '..':
-                # TODO: may not have parity with how the Papyrus Compiler handles these paths
-                folder = os.path.join(os.path.dirname(self.options.input_path), folder)
+            folder = os.path.normpath(folder)
+            if folder in ('.', '..'):
+                folder = os.path.realpath(folder)
             elif not os.path.isabs(folder):
                 folder = self._try_find_folder(folder)
 
@@ -78,10 +79,11 @@ class PapyrusProject(ProjectBase):
     def _try_find_folder(self, folder: str) -> str:
         """Try to find folder in import paths"""
         for import_path in ElementHelper.get_child_values(self.root_node, 'Imports'):
-            test_path = os.path.join(import_path, folder)
+            import_path = os.path.normpath(import_path)
+            test_path = os.path.realpath(os.path.join(import_path, folder))
             if os.path.exists(test_path):
                 return test_path
-        return folder
+        sys.exit(self.log.error('Cannot find folder < %s > in import paths. Are your import paths correct?'))
 
     def _get_script_paths_from_scripts_node(self) -> tuple:
         """Retrieves script paths from the Scripts node"""
@@ -157,6 +159,7 @@ class PapyrusProject(ProjectBase):
 
         return tuple(commands)
 
+    # TODO: this is executed in numerous code paths. need to check if we can optimize.
     def get_script_paths(self, absolute_paths: bool = False) -> tuple:
         """Returns script paths from Folders and Scripts nodes"""
         paths: list = []
