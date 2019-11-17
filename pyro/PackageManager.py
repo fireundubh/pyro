@@ -17,8 +17,9 @@ class PackageManager:
         self.output_path = self.ppj.options.output_path
         self.temp_path = self.ppj.options.temp_path
         self.game_type = self.ppj.options.game_type
+        self.includes_root = ''
 
-    def _copy_scripts_to_temp_path(self, script_paths: tuple, tmp_scripts_path: str) -> None:
+    def _copy_scripts_to_temp_path(self, script_paths: tuple, temp_scripts_path: str) -> None:
         output_path = self.output_path
 
         if any(dots in output_path.split(os.sep) for dots in ['.', '..']):
@@ -27,11 +28,12 @@ class PackageManager:
         pex_paths = [os.path.join(output_path, script_path.replace('.psc', '.pex')) for script_path in script_paths]
 
         if self.game_type != 'fo4':
+            # removes parent namespace folder from paths because TESV and SSE do not support namespaces
             pex_paths = [os.path.join(output_path, os.path.basename(script_path)) for script_path in pex_paths]
 
         for pex_path in pex_paths:
             pex_path = os.path.abspath(pex_path)
-            temp_file_path = os.path.join(tmp_scripts_path, os.path.basename(pex_path))
+            temp_file_path = os.path.join(temp_scripts_path, os.path.basename(pex_path))
 
             shutil.copy2(pex_path, temp_file_path)
 
@@ -49,8 +51,8 @@ class PackageManager:
         except AttributeError:
             return ()
 
-        includes_root = includes.get('Root')
-        if not os.path.exists(includes_root) or not os.path.isabs(includes_root):
+        self.includes_root = includes.get('Root')
+        if not os.path.exists(self.includes_root) or not os.path.isabs(self.includes_root):
             return ()
 
         if includes is not None:
@@ -62,7 +64,7 @@ class PackageManager:
         if len(include_paths) != len(relative_include_paths):
             self.log.warn('Some include paths were removed. Reason: Only relative paths are supported.')
 
-        include_paths = [os.path.join(includes_root, include_path) for include_path in include_paths]
+        include_paths = [os.path.join(self.includes_root, include_path) for include_path in include_paths]
 
         return self.ppj._unique_list(include_paths)
 
@@ -93,12 +95,11 @@ class PackageManager:
             return
 
         # create temporary folder
-        temp_path = self.temp_path
-        temp_scripts_path = os.path.join(temp_path, 'Scripts')
+        temp_scripts_path = os.path.join(self.temp_path, 'Scripts')
 
         # clear temporary data
-        if os.path.exists(temp_path):
-            shutil.rmtree(temp_path, ignore_errors=True)
+        if os.path.exists(self.temp_path):
+            shutil.rmtree(self.temp_path, ignore_errors=True)
 
         os.makedirs(temp_scripts_path, exist_ok=True)
 
@@ -109,12 +110,9 @@ class PackageManager:
         include_paths = self._get_include_paths()
 
         if include_paths:
-            output_path = self.output_path
-            root_path = os.path.dirname(output_path)
-
             for include_path in include_paths:
-                relative_include_path = os.path.relpath(include_path, root_path)
-                target_path = os.path.join(temp_path, relative_include_path)
+                relative_include_path = os.path.relpath(include_path, self.includes_root)
+                target_path = os.path.join(self.temp_path, relative_include_path)
 
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
                 shutil.copy2(include_path, target_path)
@@ -124,9 +122,9 @@ class PackageManager:
             PapyrusProject.log.error('Cannot pack archive because Archive attribute not set')
             return
 
-        commands = self.build_commands(*map(lambda x: os.path.normpath(x), [temp_path, archive_path]))
+        commands = self.build_commands(*map(lambda x: os.path.normpath(x), [self.temp_path, archive_path]))
         ProcessManager.run(commands, use_bsarch=True)
 
         # clear temporary data
-        if os.path.exists(temp_path):
-            shutil.rmtree(temp_path, ignore_errors=True)
+        if os.path.exists(self.temp_path):
+            shutil.rmtree(self.temp_path, ignore_errors=True)
