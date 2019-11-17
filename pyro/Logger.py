@@ -33,9 +33,5 @@ class Logger:
         print('[PYRO] {}'.format(message))
 
     @staticmethod
-    def idxr(message: str) -> None:
-        print('[IDXR] {}'.format(message))
-
-    @staticmethod
     def anon(message: str) -> None:
         print('[ANON] {}'.format(message))
