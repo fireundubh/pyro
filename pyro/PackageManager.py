@@ -54,7 +54,7 @@ class PackageManager:
             return ()
 
         # check if includes root path is relative to project folder
-        if not os.path.abspath(self.includes_root):
+        if not os.path.isabs(self.includes_root):
             test_path = os.path.join(os.path.dirname(self.ppj.options.input_path), self.includes_root)
             if os.path.exists(test_path):
                 self.includes_root = test_path
