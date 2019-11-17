@@ -35,7 +35,7 @@ class ProjectBase:
 
     def get_output_path(self) -> str:
         """Returns absolute output path from arguments"""
-        if not self.options.output_path:
+        if self.options.output_path:
             if os.path.abspath(self.options.output_path):
                 return self.options.output_path
             return os.path.join(os.getcwd(), self.options.output_path)
