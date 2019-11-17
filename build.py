@@ -5,7 +5,7 @@ from os import makedirs, remove
 from os.path import dirname, exists, isfile, join, normpath, relpath
 from shutil import copy2, rmtree
 from subprocess import check_call, CalledProcessError
-from zipfile import ZIP_LZMA, ZipFile
+from zipfile import ZIP_STORED, ZipFile
 
 
 class Application:
@@ -21,7 +21,7 @@ class Application:
         self.root_tools_path = join(self.root_path, 'tools')
         self.dist_tools_path = join(self.dist_path, 'tools')
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key: str, value: str) -> None:
         # sanitize paths
         if key.endswith('path'):
             value = normpath(value)
@@ -62,9 +62,9 @@ class Application:
 
         files = [f for f in glob(join(self.dist_path, '**\*'), recursive=True) if isfile(f)]
 
-        with ZipFile(zip_path, 'w', compression=ZIP_LZMA) as z:
+        with ZipFile(zip_path, 'w', compression=ZIP_STORED) as z:
             for f in files:
-                z.write(f, join(self.package_name, relpath(f, self.dist_path)), compress_type=ZIP_LZMA)
+                z.write(f, join(self.package_name, relpath(f, self.dist_path)), compress_type=ZIP_STORED)
                 print('Added file to archive: %s' % f)
 
         return zip_path
