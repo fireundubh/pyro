@@ -31,9 +31,9 @@ class Application:
             sys.exit(print_help())
 
         if not os.path.isabs(self.args.input_path):
-            self.log.warn('Using working directory: ' + os.getcwd())
+            self.log.warn('Using working directory: "%s"' % os.getcwd())
             self.args.input_path = os.path.join(os.getcwd(), self.args.input_path.replace('file://', ''))
-            self.log.warn('Using input path: ' + self.args.input_path)
+            self.log.warn('Using input path: "%s"' % self.args.input_path)
 
     def run(self) -> int:
         options = ProjectOptions(self.args)

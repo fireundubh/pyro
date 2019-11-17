@@ -26,7 +26,7 @@ class ProcessManager:
 
                     if line.startswith('Packing'):
                         package_path = line.split(':', 1)[1].strip()
-                        ProcessManager.log.bsarch('Packing folder "%s"...' % package_path)
+                        ProcessManager.log.bsarch('Packaging folder "%s"...' % package_path)
                         continue
 
                     if line.startswith('Archive Name'):

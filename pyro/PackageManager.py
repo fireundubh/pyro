@@ -111,13 +111,13 @@ class PackageManager:
 
         if include_paths:
             for include_path in include_paths:
-                relative_include_path = os.path.relpath(include_path, self.includes_root)
-                target_path = os.path.join(self.temp_path, relative_include_path)
+                self.log.pyro('Temporarily copying "%s"...' % include_path)
+
+                include_relpath = os.path.relpath(include_path, self.includes_root)
+                target_path = os.path.join(self.temp_path, include_relpath)
 
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
                 shutil.copy2(include_path, target_path)
-
-                self.log.pyro('Archiving "%s"...' % include_path)
 
         archive_path = self.ppj.root_node.get('Archive')
         if not archive_path:
