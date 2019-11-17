@@ -33,8 +33,11 @@ class PackageManager:
 
         for pex_path in pex_paths:
             pex_path = os.path.abspath(pex_path)
-            temp_file_path = os.path.join(temp_scripts_path, os.path.basename(pex_path))
+            if not os.path.exists(pex_path):
+                self.log.error('Cannot locate file: %s' % pex_path)
+                continue
 
+            temp_file_path = os.path.join(temp_scripts_path, os.path.basename(pex_path))
             shutil.copy2(pex_path, temp_file_path)
 
     def _get_include_paths(self) -> tuple:
