@@ -27,12 +27,12 @@ class BuildFacade:
             setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
 
         # record project options in log
-        os.makedirs(self.ppj.options.log_path, exist_ok=True)
-        log_path = os.path.join(self.ppj.options.log_path, 'pyro-options-%s.log' % int(time.time()))
-        with open(log_path, mode='w', encoding='utf-8') as f:
-            options: dict = deepcopy(self.ppj.options.__dict__)
-            options['args'] = options['args'].__dict__
-            json.dump(options, f, indent=2)
+        if self.ppj.options.log_path:
+            os.makedirs(self.ppj.options.log_path, exist_ok=True)
+            log_path = os.path.join(self.ppj.options.log_path, 'pyro-options-%s.log' % int(time.time()))
+            with open(log_path, mode='w', encoding='utf-8') as f:
+                options: dict = deepcopy(self.ppj.options.__dict__)
+                json.dump(options, f, indent=2)
 
         # noinspection PyAttributeOutsideInit
         self.pex_reader = PexReader(self.ppj.options)
