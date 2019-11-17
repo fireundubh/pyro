@@ -9,7 +9,7 @@ class PyroArgumentParser(ArgumentParser):
         formatter.add_text(self.description)
 
         # usage
-        formatter.add_usage(str(self.usage), self._actions,
+        formatter.add_usage(self.usage, self._actions,
                             self._mutually_exclusive_groups)
 
         # positionals, optionals and user-defined groups
