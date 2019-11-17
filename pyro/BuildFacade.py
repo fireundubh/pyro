@@ -7,6 +7,7 @@ from copy import deepcopy
 
 from pyro.Anonymizer import Anonymizer
 from pyro.Logger import Logger
+from pyro.PackageManager import PackageManager
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PexReader import PexReader
 from pyro.ProcessManager import ProcessManager
@@ -111,4 +112,5 @@ class BuildFacade:
         if self._find_missing_scripts():
             self.log.error('Cannot pack archive because there are missing scripts')
         else:
-            self.ppj.pack_archive()
+            package_manager = PackageManager(self.ppj)
+            package_manager.create_archive()
