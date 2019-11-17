@@ -41,7 +41,7 @@ class Application:
 
         # allow xml to set game type but defer to passed argument
         if not ppj.options.game_type:
-            game_type = ppj.root_node.get('Game')
+            game_type = ppj.root_node.get('Game', default='').casefold()
             if game_type:
                 ppj.options.game_type = game_type
 
@@ -82,10 +82,10 @@ if __name__ == '__main__':
     _build_arguments = _parser.add_argument_group('build arguments')
     _build_arguments.add_argument('--no-anonymize',
                                   action='store_true', default=False,
-                                  help='do not anonymize metadata (if configured in ppj)')
+                                  help='do not anonymize metadata')
     _build_arguments.add_argument('--no-bsarch',
                                   action='store_true', default=False,
-                                  help='do not pack scripts with BSArch (if configured in ppj)')
+                                  help='do not pack scripts with bsarch')
     _build_arguments.add_argument('--no-incremental-build',
                                   action='store_true', default=False,
                                   help='do not build incrementally')
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     if sys.platform == 'win32':
         _game_path_arguments.add_argument('--registry-path',
                                           action='store', type=str,
-                                          help='path to Installed Path key for game in Windows Registry')
+                                          help='path to Installed Path key in Windows Registry')
 
     _bsarch_arguments = _parser.add_argument_group('bsarch arguments')
     _bsarch_arguments.add_argument('--bsarch-path',
@@ -125,7 +125,7 @@ if __name__ == '__main__':
                                    help='relative or absolute path to bsarch.exe')
     _bsarch_arguments.add_argument('--archive-path',
                                    action='store', type=str,
-                                   help='relative or absolute path to zip file')
+                                   help='relative or absolute path to bsa/ba2 file')
     _bsarch_arguments.add_argument('--temp-path',
                                    action='store', type=str,
                                    help='relative or absolute path to temp folder')

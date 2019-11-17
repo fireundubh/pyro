@@ -19,11 +19,10 @@ class PapyrusProject(ProjectBase):
         self.pex_reader = PexReader(self.options)
 
         self.root_node = etree.parse(self.options.input_path, etree.XMLParser(remove_blank_text=True)).getroot()
-        self.options.output_path = self.root_node.get('Output')
-        self.options.flags_path = self.root_node.get('Flags')
-        self.use_bsarch = self.root_node.get('CreateArchive')
-        self.options.no_bsarch = not self.use_bsarch
-        self.use_anonymizer = self.root_node.get('Anonymize')
+        self.options.output_path = self.root_node.get('Output', default='')
+        self.options.flags_path = self.root_node.get('Flags', default='')
+        self.options.no_bsarch = not self.root_node.get('CreateArchive', default='true').casefold() == 'true'
+        self.options.no_anonymize = not self.root_node.get('Anonymize', default='true').casefold() == 'true'
         self.folders: list = []
 
     @staticmethod
@@ -99,8 +98,7 @@ class PapyrusProject(ProjectBase):
             return ()
 
         # defaults to False if the attribute does not exist
-        no_recurse = folders_node.get('NoRecurse')
-        no_recurse_value = no_recurse.casefold() == 'true' if no_recurse is not None else False
+        no_recurse = folders_node.get('NoRecurse', default='false').casefold() == 'true'
 
         for folder in ElementHelper.get_child_values(self.root_node, 'Folders'):
             folder = os.path.normpath(folder)
@@ -113,7 +111,7 @@ class PapyrusProject(ProjectBase):
             self.folders.append(folder)
 
         for folder in self.folders:
-            absolute_script_paths = glob.glob(os.path.join(os.path.abspath(folder), '*.psc'), recursive=not no_recurse_value)
+            absolute_script_paths = glob.glob(os.path.join(os.path.abspath(folder), '*.psc'), recursive=not no_recurse)
 
             # we need path parts, not absolute paths - we're assuming namespaces though (critical flaw?)
             for script_path in absolute_script_paths:
@@ -203,16 +201,16 @@ class PapyrusProject(ProjectBase):
             arguments.append_quoted(flags_path, 'f')
 
             if self.options.game_type == 'fo4':
-                release = self.root_node.get('Release')
-                if release and release.casefold() == 'true':
+                release = self.root_node.get('Release', default='true').casefold() == 'true'
+                if release:
                     arguments.append('-release')
 
-                final = self.root_node.get('Final')
-                if final and final.casefold() == 'true':
+                final = self.root_node.get('Final', default='true').casefold() == 'true'
+                if final:
                     arguments.append('-final')
 
-            optimize = self.root_node.get('Optimize')
-            if optimize and optimize.casefold() == 'true':
+            optimize = self.root_node.get('Optimize', default='true').casefold() == 'true'
+            if optimize:
                 arguments.append('-op')
 
             commands.append(arguments.join())

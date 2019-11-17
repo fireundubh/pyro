@@ -84,7 +84,7 @@ class BuildFacade:
 
         if self.ppj.options.no_parallel:
             for command in commands:
-                ProcessManager.run(command, self.ppj.use_bsarch)
+                ProcessManager.run(command, not self.ppj.options.no_bsarch)
         else:
             multiprocessing.freeze_support()
             p = multiprocessing.Pool(processes=os.cpu_count())
@@ -96,6 +96,7 @@ class BuildFacade:
 
     def try_anonymize(self) -> None:
         """Obfuscates identifying metadata in compiled scripts"""
+
         scripts: list = self._find_modified_scripts()
 
         if self.ppj.options.no_anonymize:
@@ -112,8 +113,12 @@ class BuildFacade:
 
     def try_pack(self) -> None:
         """Generates ZIP archive for project"""
+        if self.ppj.options.no_bsarch:
+            self.log.warn('Cannot build package because packaging was disabled by user')
+            return
+
         if self._find_missing_scripts():
-            self.log.error('Cannot pack archive because there are missing scripts')
+            self.log.error('Cannot build package because there are missing scripts')
         else:
             package_manager = PackageManager(self.ppj)
             package_manager.create_archive()
