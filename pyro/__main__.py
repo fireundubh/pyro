@@ -36,7 +36,7 @@ class Application:
             self.log.warn('Using input path: "%s"' % self.args.input_path)
 
     def run(self) -> int:
-        options = ProjectOptions(self.args)
+        options = ProjectOptions(self.args.__dict__)
         ppj = PapyrusProject(options)
 
         # allow xml to set game type but defer to passed argument
