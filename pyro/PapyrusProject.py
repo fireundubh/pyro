@@ -63,7 +63,7 @@ class PapyrusProject(ProjectBase):
                 if os.path.exists(test_path) and test_path not in results:
                     implicit_paths.append(test_path)
 
-        def _get_import_index(_import_paths: list, _implicit_path: str) -> int:
+        def _get_ancestor_import_index(_import_paths: list, _implicit_path: str) -> int:
             for _i, _import_path in enumerate(_import_paths):
                 if _import_path in _implicit_path:
                     return _i
@@ -72,13 +72,20 @@ class PapyrusProject(ProjectBase):
         implicit_paths.sort()
 
         for implicit_path in reversed(self._unique_list(implicit_paths)):
+            # do not add import paths that are already declared
             if implicit_path in results:
                 continue
 
-            i = _get_import_index(results, implicit_path)
+            self.log.warn('Using import path implicitly: "%s"' % implicit_path)
+
+            # insert implicit path before ancestor import path, if ancestor exists
+            i = _get_ancestor_import_index(results, implicit_path)
             if i > -1:
-                self.log.warn('Using import path implicitly: %s' % implicit_path)
                 results.insert(i, implicit_path)
+                continue
+
+            # insert orphan implicit path at the first position
+            results.insert(0, implicit_path)
 
         return self._unique_list(results)
 
