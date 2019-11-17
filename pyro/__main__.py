@@ -31,7 +31,7 @@ class Application:
             sys.exit(print_help())
 
         if not os.path.isabs(self.args.input_path):
-            self.log.warn('Relative input path detected. Using current working directory: ' + os.getcwd())
+            self.log.warn('Using working directory: ' + os.getcwd())
             self.args.input_path = os.path.join(os.getcwd(), self.args.input_path.replace('file://', ''))
             self.log.warn('Using input path: ' + self.args.input_path)
 
@@ -59,6 +59,8 @@ class Application:
         build.try_pack()
 
         time_elapsed.print(callback_func=self.log.pyro)
+
+        self.log.pyro('DONE!')
 
         return 0
 

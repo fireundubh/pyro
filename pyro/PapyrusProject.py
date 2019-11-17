@@ -24,6 +24,7 @@ class PapyrusProject(ProjectBase):
         self.use_bsarch = self.root_node.get('CreateArchive')
         self.options.no_bsarch = not self.use_bsarch
         self.use_anonymizer = self.root_node.get('Anonymize')
+        self.folders: list = []
 
     @staticmethod
     def _unique_list(items: list) -> tuple:
@@ -33,18 +34,53 @@ class PapyrusProject(ProjectBase):
         """Returns unique import paths from script paths"""
         script_paths: tuple = self.get_script_paths()
 
-        xml_import_paths: list = ElementHelper.get_child_values(self.root_node, 'Imports')
+        import_paths: list = ElementHelper.get_child_values(self.root_node, 'Imports')
 
-        psc_import_paths: list = []
+        results: list = []
+
+        for import_path in import_paths:
+            import_path = os.path.normpath(import_path)
+
+            if import_path == os.curdir or import_path == os.pardir:
+                import_path = os.path.realpath(import_path)
+            elif not os.path.isabs(import_path):
+                # relative import paths should be relative to the project
+                import_path = os.path.join(os.path.join(os.path.dirname(self.options.input_path), import_path))
+
+            if os.path.exists(import_path):
+                results.append(import_path)
+
+        # we also want to test for any implicit import paths
+        implicit_paths: list = []
 
         for script_path in script_paths:
-            for xml_import_path in xml_import_paths:
-                test_path = os.path.join(xml_import_path, os.path.dirname(script_path))
+            if os.path.isabs(script_path):
+                continue
 
-                if os.path.exists(test_path) and test_path not in psc_import_paths:
-                    psc_import_paths.append(test_path)
+            for import_path in import_paths:
+                test_path = os.path.join(import_path, os.path.dirname(script_path))
 
-        return self._unique_list(psc_import_paths + xml_import_paths)
+                if os.path.exists(test_path) and test_path not in results:
+                    implicit_paths.append(test_path)
+
+        def _get_import_index(_import_paths: list, _implicit_path: str) -> int:
+            for _i, _import_path in enumerate(_import_paths):
+                if _import_path in _implicit_path:
+                    return _i
+            return -1
+
+        implicit_paths.sort()
+
+        for implicit_path in reversed(self._unique_list(implicit_paths)):
+            if implicit_path in results:
+                continue
+
+            i = _get_import_index(results, implicit_path)
+            if i > -1:
+                self.log.warn('Using import path implicitly: %s' % implicit_path)
+                results.insert(i, implicit_path)
+
+        return self._unique_list(results)
 
     def _get_script_paths_from_folders_node(self) -> tuple:
         """Returns script paths from the Folders element array"""
@@ -52,7 +88,7 @@ class PapyrusProject(ProjectBase):
 
         folders_node = ElementHelper.get(self.root_node, 'Folders')
 
-        if not folders_node:
+        if folders_node is None:
             return ()
 
         # defaults to False if the attribute does not exist
@@ -60,13 +96,16 @@ class PapyrusProject(ProjectBase):
         no_recurse_value = no_recurse.casefold() == 'true' if no_recurse is not None else False
 
         for folder in ElementHelper.get_child_values(self.root_node, 'Folders'):
-            # fix relative paths
             folder = os.path.normpath(folder)
-            if folder in ('.', '..'):
+
+            if folder == os.curdir or folder == os.pardir:
                 folder = os.path.realpath(folder)
             elif not os.path.isabs(folder):
                 folder = self._try_find_folder(folder)
 
+            self.folders.append(folder)
+
+        for folder in self.folders:
             absolute_script_paths = glob.glob(os.path.join(os.path.abspath(folder), '*.psc'), recursive=not no_recurse_value)
 
             # we need path parts, not absolute paths - we're assuming namespaces though (critical flaw?)
@@ -77,13 +116,19 @@ class PapyrusProject(ProjectBase):
         return self._unique_list(script_paths)
 
     def _try_find_folder(self, folder: str) -> str:
-        """Try to find folder in import paths"""
+        """Try to find folder relative to project, or in import paths"""
+        test_path = os.path.join(os.path.join(os.path.dirname(self.options.input_path), folder))
+        if os.path.exists(test_path):
+            return test_path
+
         for import_path in ElementHelper.get_child_values(self.root_node, 'Imports'):
             import_path = os.path.normpath(import_path)
+
             test_path = os.path.realpath(os.path.join(import_path, folder))
             if os.path.exists(test_path):
                 return test_path
-        sys.exit(self.log.error('Cannot find folder < %s > in import paths. Are your import paths correct?'))
+
+        sys.exit(self.log.error('Cannot find folder relative to project or relative to any import paths: "%s"' % folder))
 
     def _get_script_paths_from_scripts_node(self) -> tuple:
         """Retrieves script paths from the Scripts node"""
@@ -114,7 +159,15 @@ class PapyrusProject(ProjectBase):
         output_path: str = self.options.output_path
 
         unique_imports: tuple = self._get_imports_from_script_paths()
+        self.log.pyro('Imports found:')
+        for import_path in unique_imports:
+            self.log.pyro('- "%s"' % import_path)
+
         real_psc_paths: tuple = self.get_script_paths(True)
+        self.log.pyro('Scripts found:')
+        for script_path in real_psc_paths:
+            self.log.pyro('- "%s"' % script_path)
+
         script_paths_compiled: tuple = self.get_script_paths_compiled()
 
         arguments: CommandArguments = CommandArguments()

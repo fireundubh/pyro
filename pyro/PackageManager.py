@@ -117,6 +117,8 @@ class PackageManager:
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
                 shutil.copy2(include_path, target_path)
 
+                self.log.pyro('Archiving "%s"...' % include_path)
+
         archive_path = self.ppj.root_node.get('Archive')
         if not archive_path:
             PapyrusProject.log.error('Cannot pack archive because Archive attribute not set')

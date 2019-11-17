@@ -22,7 +22,7 @@ class Logger:
 
     @staticmethod
     def bsarch(message: str) -> None:
-        print('[BSAR] INFO: {}'.format(message))
+        print('[BSAR] {}'.format(message))
 
     @staticmethod
     def compiler(message: str) -> None:

@@ -107,7 +107,7 @@ class BuildFacade:
 
             for relative_path in self.pex_paths:
                 pex_path = os.path.join(self.ppj.options.output_path, relative_path)
-                self.log.anon('INFO: Anonymizing: %s' % pex_path)
+                self.log.anon('Anonymizing "%s"...' % pex_path)
                 anonymizer.anonymize_script(pex_path)
 
     def try_pack(self) -> None:
