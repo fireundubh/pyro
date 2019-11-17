@@ -46,15 +46,12 @@ class ProjectOptions:
             except AttributeError:
                 continue
 
-    def __setattr__(self, key: str, value: str) -> None:
+    def __setattr__(self, key: str, value: object) -> None:
         # sanitize paths
-        if key.endswith('path'):
+        if isinstance(value, str) and key.endswith('path'):
             value = os.path.normpath(value)
             # normpath converts empty paths to os.curdir which we don't want
             if value == '.':
                 value = ''
-
-        if key == 'game_type':
-            value = value.casefold()
 
         super(ProjectOptions, self).__setattr__(key, value)
