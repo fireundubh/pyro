@@ -19,9 +19,29 @@ class BuildFacade:
 
     def __init__(self, ppj: PapyrusProject):
         self.ppj = ppj
-        self.pex_reader = PexReader(ppj.options)
-        self.psc_paths: tuple = ppj.get_script_paths(True)
-        self.pex_paths: tuple = ppj.get_script_paths_compiled()
+
+        # WARN: if methods are renamed and their respective option names are not, this will break.
+        for key in self.ppj.options.__dict__:
+            if key in ('args', 'input_path', 'game_type', 'game_path', 'registry_path') or key.startswith('no_'):
+                continue
+            setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
+
+        # record project options in log
+        os.makedirs(self.ppj.options.log_path, exist_ok=True)
+        log_path = os.path.join(self.ppj.options.log_path, 'pyro-options-%s.log' % int(time.time()))
+        with open(log_path, mode='w', encoding='utf-8') as f:
+            options: dict = deepcopy(self.ppj.options.__dict__)
+            options['args'] = options['args'].__dict__
+            json.dump(options, f, indent=2)
+
+        # noinspection PyAttributeOutsideInit
+        self.pex_reader = PexReader(self.ppj.options)
+
+        # noinspection PyAttributeOutsideInit
+        self.psc_paths: tuple = self.ppj.get_script_paths(True)
+
+        # noinspection PyAttributeOutsideInit
+        self.pex_paths: tuple = self.ppj.get_script_paths_compiled()
 
     def _find_missing_scripts(self) -> list:
         scripts = []
@@ -55,23 +75,6 @@ class BuildFacade:
                 scripts.append(pex_path)
 
         return scripts
-
-    def try_setup(self) -> None:
-        """Ensures project options are populated"""
-        # WARN: if methods are renamed and their respective option names are not, this will break.
-        # TODO: alternatively, set each attribute without a loop.
-        for key in self.ppj.options.__dict__:
-            if key in ('args', 'input_path', 'game_type', 'game_path', 'registry_path') or key.startswith('no_'):
-                continue
-            setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
-
-        # record project options in log
-        os.makedirs(self.ppj.options.log_path, exist_ok=True)
-        log_path = os.path.join(self.ppj.options.log_path, 'pyro-options-%s.log' % int(time.time()))
-        with open(log_path, mode='w', encoding='utf-8') as f:
-            options: dict = deepcopy(self.ppj.options.__dict__)
-            options['args'] = options['args'].__dict__
-            json.dump(options, f, indent=2)
 
     def try_compile(self, time_elapsed: TimeElapsed) -> None:
         """Builds and passes commands to Papyrus Compiler"""

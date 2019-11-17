@@ -54,7 +54,6 @@ class Application:
         time_elapsed = TimeElapsed()
 
         build = BuildFacade(ppj)
-        build.try_setup()
         build.try_compile(time_elapsed)
         build.try_anonymize()
         build.try_pack()
