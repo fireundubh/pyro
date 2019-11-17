@@ -201,15 +201,15 @@ class PapyrusProject(ProjectBase):
             arguments.append_quoted(flags_path, 'f')
 
             if self.options.game_type == 'fo4':
-                release = self.root_node.get('Release', default='true').casefold() == 'true'
+                release = self.root_node.get('Release', default='false').casefold() == 'true'
                 if release:
                     arguments.append('-release')
 
-                final = self.root_node.get('Final', default='true').casefold() == 'true'
+                final = self.root_node.get('Final', default='false').casefold() == 'true'
                 if final:
                     arguments.append('-final')
 
-            optimize = self.root_node.get('Optimize', default='true').casefold() == 'true'
+            optimize = self.root_node.get('Optimize', default='false').casefold() == 'true'
             if optimize:
                 arguments.append('-op')
 
