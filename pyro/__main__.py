@@ -39,24 +39,32 @@ class Application:
         options = ProjectOptions(self.args.__dict__)
         ppj = PapyrusProject(options)
 
-        # allow xml to set game type but defer to passed argument
-        if not ppj.options.game_type:
-            game_type = ppj.root_node.get('Game', default='').casefold()
-            if game_type:
-                ppj.options.game_type = game_type
-
-        ppj.options.game_path = ppj.get_game_path()
-
         if not ppj.options.game_path:
             self.log.error('Cannot determine game type from arguments or Papyrus Project')
             sys.exit(print_help())
+
+        self.log.pyro('Imports found:')
+        for import_path in ppj.import_paths:
+            self.log.pyro('- "%s"' % import_path)
+
+        self.log.pyro('Scripts found:')
+        for psc_path in ppj.psc_paths:
+            self.log.pyro('- "%s"' % psc_path)
 
         time_elapsed = TimeElapsed()
 
         build = BuildFacade(ppj)
         build.try_compile(time_elapsed)
-        build.try_anonymize()
-        build.try_pack()
+
+        if not ppj.options.no_anonymize:
+            build.try_anonymize()
+        else:
+            self.log.warn('Cannot anonymize scripts because anonymization was disabled by user')
+
+        if not ppj.options.no_bsarch and ppj.options.bsarch_path:
+            build.try_pack()
+        else:
+            self.log.warn('Cannot build package because packaging was disabled by user')
 
         time_elapsed.print(callback_func=self.log.pyro)
 

@@ -37,30 +37,24 @@ class BuildFacade:
         # noinspection PyAttributeOutsideInit
         self.pex_reader = PexReader(self.ppj.options)
 
-        # noinspection PyAttributeOutsideInit
-        self.psc_paths: tuple = self.ppj.get_script_paths(True)
-
-        # noinspection PyAttributeOutsideInit
-        self.pex_paths: tuple = self.ppj.get_script_paths_compiled()
-
     def _find_missing_scripts(self) -> list:
         scripts = []
 
-        if len(self.psc_paths) > len(self.pex_paths):
-            for psc_path in self.psc_paths:
+        if len(self.ppj.psc_paths) > len(self.ppj.pex_paths):
+            for psc_path in self.ppj.psc_paths:
                 script_name, _ = os.path.splitext(os.path.basename(psc_path))
-                scripts.extend([pex_path for pex_path in self.pex_paths if not pex_path.endswith('%s.pex' % script_name)])
+                scripts.extend([pex_path for pex_path in self.ppj.pex_paths if not pex_path.endswith('%s.pex' % script_name)])
 
         return scripts
 
     def _find_modified_scripts(self) -> list:
         scripts = []
 
-        for psc_path in self.psc_paths:
+        for psc_path in self.ppj.psc_paths:
             script_name, _ = os.path.splitext(os.path.basename(psc_path))
 
             # if pex exists, compare time_t in pex header with psc's last modified timestamp
-            pex_paths: list = [pex_path for pex_path in self.pex_paths if pex_path.endswith('%s.pex' % script_name)]
+            pex_paths: list = [pex_path for pex_path in self.ppj.pex_paths if pex_path.endswith('%s.pex' % script_name)]
             if not pex_paths:
                 continue
 
@@ -78,7 +72,7 @@ class BuildFacade:
 
     def try_compile(self, time_elapsed: TimeElapsed) -> None:
         """Builds and passes commands to Papyrus Compiler"""
-        commands: tuple = self.ppj.build_commands()
+        commands: list = self.ppj.build_commands()
 
         time_elapsed.start_time = time.time()
 
@@ -96,27 +90,30 @@ class BuildFacade:
 
     def try_anonymize(self) -> None:
         """Obfuscates identifying metadata in compiled scripts"""
-
         scripts: list = self._find_modified_scripts()
 
-        if self.ppj.options.no_anonymize:
-            self.log.warn('Anonymization disabled by user.')
-        elif not scripts and not self.ppj.options.no_incremental_build:
+        if not scripts and not self.ppj.options.no_incremental_build:
             self.log.error('Cannot anonymize compiled scripts because no source scripts were modified')
         else:
             anonymizer = Anonymizer(self.ppj.options)
 
-            for relative_path in self.pex_paths:
-                pex_path = os.path.join(self.ppj.options.output_path, relative_path)
-                self.log.anon('Anonymizing "%s"...' % pex_path)
-                anonymizer.anonymize_script(pex_path)
+            for pex_path in self.ppj.pex_paths:
+                if self.ppj.options.game_type == 'fo4':
+                    namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(pex_path), pex_path])
+                    target_path = os.path.join(self.ppj.options.output_path, namespace, file_name)
+                else:
+                    pex_path = os.path.basename(pex_path)
+                    target_path = os.path.join(self.ppj.options.output_path, pex_path)
+
+                if not os.path.exists(target_path):
+                    self.log.error('Cannot locate file to anonymize: "%s"' % target_path)
+                    continue
+
+                self.log.anon('Anonymizing "%s"...' % target_path)
+                anonymizer.anonymize_script(target_path)
 
     def try_pack(self) -> None:
         """Generates ZIP archive for project"""
-        if self.ppj.options.no_bsarch:
-            self.log.warn('Cannot build package because packaging was disabled by user')
-            return
-
         if self._find_missing_scripts():
             self.log.error('Cannot build package because there are missing scripts')
         else:

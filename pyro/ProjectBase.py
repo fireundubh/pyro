@@ -39,7 +39,7 @@ class ProjectBase:
             if os.path.isabs(self.options.output_path):
                 return self.options.output_path
             return os.path.join(os.getcwd(), self.options.output_path)
-        return os.path.realpath(os.path.join(self.program_path, os.pardir, 'out'))
+        return os.path.abspath(os.path.join(self.program_path, os.pardir, 'out'))
 
     # game arguments
     def get_game_path(self) -> str:
@@ -52,7 +52,7 @@ class ProjectBase:
         if sys.platform == 'win32':
             return self.get_registry_path()
 
-        return ''
+        sys.exit(self.log.error('Cannot locate game path'))
 
     def get_registry_path(self) -> str:
         """Returns absolute game path using Windows Registry"""
@@ -98,7 +98,7 @@ class ProjectBase:
             if os.path.isabs(self.options.bsarch_path):
                 return self.options.bsarch_path
             return os.path.join(os.getcwd(), self.options.bsarch_path)
-        return os.path.realpath(os.path.join(self.program_path, 'tools', 'bsarch.exe'))
+        return os.path.abspath(os.path.join(self.program_path, 'tools', 'bsarch.exe'))
 
     def get_archive_path(self) -> str:
         """Returns absolute archive path from arguments"""
@@ -106,7 +106,7 @@ class ProjectBase:
             if os.path.isabs(self.options.archive_path):
                 return self.options.archive_path
             return os.path.join(os.getcwd(), self.options.archive_path)
-        return os.path.realpath(os.path.join(self.program_path, os.pardir, 'dist'))
+        return os.path.abspath(os.path.join(self.program_path, os.pardir, 'dist'))
 
     def get_temp_path(self) -> str:
         """Returns absolute temp path from arguments"""
@@ -114,7 +114,7 @@ class ProjectBase:
             if os.path.isabs(self.options.temp_path):
                 return self.options.temp_path
             return os.path.join(os.getcwd(), self.options.temp_path)
-        return os.path.realpath(os.path.join(self.program_path, os.pardir, 'temp'))
+        return os.path.abspath(os.path.join(self.program_path, os.pardir, 'temp'))
 
     # program arguments
     def get_log_path(self) -> str:
@@ -123,4 +123,4 @@ class ProjectBase:
             if os.path.isabs(self.options.log_path):
                 return self.options.log_path
             return os.path.join(os.getcwd(), self.options.log_path)
-        return os.path.realpath(os.path.join(self.program_path, os.pardir, 'logs'))
+        return os.path.abspath(os.path.join(self.program_path, os.pardir, 'logs'))

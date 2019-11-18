@@ -13,52 +13,55 @@ class PackageManager:
 
     def __init__(self, ppj: PapyrusProject) -> None:
         self.ppj = ppj
-        self.bsarch_path = self.ppj.options.bsarch_path
-        self.output_path = self.ppj.options.output_path
-        self.temp_path = self.ppj.options.temp_path
-        self.game_type = self.ppj.options.game_type
         self.includes_root = ''
 
-    def _copy_scripts_to_temp_path(self, script_paths: tuple, temp_scripts_path: str) -> None:
-        output_path = self.output_path
+    def _copy_scripts_to_temp_path(self, psc_paths: list, temp_path: str) -> None:
+        output_path = self.ppj.options.output_path
 
         if any(dots in output_path.split(os.sep) for dots in ['.', '..']):
-            output_path = os.path.normpath(os.path.join(os.path.dirname(self.ppj.options.input_path), output_path))
+            output_path = os.path.normpath(os.path.join(self.ppj.project_path, output_path))
 
-        pex_paths = [os.path.join(output_path, script_path.replace('.psc', '.pex')) for script_path in script_paths]
+        pex_paths = [os.path.join(output_path, script_path.replace('.psc', '.pex')) for script_path in psc_paths]
 
-        if self.game_type != 'fo4':
+        if self.ppj.options.game_type != 'fo4':
             # removes parent namespace folder from paths because TESV and SSE do not support namespaces
             pex_paths = [os.path.join(output_path, os.path.basename(script_path)) for script_path in pex_paths]
 
         for pex_path in pex_paths:
-            pex_path = os.path.abspath(pex_path)
-            if not os.path.exists(pex_path):
-                self.log.error('Cannot locate file: %s' % pex_path)
+            if self.ppj.options.game_type == 'fo4':
+                namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(pex_path), pex_path])
+                target_path = os.path.join(self.ppj.options.output_path, namespace, file_name)
+                temp_file_path = os.path.join(temp_path, namespace, file_name)
+            else:
+                target_path = os.path.abspath(pex_path)
+                temp_file_path = os.path.join(temp_path, os.path.basename(pex_path))
+
+            if not os.path.exists(target_path):
+                self.log.error('Cannot locate file to copy: %s' % target_path)
                 continue
 
-            temp_file_path = os.path.join(temp_scripts_path, os.path.basename(pex_path))
-            shutil.copy2(pex_path, temp_file_path)
+            os.makedirs(os.path.dirname(temp_file_path), exist_ok=True)
+            shutil.copy2(target_path, temp_file_path)
 
-    def _get_include_paths(self) -> tuple:
+    def _get_include_paths(self) -> list:
         # TODO: support includes for multiple archives
         includes = ElementHelper.get(self.ppj.root_node, 'Includes')
         if includes is None or len(list(includes)) == 0:
-            return ()
+            return []
 
-        self.includes_root = includes.get('Root', default=os.path.dirname(self.ppj.options.input_path))
+        self.includes_root = includes.get('Root', default=self.ppj.project_path)
 
         # treat curdir the same as the project path
         if self.includes_root == os.curdir:
-            self.includes_root = os.path.dirname(self.ppj.options.input_path)
+            self.includes_root = self.ppj.project_path
 
         if self.includes_root == os.pardir:
             self.log.warn('Cannot use parent folder of project path as includes root')
-            return ()
+            return []
 
         # check if includes root path is relative to project folder
         if not os.path.isabs(self.includes_root):
-            test_path = os.path.join(os.path.dirname(self.ppj.options.input_path), self.includes_root)
+            test_path = os.path.join(self.ppj.project_path, self.includes_root)
             if os.path.exists(test_path):
                 self.includes_root = test_path
 
@@ -80,14 +83,14 @@ class PackageManager:
     def build_commands(self, script_folder: str, archive_path: str) -> str:
         arguments = CommandArguments()
 
-        arguments.append_quoted(self.bsarch_path)
+        arguments.append_quoted(self.ppj.options.bsarch_path)
         arguments.append('pack')
         arguments.append_quoted(script_folder)
         arguments.append_quoted(archive_path)
 
-        if self.game_type == 'fo4':
+        if self.ppj.options.game_type == 'fo4':
             arguments.append('-fo4')
-        elif self.game_type == 'sse':
+        elif self.ppj.options.game_type == 'sse':
             arguments.append('-sse')
         else:
             arguments.append('-tes5')
@@ -96,42 +99,46 @@ class PackageManager:
 
     def create_archive(self) -> None:
         # create temporary folder
-        temp_scripts_path = os.path.join(self.temp_path, 'Scripts')
+        temp_scripts_path = os.path.join(self.ppj.options.temp_path, 'Scripts')
 
         # clear temporary data
-        if os.path.exists(self.temp_path):
-            shutil.rmtree(self.temp_path, ignore_errors=True)
+        if os.path.exists(self.ppj.options.temp_path):
+            shutil.rmtree(self.ppj.options.temp_path, ignore_errors=True)
 
         os.makedirs(temp_scripts_path, exist_ok=True)
 
-        script_paths = self.ppj.get_script_paths()
-        self._copy_scripts_to_temp_path(script_paths, temp_scripts_path)
+        self._copy_scripts_to_temp_path(self.ppj.psc_paths, temp_scripts_path)
 
         # copy includes to archive
         include_paths = self._get_include_paths()
-
-        self.log.pyro('Includes found:')
-        for include_path in include_paths:
-            self.log.pyro('- "%s"' % include_path)
-
         if include_paths:
+            self.log.pyro('Includes found:')
+            for include_path in include_paths:
+                self.log.pyro('- "%s"' % include_path)
+
             for include_path in include_paths:
                 include_relpath = os.path.relpath(include_path, self.includes_root)
-                target_path = os.path.join(self.temp_path, include_relpath)
+                target_path = os.path.join(self.ppj.options.temp_path, include_relpath)
 
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
                 shutil.copy2(include_path, target_path)
 
-        self.log.pyro('Copied includes to temporary folder.')
+            self.log.pyro('Copied includes to temporary folder.')
 
-        archive_path = self.ppj.root_node.get('Archive', default='')
-        if not archive_path:
-            PapyrusProject.log.error('Cannot pack archive because Archive attribute not set')
-            return
+        archive_path = self.ppj.options.archive_path
 
-        commands = self.build_commands(*map(lambda x: os.path.normpath(x), [self.temp_path, archive_path]))
+        # handle file paths
+        if not archive_path.casefold().endswith(('.ba2', '.bsa')):
+            archive_name, _ = os.path.splitext(os.path.basename(self.ppj.options.input_path))
+            archive_path = os.path.join(archive_path, '%s%s' % (archive_name, '.ba2' if self.ppj.options.game_type == 'fo4' else '.bsa'))
+
+        # create archive directory
+        os.makedirs(os.path.dirname(archive_path), exist_ok=True)
+
+        # run bsarch
+        commands = self.build_commands(*map(lambda x: os.path.normpath(x), [self.ppj.options.temp_path, archive_path]))
         ProcessManager.run(commands, use_bsarch=True)
 
         # clear temporary data
-        if os.path.exists(self.temp_path):
-            shutil.rmtree(self.temp_path, ignore_errors=True)
+        if os.path.exists(self.ppj.options.temp_path):
+            shutil.rmtree(self.ppj.options.temp_path, ignore_errors=True)
