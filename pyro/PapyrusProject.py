@@ -16,8 +16,6 @@ class PapyrusProject(ProjectBase):
     def __init__(self, options: ProjectOptions) -> None:
         super().__init__(options)
 
-        self.project_path = os.path.dirname(self.options.input_path)
-
         self.root_node = etree.parse(self.options.input_path, etree.XMLParser(remove_blank_text=True)).getroot()
 
         # allow xml to set game type but defer to passed argument

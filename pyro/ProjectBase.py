@@ -10,7 +10,12 @@ class ProjectBase:
 
     def __init__(self, options: ProjectOptions) -> None:
         self.options: ProjectOptions = options
-        self.program_path: str = os.path.dirname(__file__)
+
+        self.program_path = os.path.dirname(__file__)
+        if sys.argv[0].endswith(('pyro', '.exe')):
+            self.program_path = os.path.abspath(os.path.join(self.program_path, os.pardir))
+
+        self.project_path = os.path.dirname(self.options.input_path)
 
     # compiler arguments
     def get_compiler_path(self) -> str:
