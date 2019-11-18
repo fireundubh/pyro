@@ -82,7 +82,6 @@ class Application:
             '--standalone', 'pyro',
             '--include-package=pyro',
             '--experimental=use_pefile',
-            '--python-flag=no_site',
             '--python-flag=nosite',
             '--python-for-scons=%s' % sys.executable,
             '--assume-yes-for-downloads',
