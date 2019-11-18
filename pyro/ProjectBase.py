@@ -33,7 +33,7 @@ class ProjectBase:
                 return self.options.flags_path
             if os.path.isabs(self.options.flags_path):
                 return self.options.flags_path
-            return os.path.join(os.getcwd(), self.options.flags_path)
+            return os.path.join(self.project_path, self.options.flags_path)
 
         game_path: str = self.options.game_path.casefold()
         return 'Institute_Papyrus_Flags.flg' if game_path.endswith('fallout 4') else 'TESV_Papyrus_Flags.flg'
@@ -43,7 +43,7 @@ class ProjectBase:
         if self.options.output_path:
             if os.path.isabs(self.options.output_path):
                 return self.options.output_path
-            return os.path.join(os.getcwd(), self.options.output_path)
+            return os.path.join(self.project_path, self.options.output_path)
         return os.path.abspath(os.path.join(self.program_path, os.pardir, 'out'))
 
     # game arguments
@@ -110,7 +110,7 @@ class ProjectBase:
         if self.options.archive_path:
             if os.path.isabs(self.options.archive_path):
                 return self.options.archive_path
-            return os.path.join(os.getcwd(), self.options.archive_path)
+            return os.path.join(self.project_path, self.options.archive_path)
         return os.path.abspath(os.path.join(self.program_path, os.pardir, 'dist'))
 
     def get_temp_path(self) -> str:
