@@ -5,6 +5,7 @@ from pyro.CommandArguments import CommandArguments
 from pyro.ElementHelper import ElementHelper
 from pyro.Logger import Logger
 from pyro.PapyrusProject import PapyrusProject
+from pyro.PathHelper import PathHelper
 from pyro.ProcessManager import ProcessManager
 
 
@@ -16,20 +17,15 @@ class PackageManager:
         self.includes_root = ''
 
     def _copy_scripts_to_temp_path(self, psc_paths: list, temp_path: str) -> None:
-        output_path = self.ppj.options.output_path
-
-        if any(dots in output_path.split(os.sep) for dots in ['.', '..']):
-            output_path = os.path.normpath(os.path.join(self.ppj.project_path, output_path))
-
-        pex_paths = [os.path.join(output_path, script_path.replace('.psc', '.pex')) for script_path in psc_paths]
+        pex_paths = [os.path.join(self.ppj.options.output_path, psc_path.replace('.psc', '.pex')) for psc_path in psc_paths]
 
         if self.ppj.options.game_type != 'fo4':
-            # removes parent namespace folder from paths because TESV and SSE do not support namespaces
-            pex_paths = [os.path.join(output_path, os.path.basename(script_path)) for script_path in pex_paths]
+            # removes parent and ancestor folders from paths
+            pex_paths = [os.path.join(self.ppj.options.output_path, os.path.basename(pex_path)) for pex_path in pex_paths]
 
         for pex_path in pex_paths:
             if self.ppj.options.game_type == 'fo4':
-                namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(pex_path), pex_path])
+                namespace, file_name = PathHelper.nsify(pex_path)
                 target_path = os.path.join(self.ppj.options.output_path, namespace, file_name)
                 temp_file_path = os.path.join(temp_path, namespace, file_name)
             else:
@@ -78,7 +74,7 @@ class PackageManager:
             if os.path.exists(full_path):
                 results.append(full_path)
 
-        return self.ppj._unique_list(results)
+        return PathHelper.uniqify(results)
 
     def build_commands(self, script_folder: str, archive_path: str) -> str:
         arguments = CommandArguments()

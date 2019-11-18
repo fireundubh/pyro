@@ -9,6 +9,7 @@ from pyro.Anonymizer import Anonymizer
 from pyro.Logger import Logger
 from pyro.PackageManager import PackageManager
 from pyro.PapyrusProject import PapyrusProject
+from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProcessManager import ProcessManager
 from pyro.TimeElapsed import TimeElapsed
@@ -28,6 +29,8 @@ class BuildFacade:
 
         # record project options in log
         if self.ppj.options.log_path:
+            self._rotate_logs(5)
+
             os.makedirs(self.ppj.options.log_path, exist_ok=True)
             log_path = os.path.join(self.ppj.options.log_path, 'pyro-options-%s.log' % int(time.time()))
             with open(log_path, mode='w', encoding='utf-8') as f:
@@ -37,18 +40,40 @@ class BuildFacade:
         # noinspection PyAttributeOutsideInit
         self.pex_reader = PexReader(self.ppj.options)
 
+    def _rotate_logs(self, keep_count: int) -> None:
+        if not os.path.exists(self.ppj.options.log_path):
+            return
+
+        # because we're rotating at start, account for new log file
+        keep_count = keep_count - 1
+
+        log_files = os.listdir(self.ppj.options.log_path)
+        if not (len(log_files) > keep_count):
+            return
+
+        log_paths = [os.path.join(self.ppj.options.log_path, f) for f in log_files]
+
+        logs_to_retain = log_paths[-keep_count:]
+        logs_to_remove = [f for f in log_paths if f not in logs_to_retain]
+
+        for f in logs_to_remove:
+            try:
+                os.remove(f)
+            except PermissionError:
+                self.log.error('Cannot delete log file without permission: %s' % f)
+
     def _find_modified_scripts(self) -> list:
-        scripts = []
+        pex_paths: list = []
 
         for psc_path in self.ppj.psc_paths:
             script_name, _ = os.path.splitext(os.path.basename(psc_path))
 
             # if pex exists, compare time_t in pex header with psc's last modified timestamp
-            pex_paths: list = [pex_path for pex_path in self.ppj.pex_paths if pex_path.endswith('%s.pex' % script_name)]
-            if not pex_paths:
+            pex_match: list = [pex_path for pex_path in self.ppj.pex_paths if pex_path.endswith('%s.pex' % script_name)]
+            if not pex_match:
                 continue
 
-            pex_path: str = pex_paths[0]
+            pex_path: str = pex_match[0]
             if not os.path.exists(pex_path):
                 continue
 
@@ -56,9 +81,9 @@ class BuildFacade:
 
             # if psc is older than the pex
             if os.path.getmtime(psc_path) >= compiled_time:
-                scripts.append(pex_path)
+                pex_paths.append(pex_path)
 
-        return scripts
+        return PathHelper.uniqify(pex_paths)
 
     def try_compile(self, time_elapsed: TimeElapsed) -> None:
         """Builds and passes commands to Papyrus Compiler"""
@@ -89,7 +114,7 @@ class BuildFacade:
 
             for pex_path in self.ppj.pex_paths:
                 if self.ppj.options.game_type == 'fo4':
-                    namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(pex_path), pex_path])
+                    namespace, file_name = PathHelper.nsify(pex_path)
                     target_path = os.path.join(self.ppj.options.output_path, namespace, file_name)
                 else:
                     pex_path = os.path.basename(pex_path)

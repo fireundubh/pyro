@@ -7,6 +7,7 @@ from lxml import etree
 
 from pyro.CommandArguments import CommandArguments
 from pyro.ElementHelper import ElementHelper
+from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProjectBase import ProjectBase
 from pyro.ProjectOptions import ProjectOptions
@@ -58,14 +59,17 @@ class PapyrusProject(ProjectBase):
         return list(OrderedDict.fromkeys(items))
 
     def _find_missing_script_names(self) -> list:
-        scripts = []
+        script_names: list = []
 
         for pex_path in self.pex_paths:
-            if not os.path.exists(pex_path):
-                file_name, _ = os.path.splitext(os.path.basename(pex_path))
-                scripts.append(file_name)
+            if os.path.exists(pex_path):
+                continue
 
-        return scripts
+            file_name, _ = os.path.splitext(os.path.basename(pex_path))
+            if file_name not in script_names:
+                script_names.append(file_name)
+
+        return script_names
 
     def _add_implicit_imports(self, implicit_paths: list, import_paths: list) -> None:
         def _get_ancestor_import_index(_import_paths: list, _implicit_path: str) -> int:
@@ -76,7 +80,7 @@ class PapyrusProject(ProjectBase):
 
         implicit_paths.sort()
 
-        for implicit_path in reversed(self._unique_list(implicit_paths)):
+        for implicit_path in reversed(PathHelper.uniqify(implicit_paths)):
             # do not add import paths that are already declared
             if implicit_path in import_paths:
                 continue
@@ -105,16 +109,18 @@ class PapyrusProject(ProjectBase):
         for import_path in import_paths:
             import_path = os.path.normpath(import_path)
 
-            if import_path == os.curdir or import_path == os.pardir:
-                import_path = os.path.abspath(import_path)
+            if import_path == os.curdir:
+                import_path = self.project_path
+            elif import_path == os.pardir:
+                self.log.warn('Cannot use ".." as import path')
+                continue
             elif not os.path.isabs(import_path):
                 # relative import paths should be relative to the project
-                import_path = os.path.join(os.path.join(self.project_path, import_path))
+                import_path = os.path.join(self.project_path, import_path)
 
-            if os.path.exists(import_path):
-                results.append(import_path)
+            PathHelper.try_append_existing(import_path, results)
 
-        return self._unique_list(results)
+        return PathHelper.uniqify(results)
 
     def _get_implicit_folder_imports(self) -> list:
         implicit_paths: list = []
@@ -126,15 +132,13 @@ class PapyrusProject(ProjectBase):
         folder_paths = ElementHelper.get_child_values(self.root_node, 'Folders')
 
         for folder_path in folder_paths:
-            if not os.path.isabs(folder_path):
-                test_path = os.path.join(self.project_path, folder_path)
-                if os.path.exists(test_path) and test_path not in implicit_paths:
-                    implicit_paths.append(test_path)
-            else:
-                if os.path.exists(folder_path) and folder_path not in implicit_paths:
-                    implicit_paths.append(folder_path)
+            if PathHelper.try_append_abspath(folder_path, implicit_paths):
+                continue
 
-        return self._unique_list(implicit_paths)
+            test_path = os.path.join(self.project_path, folder_path)
+            PathHelper.try_append_existing(test_path, implicit_paths)
+
+        return PathHelper.uniqify(implicit_paths)
 
     def _get_implicit_script_imports(self) -> list:
         """Returns absolute implicit import paths from Folders and Scripts paths"""
@@ -143,21 +147,20 @@ class PapyrusProject(ProjectBase):
         implicit_paths: list = []
 
         for psc_path in self.psc_paths:
-            namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(psc_path), psc_path])
+            namespace, file_name = PathHelper.nsify(psc_path)
 
             for import_path in self.import_paths:
                 test_path = os.path.join(import_path, namespace)
-                if os.path.exists(test_path) and test_path not in implicit_paths and test_path not in results:
-                    implicit_paths.append(test_path)
+                PathHelper.try_append_existing(test_path, implicit_paths)
 
         self._add_implicit_imports(implicit_paths, results)
 
-        return self._unique_list(results)
+        return PathHelper.uniqify(results)
 
     def _get_pex_paths(self) -> list:
         """Returns compiled script paths from output folder"""
-        psc_paths = []
-        pex_paths = []
+        psc_paths: list = []
+        pex_paths: list = []
 
         # build paths to source scripts
         for psc_path in self.psc_paths:
@@ -177,7 +180,7 @@ class PapyrusProject(ProjectBase):
             pex_path = os.path.join(self.options.output_path, psc_path).replace('.psc', '.pex')
             pex_paths.append(pex_path)
 
-        return pex_paths
+        return PathHelper.uniqify(pex_paths)
 
     def _get_psc_paths(self) -> list:
         """Returns script paths from Folders and Scripts nodes"""
@@ -200,13 +203,11 @@ class PapyrusProject(ProjectBase):
         for path in paths:
             path = os.path.normpath(path)
 
-            if os.path.isabs(path):
-                results.append(path)
+            if PathHelper.try_append_abspath(path, results):
                 continue
 
             test_path = os.path.join(self.project_path, path)
-            if os.path.exists(test_path):
-                results.append(test_path)
+            if PathHelper.try_append_existing(test_path, results):
                 continue
 
             for import_path in self.import_paths:
@@ -214,18 +215,16 @@ class PapyrusProject(ProjectBase):
                     import_path = os.path.join(self.project_path, import_path)
 
                 test_path = os.path.join(import_path, path)
-                if os.path.exists(test_path):
-                    results.append(test_path)
+                if PathHelper.try_append_existing(test_path, results):
                     break
 
-        return self._unique_list(results)
+        return PathHelper.uniqify(results)
 
     def _get_script_paths_from_folders_node(self) -> list:
         """Returns script paths from the Folders element array"""
-        paths = []
+        paths: list = []
 
         folders_node = ElementHelper.get(self.root_node, 'Folders')
-
         if folders_node is None:
             return []
 
@@ -235,8 +234,11 @@ class PapyrusProject(ProjectBase):
         for folder in ElementHelper.get_child_values(self.root_node, 'Folders'):
             folder = os.path.normpath(folder)
 
-            if folder == os.curdir or folder == os.pardir:
-                folder = os.path.abspath(folder)
+            if folder == os.curdir:
+                folder = self.project_path
+            elif folder == os.pardir:
+                self.log.warn('Cannot use ".." as folder path')
+                continue
             elif not os.path.isabs(folder):
                 folder = self._try_find_folder(folder)
 
@@ -244,85 +246,83 @@ class PapyrusProject(ProjectBase):
 
         for folder in self.folders:
             search_pattern = os.path.join(folder, '*.psc')
-            script_paths = glob.glob(search_pattern, recursive=not no_recurse)
+            psc_paths = glob.glob(search_pattern, recursive=not no_recurse)
 
             # we need path parts, not absolute paths
-            for script_path in script_paths:
-                namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(script_path), script_path])
-
-                path = file_name
-                if self.options.game_type == 'fo4':
-                    path = os.path.join(namespace, file_name)
-
+            for psc_path in psc_paths:
+                namespace, file_name = PathHelper.nsify(psc_path)
+                path = os.path.join(namespace, file_name) if self.options.game_type == 'fo4' else file_name
                 paths.append(path)
 
-        return self._unique_list(paths)
+        return PathHelper.uniqify(paths)
 
     def _get_script_paths_from_scripts_node(self) -> list:
-        """Retrieves script paths from the Scripts node"""
-        script_paths = []
+        """Returns script paths from the Scripts node"""
+        psc_paths: list = []
 
         scripts_node = ElementHelper.get(self.root_node, 'Scripts')
         if scripts_node is None:
             return []
 
-        # "support" colons by replacing them with path separators so they're proper path parts
-        # but watch out for absolute paths and use the path parts directly instead
-        def fix_path(script_path: str) -> str:
-            if os.path.isabs(script_path):
-                namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(script_path), script_path])
-                return os.path.join(namespace, file_name)
-            return script_path.replace(':', os.sep)
+        for psc_path in ElementHelper.get_child_values(self.root_node, 'Scripts'):
+            if not os.path.isabs(psc_path):
+                path = psc_path.replace(':', os.sep)
+                psc_paths.append(path)
+                continue
 
-        scripts = [fix_path(script_path) for script_path in ElementHelper.get_child_values(self.root_node, 'Scripts')]
-        script_paths.extend(scripts)
+            namespace, file_name = PathHelper.nsify(psc_path)
+            path = os.path.join(namespace, file_name)
+            psc_paths.append(path)
 
-        return self._unique_list(script_paths)
+        return PathHelper.uniqify(psc_paths)
 
     def _try_exclude_unmodified_scripts(self) -> list:
-        scripts_to_compile: list = []
-
         if self.options.no_incremental_build:
-            scripts_to_compile = self.psc_paths
-        else:
-            for psc_path in self.psc_paths:
-                script_name, script_extension = os.path.splitext(os.path.basename(psc_path))
+            return PathHelper.uniqify(self.psc_paths)
 
-                # if pex exists, compare time_t in pex header with psc's last modified timestamp
-                matching_path: str = ''
-                for pex_path in self.pex_paths:
-                    if pex_path.endswith('%s.%s' % (script_name, script_extension)):
-                        matching_path = pex_path
-                        break
+        psc_paths: list = []
 
-                if not os.path.exists(matching_path):
-                    continue
+        for psc_path in self.psc_paths:
+            script_name, script_extension = os.path.splitext(os.path.basename(psc_path))
 
-                compiled_time: int = self.pex_reader.get_compilation_time(matching_path)
-                if os.path.getmtime(psc_path) < compiled_time:
-                    continue
+            # if pex exists, compare time_t in pex header with psc's last modified timestamp
+            matching_path: str = ''
+            for pex_path in self.pex_paths:
+                if pex_path.endswith('%s.pex' % script_name):
+                    matching_path = pex_path
+                    break
 
-                scripts_to_compile.append(psc_path)
+            if not os.path.exists(matching_path):
+                continue
 
-        return scripts_to_compile
+            compiled_time: int = self.pex_reader.get_compilation_time(matching_path)
+            if os.path.getmtime(psc_path) < compiled_time:
+                continue
+
+            psc_paths.append(psc_path)
+
+        return PathHelper.uniqify(psc_paths)
 
     def _try_find_folder(self, folder: str) -> str:
         """Try to find folder relative to project, or in import paths"""
-        test_path = os.path.join(os.path.join(self.project_path, folder))
+        test_path = os.path.join(self.project_path, folder)
         if os.path.exists(test_path):
             return test_path
 
         for import_path in ElementHelper.get_child_values(self.root_node, 'Imports'):
+            if not os.path.isabs(import_path):
+                continue
+
             import_path = os.path.normpath(import_path)
 
-            test_path = os.path.abspath(os.path.join(import_path, folder))
+            test_path = os.path.join(import_path, folder)
             if os.path.exists(test_path):
                 return test_path
 
-        sys.exit(self.log.error('Cannot find folder relative to project or relative to any import paths: "%s"' % folder))
+        sys.exit(self.log.error('Cannot find folder relative to project or any import paths: "%s"' % folder))
 
     def build_commands(self) -> list:
-        commands = []
+        commands: list = []
 
         compiler_path: str = self.options.compiler_path
         flags_path: str = self.options.flags_path
@@ -340,7 +340,7 @@ class PapyrusProject(ProjectBase):
 
         for psc_path in psc_paths:
             if os.path.isabs(psc_path):
-                namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(psc_path), psc_path])
+                namespace, file_name = PathHelper.nsify(psc_path)
                 psc_path = os.path.join(namespace, file_name)
 
             arguments.clear()
