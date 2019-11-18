@@ -3,6 +3,7 @@
 .vscode/
 __pycache__/
 bin/
+dev/
 dist/
 logs/
 out/
@@ -11,4 +12,4 @@ pyro/temp/
 pyro/tools/
 pyro.build/
 pyro.dist/
-tools/test.bat
+*.bat
