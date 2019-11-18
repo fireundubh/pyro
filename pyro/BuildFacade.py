@@ -37,16 +37,6 @@ class BuildFacade:
         # noinspection PyAttributeOutsideInit
         self.pex_reader = PexReader(self.ppj.options)
 
-    def _find_missing_scripts(self) -> list:
-        scripts = []
-
-        if len(self.ppj.psc_paths) > len(self.ppj.pex_paths):
-            for psc_path in self.ppj.psc_paths:
-                script_name, _ = os.path.splitext(os.path.basename(psc_path))
-                scripts.extend([pex_path for pex_path in self.ppj.pex_paths if not pex_path.endswith('%s.pex' % script_name)])
-
-        return scripts
-
     def _find_modified_scripts(self) -> list:
         scripts = []
 
@@ -92,7 +82,7 @@ class BuildFacade:
         """Obfuscates identifying metadata in compiled scripts"""
         scripts: list = self._find_modified_scripts()
 
-        if not scripts and not self.ppj.options.no_incremental_build:
+        if not scripts and not self.ppj.missing_script_names and not self.ppj.options.no_incremental_build:
             self.log.error('Cannot anonymize compiled scripts because no source scripts were modified')
         else:
             anonymizer = Anonymizer(self.ppj.options)
@@ -114,8 +104,5 @@ class BuildFacade:
 
     def try_pack(self) -> None:
         """Generates ZIP archive for project"""
-        if self._find_missing_scripts():
-            self.log.error('Cannot build package because there are missing scripts')
-        else:
-            package_manager = PackageManager(self.ppj)
-            package_manager.create_archive()
+        package_manager = PackageManager(self.ppj)
+        package_manager.create_archive()

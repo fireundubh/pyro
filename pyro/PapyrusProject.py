@@ -48,11 +48,24 @@ class PapyrusProject(ProjectBase):
         # get expected pex paths - these paths may not exist and that is okay!
         self.pex_paths: list = self._get_pex_paths()
 
+        # these are file names
+        self.missing_script_names: list = self._find_missing_script_names()
+
         self.pex_reader = PexReader(self.options)
 
     @staticmethod
     def _unique_list(items: list) -> list:
         return list(OrderedDict.fromkeys(items))
+
+    def _find_missing_script_names(self) -> list:
+        scripts = []
+
+        for pex_path in self.pex_paths:
+            if not os.path.exists(pex_path):
+                file_name, _ = os.path.splitext(os.path.basename(pex_path))
+                scripts.append(file_name)
+
+        return scripts
 
     def _add_implicit_imports(self, implicit_paths: list, import_paths: list) -> None:
         def _get_ancestor_import_index(_import_paths: list, _implicit_path: str) -> int:
@@ -318,6 +331,12 @@ class PapyrusProject(ProjectBase):
         arguments: CommandArguments = CommandArguments()
 
         psc_paths = self._try_exclude_unmodified_scripts()
+
+        for script_name in self.missing_script_names:
+            for psc_path in self.psc_paths:
+                if psc_path.endswith('%s.psc' % script_name):
+                    psc_paths.append(psc_path)
+                    continue
 
         for psc_path in psc_paths:
             if os.path.isabs(psc_path):
