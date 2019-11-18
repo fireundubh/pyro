@@ -7,7 +7,7 @@ from pyro.Logger import Logger
 from pyro.PapyrusProject import PapyrusProject
 from pyro.ProjectOptions import ProjectOptions
 from pyro.PyroArgumentParser import PyroArgumentParser
-from pyro.PyroRawDescriptionHelpFormatter import PyroRawDescriptionHelpFormatter
+from pyro.PyroRawDescriptionHelpFormatter import PyroRawTextHelpFormatter
 from pyro.TimeElapsed import TimeElapsed
 
 
@@ -75,7 +75,7 @@ class Application:
 
 if __name__ == '__main__':
     _parser = PyroArgumentParser(add_help=False,
-                                 formatter_class=PyroRawDescriptionHelpFormatter,
+                                 formatter_class=PyroRawTextHelpFormatter,
                                  description=os.linesep.join([
                                      'Pyro CLI by fireundubh',
                                      'A semi-automated incremental build system for TESV, SSE, and FO4 projects'
@@ -85,9 +85,14 @@ if __name__ == '__main__':
     _required_arguments = _parser.add_argument_group('required arguments')
     _required_arguments.add_argument('-i', '--input-path',
                                      action='store', type=str,
-                                     help='relative or absolute path to input ppj file')
+                                     help='relative or absolute path to input ppj file\n'
+                                          '(if relative, must be relative to current working directory)')
 
     _build_arguments = _parser.add_argument_group('build arguments')
+    _build_arguments.add_argument('--log-path',
+                                  action='store', type=str,
+                                  help='relative or absolute path to log folder\n'
+                                       '(if relative, must be relative to current working directory)')
     _build_arguments.add_argument('--no-anonymize',
                                   action='store_true', default=False,
                                   help='do not anonymize metadata')
@@ -104,13 +109,16 @@ if __name__ == '__main__':
     _compiler_arguments = _parser.add_argument_group('compiler arguments')
     _compiler_arguments.add_argument('--compiler-path',
                                      action='store', type=str,
-                                     help='relative or absolute path to PapyrusCompiler.exe')
+                                     help='relative or absolute path to PapyrusCompiler.exe\n'
+                                          '(if relative, must be relative to current working directory)')
     _compiler_arguments.add_argument('--flags-path',
                                      action='store', type=str,
-                                     help='relative or absolute path to Papyrus Flags file')
+                                     help='relative or absolute path to Papyrus Flags file\n'
+                                          '(if relative, must be relative to project)')
     _compiler_arguments.add_argument('--output-path',
                                      action='store', type=str,
-                                     help='relative or absolute path to output folder')
+                                     help='relative or absolute path to output folder\n'
+                                          '(if relative, must be relative to project)')
 
     _game_arguments = _parser.add_argument_group('game arguments')
     _game_arguments.add_argument('-g', '--game-type',
@@ -121,7 +129,8 @@ if __name__ == '__main__':
     _game_path_arguments = _game_arguments.add_mutually_exclusive_group()
     _game_path_arguments.add_argument('--game-path',
                                       action='store', type=str,
-                                      help='relative or absolute path to game install directory')
+                                      help='relative or absolute path to game install directory\n'
+                                           '(if relative, must be relative to current working directory)')
     if sys.platform == 'win32':
         _game_path_arguments.add_argument('--registry-path',
                                           action='store', type=str,
@@ -130,18 +139,18 @@ if __name__ == '__main__':
     _bsarch_arguments = _parser.add_argument_group('bsarch arguments')
     _bsarch_arguments.add_argument('--bsarch-path',
                                    action='store', type=str,
-                                   help='relative or absolute path to bsarch.exe')
+                                   help='relative or absolute path to bsarch.exe\n'
+                                        '(if relative, must be relative to current working directory)')
     _bsarch_arguments.add_argument('--archive-path',
                                    action='store', type=str,
-                                   help='relative or absolute path to bsa/ba2 file')
+                                   help='relative or absolute path to bsa/ba2 file\n'
+                                        '(if relative, must be relative to project)')
     _bsarch_arguments.add_argument('--temp-path',
                                    action='store', type=str,
-                                   help='relative or absolute path to temp folder')
+                                   help='relative or absolute path to temp folder\n'
+                                        '(if relative, must be relative to current working directory)')
 
     _program_arguments = _parser.add_argument_group('program arguments')
-    _program_arguments.add_argument('--log-path',
-                                    action='store', type=str,
-                                    help='relative or absolute path to log folder')
     _program_arguments.add_argument('--help', dest='show_help',
                                     action='store_true', default=False,
                                     help='show help and exit')
