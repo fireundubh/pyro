@@ -322,20 +322,29 @@ class PapyrusProject(ProjectBase):
     def build_commands(self) -> list:
         commands: list = []
 
+        arguments: CommandArguments = CommandArguments()
+
         compiler_path: str = self.options.compiler_path
         flags_path: str = self.options.flags_path
         output_path: str = self.options.output_path
+        import_paths: str = ';'.join(self.import_paths)
 
-        arguments: CommandArguments = CommandArguments()
+        if self.options.game_type == 'fo4':
+            release: bool = self.root_node.get('Release', default='false').casefold() == 'true'
+            final: bool = self.root_node.get('Final', default='false').casefold() == 'true'
 
-        psc_paths = self._try_exclude_unmodified_scripts()
+        optimize: bool = self.root_node.get('Optimize', default='false').casefold() == 'true'
 
+        psc_paths: list = self._try_exclude_unmodified_scripts()
+
+        # add .psc scripts whose .pex counterparts do not exist
         for script_name in self.missing_script_names:
             for psc_path in self.psc_paths:
                 if psc_path.endswith('%s.psc' % script_name):
                     psc_paths.append(psc_path)
-                    continue
+                    break
 
+        # generate list of commands
         for psc_path in psc_paths:
             if os.path.isabs(psc_path):
                 namespace, file_name = PathHelper.nsify(psc_path)
@@ -345,19 +354,18 @@ class PapyrusProject(ProjectBase):
             arguments.append_quoted(compiler_path)
             arguments.append_quoted(psc_path)
             arguments.append_quoted(output_path, 'o')
-            arguments.append_quoted(';'.join(self.import_paths), 'i')
+            arguments.append_quoted(import_paths, 'i')
             arguments.append_quoted(flags_path, 'f')
 
             if self.options.game_type == 'fo4':
-                release = self.root_node.get('Release', default='false').casefold() == 'true'
+                # noinspection PyUnboundLocalVariable
                 if release:
                     arguments.append('-release')
 
-                final = self.root_node.get('Final', default='false').casefold() == 'true'
+                # noinspection PyUnboundLocalVariable
                 if final:
                     arguments.append('-final')
 
-            optimize = self.root_node.get('Optimize', default='false').casefold() == 'true'
             if optimize:
                 arguments.append('-op')
 
