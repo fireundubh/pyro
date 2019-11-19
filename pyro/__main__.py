@@ -89,9 +89,13 @@ if __name__ == '__main__':
                                           '(if relative, must be relative to current working directory)')
 
     _build_arguments = _parser.add_argument_group('build arguments')
+    _build_arguments.add_argument('--cpu-count',
+                                  action='store', type=int,
+                                  help='total available processors for parallel compilation\n'
+                                       '(usually set automatically; significant performance impact)')
     _build_arguments.add_argument('--log-path',
                                   action='store', type=str,
-                                  help='relative or absolute path to log folder\n'
+                                  help='relative or absolute path to build log folder\n'
                                        '(if relative, must be relative to current working directory)')
     _build_arguments.add_argument('--no-anonymize',
                                   action='store_true', default=False,

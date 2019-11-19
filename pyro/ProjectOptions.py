@@ -11,6 +11,8 @@ class ProjectOptions:
     input_path: str = field(init=False, default_factory=str)
 
     # build arguments
+    cpu_count: int = field(init=False, default_factory=int)
+    log_path: str = field(init=False, default_factory=str)
     no_anonymize: bool = field(init=False, default_factory=bool)
     no_bsarch: bool = field(init=False, default_factory=bool)
     no_incremental_build: bool = field(init=False, default_factory=bool)
@@ -30,9 +32,6 @@ class ProjectOptions:
     bsarch_path: str = field(init=False, default_factory=str)
     archive_path: str = field(init=False, default_factory=str)
     temp_path: str = field(init=False, default_factory=str)
-
-    # program arguments
-    log_path: str = field(init=False, default_factory=str)
 
     def __post_init__(self) -> None:
         for key in self.__dict__:

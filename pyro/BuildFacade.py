@@ -24,16 +24,27 @@ class BuildFacade:
 
         # WARN: if methods are renamed and their respective option names are not, this will break.
         for key in self.ppj.options.__dict__:
-            if key in ('args', 'input_path', 'game_type', 'game_path', 'registry_path') or key.startswith('no_'):
+            if key in ('args', 'input_path', 'game_type', 'game_path', 'registry_path', 'cpu_count') or key.startswith('no_'):
                 continue
             setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
+
+        if not self.ppj.options.cpu_count:
+            cpu_count = 2
+
+            try:
+                # noinspection Mypy
+                cpu_count = os.cpu_count()  # can be None if indeterminate
+            except NotImplementedError:
+                pass
+
+            self.ppj.options.cpu_count = cpu_count
 
         # record project options in log
         if self.ppj.options.log_path:
             self._rotate_logs(5)
 
             os.makedirs(self.ppj.options.log_path, exist_ok=True)
-            log_path = os.path.join(self.ppj.options.log_path, 'pyro-options-%s.log' % int(time.time()))
+            log_path = os.path.join(self.ppj.options.log_path, 'pyro-%s.log' % int(time.time()))
             with open(log_path, mode='w', encoding='utf-8') as f:
                 options: dict = deepcopy(self.ppj.options.__dict__)
                 json.dump(options, f, indent=2)
@@ -104,7 +115,7 @@ class BuildFacade:
                 ProcessManager.run(command)
         else:
             multiprocessing.freeze_support()
-            p = multiprocessing.Pool(processes=os.cpu_count())
+            p = multiprocessing.Pool(processes=min(len(self.ppj.psc_paths), self.ppj.options.cpu_count))
             p.imap(ProcessManager.run, commands)
             p.close()
             p.join()
