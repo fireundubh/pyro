@@ -37,9 +37,6 @@ class BuildFacade:
                 options: dict = deepcopy(self.ppj.options.__dict__)
                 json.dump(options, f, indent=2)
 
-        # noinspection PyAttributeOutsideInit
-        self.pex_reader = PexReader(self.ppj.options)
-
     def _rotate_logs(self, keep_count: int) -> None:
         if not os.path.exists(self.ppj.options.log_path):
             return
@@ -77,7 +74,7 @@ class BuildFacade:
             if not os.path.exists(pex_path):
                 continue
 
-            compiled_time: int = self.pex_reader.get_compilation_time(pex_path)
+            compiled_time: int = PexReader.get_header(pex_path).compilation_time.value
 
             # if psc is older than the pex
             if os.path.getmtime(psc_path) >= compiled_time:
@@ -93,7 +90,7 @@ class BuildFacade:
 
         if self.ppj.options.no_parallel:
             for command in commands:
-                ProcessManager.run(command, not self.ppj.options.no_bsarch)
+                ProcessManager.run(command)
         else:
             multiprocessing.freeze_support()
             p = multiprocessing.Pool(processes=os.cpu_count())
@@ -110,8 +107,6 @@ class BuildFacade:
         if not scripts and not self.ppj.missing_script_names and not self.ppj.options.no_incremental_build:
             self.log.error('Cannot anonymize compiled scripts because no source scripts were modified')
         else:
-            anonymizer = Anonymizer(self.ppj.options)
-
             for pex_path in self.ppj.pex_paths:
                 if self.ppj.options.game_type == 'fo4':
                     namespace, file_name = PathHelper.nsify(pex_path)
@@ -125,7 +120,7 @@ class BuildFacade:
                     continue
 
                 self.log.anon('Anonymizing "%s"...' % target_path)
-                anonymizer.anonymize_script(target_path)
+                Anonymizer.anonymize_script(target_path)
 
     def try_pack(self) -> None:
         """Generates ZIP archive for project"""

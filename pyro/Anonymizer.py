@@ -1,56 +1,29 @@
+import os
 import random
 import string
-from typing import BinaryIO
 
-from pyro.ProjectOptions import ProjectOptions
+from pyro.PexReader import PexReader
 
 
 class Anonymizer:
-    def __init__(self, options: ProjectOptions) -> None:
-        self.options: ProjectOptions = options
+    @staticmethod
+    def _randomize_str(size: int, uppercase: bool = False) -> str:
+        return ''.join([random.choice(string.ascii_lowercase if not uppercase else string.ascii_uppercase) for _ in range(size)])
 
     @staticmethod
-    def _randomize_str(length: int, uppercase: bool = False) -> str:
-        return ''.join([random.choice(string.ascii_lowercase if not uppercase else string.ascii_uppercase) for _ in range(length)])
+    def anonymize_script(path: str) -> None:
+        header = PexReader.get_header(path)
 
-    def _get_metadata(self, file_path: str) -> list:
-        with open(file_path, mode='rb') as data:
-            offset = 17 if self.options.game_type != 'fo4' else 16
-            data.seek(offset)
-            file_name = self._read_fixed_length_str(data)
-            user_name = self._read_fixed_length_str(data)
-            sys_name = self._read_fixed_length_str(data)
-            return [file_name, user_name, sys_name]
+        file_path: str = header.script_path.value
+        user_name: str = header.user_name.value
+        computer_name: str = header.computer_name.value
 
-    def _read_fixed_length_str(self, data: BinaryIO) -> str:
-        str_length = int.from_bytes(data.read(1), byteorder='little')
-        if str_length <= 0:
-            return ''
-
-        # skip null byte
-        if self.options.game_type == 'fo4':
-            data.read(1)
-
-        str_data = data.read(str_length).decode(encoding='ascii')
-
-        # skip null byte
-        if self.options.game_type != 'fo4':
-            data.read(1)
-
-        return str_data
-
-    def anonymize_script(self, file_path: str) -> None:
-        file_name, user_name, sys_name = self._get_metadata(file_path)
-
-        if not (len(file_name) > 0 and file_name.endswith('.psc') and len(user_name) > 0 and len(sys_name) > 0):
+        if not len(file_path) > 0 and file_path.endswith('.psc') and len(user_name) > 0 and len(computer_name) > 0:
             return
 
-        def write_random_name(data: BinaryIO, name: str, uppercase: bool = False) -> None:
-            result = Anonymizer._randomize_str(len(name), uppercase)
-            data.write(bytes(result, encoding='ascii'))
+        with open(path, mode='r+b') as f:
+            f.seek(header.user_name.offset, os.SEEK_SET)
+            f.write(bytes(Anonymizer._randomize_str(header.user_name_size.value), encoding='ascii'))
 
-        with open(file_path, mode='r+b') as f:
-            f.seek(18 + len(file_name) + 2)
-            write_random_name(f, user_name)
-            f.read(2)
-            write_random_name(f, sys_name, True)
+            f.seek(header.computer_name.offset, os.SEEK_SET)
+            f.write(bytes(Anonymizer._randomize_str(header.computer_name_size.value, True), encoding='ascii'))

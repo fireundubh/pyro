@@ -52,8 +52,6 @@ class PapyrusProject(ProjectBase):
         # these are file names
         self.missing_script_names: list = self._find_missing_script_names()
 
-        self.pex_reader = PexReader(self.options)
-
     @staticmethod
     def _unique_list(items: list) -> list:
         return list(OrderedDict.fromkeys(items))
@@ -295,7 +293,7 @@ class PapyrusProject(ProjectBase):
             if not os.path.exists(matching_path):
                 continue
 
-            compiled_time: int = self.pex_reader.get_compilation_time(matching_path)
+            compiled_time: int = PexReader.get_header(matching_path).compilation_time.value
             if os.path.getmtime(psc_path) < compiled_time:
                 continue
 
