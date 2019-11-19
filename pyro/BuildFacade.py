@@ -24,20 +24,20 @@ class BuildFacade:
 
         # WARN: if methods are renamed and their respective option names are not, this will break.
         for key in self.ppj.options.__dict__:
-            if key in ('args', 'input_path', 'game_type', 'game_path', 'registry_path', 'cpu_count') or key.startswith('no_'):
+            if key in ('args', 'input_path', 'game_type', 'game_path', 'registry_path', 'worker_limit') or key.startswith('no_'):
                 continue
             setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
 
-        if not self.ppj.options.cpu_count:
-            cpu_count = 2
+        if not self.ppj.options.worker_limit:
+            worker_limit = 2
 
             try:
                 # noinspection Mypy
-                cpu_count = os.cpu_count()  # can be None if indeterminate
+                worker_limit = os.cpu_count()  # can be None if indeterminate
             except NotImplementedError:
                 pass
 
-            self.ppj.options.cpu_count = cpu_count
+            self.ppj.options.worker_limit = worker_limit
 
         # record project options in log
         if self.ppj.options.log_path:
@@ -115,7 +115,7 @@ class BuildFacade:
                 ProcessManager.run(command)
         else:
             multiprocessing.freeze_support()
-            p = multiprocessing.Pool(processes=min(len(self.ppj.psc_paths), self.ppj.options.cpu_count))
+            p = multiprocessing.Pool(processes=min(len(self.ppj.psc_paths), self.ppj.options.worker_limit))
             p.imap(ProcessManager.run, commands)
             p.close()
             p.join()

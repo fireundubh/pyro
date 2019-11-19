@@ -11,12 +11,12 @@ class ProjectOptions:
     input_path: str = field(init=False, default_factory=str)
 
     # build arguments
-    cpu_count: int = field(init=False, default_factory=int)
     log_path: str = field(init=False, default_factory=str)
     no_anonymize: bool = field(init=False, default_factory=bool)
     no_bsarch: bool = field(init=False, default_factory=bool)
     no_incremental_build: bool = field(init=False, default_factory=bool)
     no_parallel: bool = field(init=False, default_factory=bool)
+    worker_limit: int = field(init=False, default_factory=int)
 
     # game arguments
     game_type: str = field(init=False, default_factory=str)
