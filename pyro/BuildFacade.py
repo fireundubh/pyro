@@ -6,6 +6,7 @@ import time
 from copy import deepcopy
 
 from pyro.Anonymizer import Anonymizer
+from pyro.JsonLogger import JsonLogger
 from pyro.Logger import Logger
 from pyro.PackageManager import PackageManager
 from pyro.PapyrusProject import PapyrusProject
@@ -36,6 +37,16 @@ class BuildFacade:
             with open(log_path, mode='w', encoding='utf-8') as f:
                 options: dict = deepcopy(self.ppj.options.__dict__)
                 json.dump(options, f, indent=2)
+
+        self.log_file = JsonLogger(ppj)
+        self.log_file.add_record('project_data', {
+            'program_path': ppj.program_path,
+            'project_path': ppj.project_path,
+            'import_paths': ppj.import_paths,
+            'folder_paths': ppj.folders,
+            'psc_paths': ppj.psc_paths,
+            'pex_paths': ppj.pex_paths
+        })
 
     def _rotate_logs(self, keep_count: int) -> None:
         if not os.path.exists(self.ppj.options.log_path):
