@@ -29,5 +29,9 @@ class PyroRawDescriptionHelpFormatter(argparse.RawDescriptionHelpFormatter):
 
         return ', '.join(parts)
 
-    def _get_default_metavar_for_optional(self, action):
+    def _get_default_metavar_for_optional(self, action: argparse.Action) -> str:
         return ''
+
+
+class PyroRawTextHelpFormatter(argparse.RawTextHelpFormatter, PyroRawDescriptionHelpFormatter):
+    pass

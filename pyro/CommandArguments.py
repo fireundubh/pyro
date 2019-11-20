@@ -1,6 +1,6 @@
-class Arguments(list):
+class CommandArguments(list):
     def __init__(self) -> None:
-        super(Arguments, self).__init__()
+        super(CommandArguments, self).__init__()
 
     def append_quoted(self, value: str, name: str = '') -> None:
         self.append('-%s="%s"' % (name, value) if name else '"%s"' % value)

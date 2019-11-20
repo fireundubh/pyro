@@ -5,17 +5,14 @@ import sys
 from pyro.BuildFacade import BuildFacade
 from pyro.Logger import Logger
 from pyro.PapyrusProject import PapyrusProject
-from pyro.Project import Project
 from pyro.ProjectOptions import ProjectOptions
 from pyro.PyroArgumentParser import PyroArgumentParser
-from pyro.PyroRawDescriptionHelpFormatter import PyroRawDescriptionHelpFormatter
+from pyro.PyroRawDescriptionHelpFormatter import PyroRawTextHelpFormatter
 from pyro.TimeElapsed import TimeElapsed
 
 
-class Application:
-    log = Logger()
-
-    def __init__(self, args: argparse.Namespace):
+class Application(Logger):
+    def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
         self._validate_args()
 
@@ -24,90 +21,106 @@ class Application:
             sys.exit(print_help())
 
         if not self.args.input_path:
-            self.log.error('required argument missing: -i INPUT.ppj')
+            Application.log.error('required argument missing: -i INPUT.ppj')
             sys.exit(print_help())
 
         if not self.args.input_path.endswith('.ppj'):
-            self.log.error('Single script compilation is no longer supported. Use a PPJ file.')
+            Application.log.error('Single script compilation is no longer supported. Use a PPJ file.')
             sys.exit(print_help())
 
         if not os.path.isabs(self.args.input_path):
-            self.log.warn('Relative input path detected. Using current working directory: ' + os.getcwd())
+            Application.log.warning('Using working directory: "%s"' % os.getcwd())
             self.args.input_path = os.path.join(os.getcwd(), self.args.input_path.replace('file://', ''))
-            self.log.warn('Using input path: ' + self.args.input_path)
+            Application.log.warning('Using input path: "%s"' % self.args.input_path)
 
     def run(self) -> int:
-        project_options = ProjectOptions(self.args)
-        project = Project(project_options)
+        options = ProjectOptions(self.args.__dict__)
+        ppj = PapyrusProject(options)
 
-        ppj = PapyrusProject(project)
+        if not ppj.options.game_path:
+            Application.log.error('Cannot determine game type from arguments or Papyrus Project')
+            sys.exit(print_help())
 
-        # allow xml to set game type but defer to passed argument
-        if not ppj.options.game_type:
-            game_type = ppj.root_node.get('Game')
-            if game_type:
-                ppj.options.game_type = game_type
-                ppj.game_path = ppj.project.get_game_path()
-            else:
-                self.log.error('Cannot determine game type from arguments or Papyrus Project')
-                sys.exit(print_help())
+        Application.log.info('Imports found:')
+        for import_path in ppj.import_paths:
+            Application.log.info('- "%s"' % import_path)
+
+        Application.log.info('Scripts found:')
+        for psc_path in ppj.psc_paths:
+            Application.log.info('- "%s"' % psc_path)
 
         time_elapsed = TimeElapsed()
 
         build = BuildFacade(ppj)
         build.try_compile(time_elapsed)
-        build.try_anonymize()
-        build.try_pack()
 
-        time_elapsed.print()
+        if not ppj.options.no_anonymize:
+            build.try_anonymize()
+        else:
+            Application.log.warning('Cannot anonymize scripts because anonymization was disabled by user')
+
+        if not ppj.options.no_bsarch and ppj.options.bsarch_path:
+            build.try_pack()
+        else:
+            Application.log.warning('Cannot build package because packaging was disabled by user')
+
+        time_elapsed.print(callback_func=Application.log.info)
+
+        Application.log.info('DONE!')
 
         return 0
 
 
 if __name__ == '__main__':
     _parser = PyroArgumentParser(add_help=False,
-                                 formatter_class=PyroRawDescriptionHelpFormatter,
+                                 formatter_class=PyroRawTextHelpFormatter,
                                  description=os.linesep.join([
-                                     'Pyro CLI by fireundubh',
-                                     'A semi-automated incremental build system for TESV, SSE, and FO4 projects'
-                                 ]),
-                                 epilog='For more help, visit: github.com/fireundubh/pyro')
+                                     '-' * 80,
+                                     ''.join([c.center(3) for c in 'PYRO']).center(80),
+                                     '-' * 53 + ' github.com/fireundubh/pyro'
+                                 ]))
 
     _required_arguments = _parser.add_argument_group('required arguments')
     _required_arguments.add_argument('-i', '--input-path',
                                      action='store', type=str,
-                                     help='relative or absolute path to input ppj file')
+                                     help='relative or absolute path to input ppj file\n'
+                                          '(if relative, must be relative to current working directory)')
 
-    _optional_arguments = _parser.add_argument_group('optional arguments')
-    _optional_arguments.add_argument('--no-anonymize',
-                                     action='store_true', default=False,
-                                     help='do not anonymize metadata (if configured in ppj)')
-    _optional_arguments.add_argument('--no-bsarch',
-                                     action='store_true', default=False,
-                                     help='do not pack scripts with BSArch (if configured in ppj)')
-    _optional_arguments.add_argument('--no-incremental-build',
-                                     action='store_true', default=False,
-                                     help='do not build incrementally')
-    _optional_arguments.add_argument('--no-parallel',
-                                     action='store_true', default=False,
-                                     help='do not parallelize compilation')
+    _build_arguments = _parser.add_argument_group('build arguments')
+    _build_arguments.add_argument('--log-path',
+                                  action='store', type=str,
+                                  help='relative or absolute path to build log folder\n'
+                                       '(if relative, must be relative to current working directory)')
+    _build_arguments.add_argument('--no-anonymize',
+                                  action='store_true', default=False,
+                                  help='do not anonymize metadata')
+    _build_arguments.add_argument('--no-bsarch',
+                                  action='store_true', default=False,
+                                  help='do not pack scripts with bsarch')
+    _build_arguments.add_argument('--no-incremental-build',
+                                  action='store_true', default=False,
+                                  help='do not build incrementally')
+    _build_arguments.add_argument('--no-parallel',
+                                  action='store_true', default=False,
+                                  help='do not parallelize compilation')
+    _build_arguments.add_argument('--worker-limit',
+                                  action='store', type=int,
+                                  help='max workers for parallel compilation\n'
+                                       '(usually set automatically to processor count)')
 
     _compiler_arguments = _parser.add_argument_group('compiler arguments')
     _compiler_arguments.add_argument('--compiler-path',
                                      action='store', type=str,
-                                     help='relative path from game to PapyrusCompiler.exe')
+                                     help='relative or absolute path to PapyrusCompiler.exe\n'
+                                          '(if relative, must be relative to current working directory)')
     _compiler_arguments.add_argument('--flags-path',
                                      action='store', type=str,
-                                     help='relative path from game to Papyrus flags file')
-    _compiler_arguments.add_argument('--source-path',
+                                     help='relative or absolute path to Papyrus Flags file\n'
+                                          '(if relative, must be relative to project)')
+    _compiler_arguments.add_argument('--output-path',
                                      action='store', type=str,
-                                     help='relative path from game to script sources folder')
-    _compiler_arguments.add_argument('--base-path',
-                                     action='store', type=str,
-                                     help='relative path from game to base script sources folder')
-    _compiler_arguments.add_argument('--user-path',
-                                     action='store', type=str,
-                                     help='relative path from game to user script sources folder')
+                                     help='relative or absolute path to output folder\n'
+                                          '(if relative, must be relative to project)')
 
     _game_arguments = _parser.add_argument_group('game arguments')
     _game_arguments.add_argument('-g', '--game-type',
@@ -118,21 +131,28 @@ if __name__ == '__main__':
     _game_path_arguments = _game_arguments.add_mutually_exclusive_group()
     _game_path_arguments.add_argument('--game-path',
                                       action='store', type=str,
-                                      help='absolute path to installation directory for game')
+                                      help='relative or absolute path to game install directory\n'
+                                           '(if relative, must be relative to current working directory)')
     if sys.platform == 'win32':
         _game_path_arguments.add_argument('--registry-path',
                                           action='store', type=str,
-                                          help='path to game Installed Path key in Windows Registry')
+                                          help='path to Installed Path key in Windows Registry')
 
-    _tool_arguments = _parser.add_argument_group('tool arguments')
-    _tool_arguments.add_argument('--bsarch-path',
-                                 action='store', type=str,
-                                 help='relative or absolute path to BSArch.exe')
+    _bsarch_arguments = _parser.add_argument_group('bsarch arguments')
+    _bsarch_arguments.add_argument('--bsarch-path',
+                                   action='store', type=str,
+                                   help='relative or absolute path to bsarch.exe\n'
+                                        '(if relative, must be relative to current working directory)')
+    _bsarch_arguments.add_argument('--archive-path',
+                                   action='store', type=str,
+                                   help='relative or absolute path to bsa/ba2 file\n'
+                                        '(if relative, must be relative to project)')
+    _bsarch_arguments.add_argument('--temp-path',
+                                   action='store', type=str,
+                                   help='relative or absolute path to temp folder\n'
+                                        '(if relative, must be relative to current working directory)')
 
     _program_arguments = _parser.add_argument_group('program arguments')
-    _program_arguments.add_argument('--temp-path',
-                                    action='store', type=str,
-                                    help='relative or absolute path to temp folder')
     _program_arguments.add_argument('--help', dest='show_help',
                                     action='store_true', default=False,
                                     help='show help and exit')

@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 
 
 class PyroArgumentParser(ArgumentParser):
-    def format_help(self):
+    def format_help(self) -> str:
         formatter = self._get_formatter()
 
         # description

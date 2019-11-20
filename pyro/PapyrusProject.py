@@ -1,387 +1,369 @@
 import glob
 import os
-import re
-import shutil
-import subprocess
 import sys
 from collections import OrderedDict
 
 from lxml import etree
 
-from pyro.Arguments import Arguments
-from pyro.Logger import Logger
+from pyro.CommandArguments import CommandArguments
+from pyro.ElementHelper import ElementHelper
 from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
-from pyro.Project import Project
+from pyro.ProjectBase import ProjectBase
+from pyro.ProjectOptions import ProjectOptions
 
 
-class PapyrusProject:
-    log = Logger()
-
-    def __init__(self, prj: Project):
-        self.project = prj
-        self.options = prj.options
-        self.pex_reader = PexReader(prj)
+class PapyrusProject(ProjectBase):
+    def __init__(self, options: ProjectOptions) -> None:
+        super().__init__(options)
 
         self.root_node = etree.parse(self.options.input_path, etree.XMLParser(remove_blank_text=True)).getroot()
-        self.output_path = self.root_node.get('Output')
-        self.flags_path = self.root_node.get('Flags')
-        self.use_bsarch = self.root_node.get('CreateArchive')
-        self.use_anonymizer = self.root_node.get('Anonymize')
 
-        self.compiler_path = prj.get_compiler_path()
-        self.input_path = self.options.input_path
+        # allow xml to set game type but defer to passed argument
+        if not self.options.game_type:
+            game_type = self.root_node.get('Game', default='').casefold()
+            if game_type:
+                self.options.game_type = game_type
+
+        # game type must be set before we call this
+        self.options.game_path = self.get_game_path()
+
+        self.options.archive_path = self.root_node.get('Archive', default='')
+        self.options.output_path = self.root_node.get('Output', default='')
+        self.options.flags_path = self.root_node.get('Flags', default='')
+        self.options.no_bsarch = not self.root_node.get('CreateArchive', default='true').casefold() == 'true'
+        self.options.no_anonymize = not self.root_node.get('Anonymize', default='true').casefold() == 'true'
+
+        self.folder_paths: list = []
+
+        self.import_paths: list = self._get_imports()
+        if not self.import_paths:
+            sys.exit(self.log.error('Failed to build list of import paths using arguments or Papyrus Project'))
+
+        self.psc_paths: list = self._get_psc_paths()
+        if not self.psc_paths:
+            sys.exit(self.log.error('Failed to build list of script paths using arguments or Papyrus Project'))
+
+        # this adds implicit imports from script paths
+        self.import_paths = self._get_implicit_script_imports()
+
+        # get expected pex paths - these paths may not exist and that is okay!
+        self.pex_paths: list = self._get_pex_paths()
+
+        # these are file names
+        self.missing_script_names: list = self._find_missing_script_names()
 
     @staticmethod
-    def _get_node(parent_node: etree.Element, tag: str, ns: str = 'PapyrusProject.xsd') -> etree.Element:
-        return parent_node.find('ns:%s' % tag, {'ns': '%s' % ns})
+    def _unique_list(items: list) -> list:
+        return list(OrderedDict.fromkeys(items))
 
-    @staticmethod
-    def _get_node_children(parent_node: etree.Element, tag: str, ns: str = 'PapyrusProject.xsd') -> list:
-        return parent_node.findall('ns:%s' % tag[:-1], {'ns': '%s' % ns})
+    def _find_missing_script_names(self) -> list:
+        script_names: list = []
 
-    @staticmethod
-    def _get_node_children_values(parent_node: etree.Element, tag: str) -> list:
-        node = PapyrusProject._get_node(parent_node, tag)
+        for pex_path in self.pex_paths:
+            if os.path.exists(pex_path):
+                continue
 
-        if node is None:
-            sys.exit(PapyrusProject.log.pyro('The PPJ file is missing the following tag: {0}'.format(tag)))
+            file_name, _ = os.path.splitext(os.path.basename(pex_path))
+            if file_name not in script_names:
+                script_names.append(file_name)
 
-        child_nodes = PapyrusProject._get_node_children(node, tag)
+        return script_names
 
-        if child_nodes is None or len(child_nodes) == 0:
-            sys.tracebacklimit = 0
-            raise Exception('No child nodes exist for <%s> tag' % tag)
-
-        return [str(field.text) for field in child_nodes if field.text is not None and field.text != '']
-
-    @staticmethod
-    def _open_process(command: str, use_bsarch: bool = False) -> int:
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True)
-
-        exclusions = ('Starting', 'Assembly', 'Compilation', 'Batch', 'Copyright', 'Papyrus', 'Failed', 'No output')
-
-        line_error = re.compile('\(\d+,\d+\)')
-
-        try:
-            while process.poll() is None:
-                line = process.stdout.readline().strip()
-                if not use_bsarch:
-                    exclude_lines = not line.startswith(exclusions)
-                    PapyrusProject.log.compiler(line) if line != '' and exclude_lines and 'error(s)' not in line else None
-                    if line_error.match(line) is not None:
-                        process.terminate()
-                        return -1
-                else:
-                    PapyrusProject.log.bsarch(line) if line != '' else None
-            return 0
-
-        except KeyboardInterrupt:
-            try:
-                process.terminate()
-            except OSError:
-                pass
+    def _add_implicit_imports(self, implicit_paths: list, import_paths: list) -> None:
+        def _get_ancestor_import_index(_import_paths: list, _implicit_path: str) -> int:
+            for _i, _import_path in enumerate(_import_paths):
+                if _import_path in _implicit_path:
+                    return _i
             return -1
 
-    @staticmethod
-    def _unique_list(items: list) -> tuple:
-        return tuple(OrderedDict.fromkeys(items))
+        implicit_paths.sort()
 
-    def _build_commands(self) -> tuple:
-        commands: list = list()
+        for implicit_path in reversed(PathHelper.uniqify(implicit_paths)):
+            # do not add import paths that are already declared
+            if implicit_path in import_paths:
+                continue
 
-        unique_imports: tuple = self._get_imports_from_script_paths()
-        real_psc_paths: tuple = self.get_script_paths(True)
-        script_paths_compiled: tuple = self.get_script_paths_compiled()
+            self.log.warn('Using import path implicitly: "%s"' % implicit_path)
 
-        arguments: Arguments = Arguments()
+            # insert implicit path before ancestor import path, if ancestor exists
+            i = _get_ancestor_import_index(import_paths, implicit_path)
+            if i > -1:
+                import_paths.insert(i, implicit_path)
+                continue
 
-        for real_psc_path in real_psc_paths:
-            if not self.options.no_incremental_build:
-                script_name, _ = os.path.splitext(os.path.basename(real_psc_path))
+            # insert orphan implicit path at the first position
+            import_paths.insert(0, implicit_path)
 
-                # if pex exists, compare time_t in pex header with psc's last modified timestamp
-                pex_path: str = [s for s in script_paths_compiled if s.endswith('%s.pex' % script_name)][0]
-                if not os.path.exists(pex_path):
-                    continue
+    def _get_imports(self) -> list:
+        """Returns absolute import paths from Papyrus Project"""
+        import_paths: list = ElementHelper.get_child_values(self.root_node, 'Imports')
 
-                compiled_time = self.pex_reader.get_compilation_time(pex_path)
-                if os.path.getmtime(real_psc_path) < compiled_time:
-                    continue
+        # ensure that folder paths are implicitly imported
+        folder_paths: list = self._get_implicit_folder_imports()
+        self._add_implicit_imports(folder_paths, import_paths)
+
+        results: list = []
+
+        for import_path in import_paths:
+            import_path = os.path.normpath(import_path)
+
+            if import_path == os.curdir:
+                import_path = self.project_path
+            elif import_path == os.pardir:
+                self.log.warn('Cannot use ".." as import path')
+                continue
+            elif not os.path.isabs(import_path):
+                # relative import paths should be relative to the project
+                import_path = os.path.join(self.project_path, import_path)
+
+            PathHelper.try_append_existing(import_path, results)
+
+        return PathHelper.uniqify(results)
+
+    def _get_implicit_folder_imports(self) -> list:
+        implicit_paths: list = []
+
+        folders = ElementHelper.get(self.root_node, 'Folders')
+        if folders is None:
+            return []
+
+        folder_paths = ElementHelper.get_child_values(self.root_node, 'Folders')
+
+        for folder_path in folder_paths:
+            if PathHelper.try_append_abspath(folder_path, implicit_paths):
+                continue
+
+            test_path = os.path.join(self.project_path, folder_path)
+            PathHelper.try_append_existing(test_path, implicit_paths)
+
+        return PathHelper.uniqify(implicit_paths)
+
+    def _get_implicit_script_imports(self) -> list:
+        """Returns absolute implicit import paths from Folders and Scripts paths"""
+        results: list = self.import_paths
+
+        implicit_paths: list = []
+
+        for psc_path in self.psc_paths:
+            namespace, file_name = PathHelper.nsify(psc_path)
+
+            for import_path in self.import_paths:
+                test_path = os.path.join(import_path, namespace)
+                PathHelper.try_append_existing(test_path, implicit_paths)
+
+        self._add_implicit_imports(implicit_paths, results)
+
+        return PathHelper.uniqify(results)
+
+    def _get_pex_paths(self) -> list:
+        """Returns compiled script paths from output folder"""
+        psc_paths: list = []
+        pex_paths: list = []
+
+        # build paths to source scripts
+        for psc_path in self.psc_paths:
+            # fo4 supports namespaced script names
+            if self.options.game_type == 'fo4':
+                psc_paths.append(psc_path)
+                continue
+
+            psc_paths.append(os.path.basename(psc_path))
+
+        # build paths to compiled scripts
+        for psc_path in psc_paths:
+            pex_path = os.path.join(self.options.output_path, psc_path.replace('.psc', '.pex'))
+            pex_paths.append(pex_path)
+
+        return PathHelper.uniqify(pex_paths)
+
+    def _get_psc_paths(self) -> list:
+        """Returns script paths from Folders and Scripts nodes"""
+        paths: list = []
+
+        # try to populate paths with scripts from Folders and Scripts nodes
+        for tag in ('Folders', 'Scripts'):
+            node = ElementHelper.get(self.root_node, tag)
+            if node is None:
+                continue
+            node_paths = getattr(self, '_get_script_paths_from_%s_node' % tag.lower())()
+            if node_paths:
+                paths.extend(node_paths)
+
+        results: list = []
+
+        # convert user paths to absolute paths
+        for path in paths:
+            # try to add existing absolute paths
+            if PathHelper.try_append_abspath(path, results):
+                continue
+
+            # try to add existing project-relative paths
+            test_path = os.path.join(self.project_path, path)
+            if PathHelper.try_append_existing(test_path, results):
+                continue
+
+            # try to add existing import-relative paths
+            for import_path in self.import_paths:
+                if not os.path.isabs(import_path):
+                    import_path = os.path.join(self.project_path, import_path)
+
+                test_path = os.path.join(import_path, path)
+                if PathHelper.try_append_existing(test_path, results):
+                    break
+
+        return PathHelper.uniqify(results)
+
+    def _get_script_paths_from_folders_node(self) -> list:
+        """Returns script paths from the Folders element array"""
+        paths: list = []
+
+        folders_node = ElementHelper.get(self.root_node, 'Folders')
+        if folders_node is None:
+            return []
+
+        # defaults to False if the attribute does not exist
+        no_recurse = folders_node.get('NoRecurse', default='false').casefold() == 'true'
+
+        for folder in ElementHelper.get_child_values(self.root_node, 'Folders'):
+            folder = os.path.normpath(folder)
+
+            if folder == os.curdir:
+                folder = self.project_path
+            elif folder == os.pardir:
+                self.log.warn('Cannot use ".." as folder path')
+                continue
+            elif not os.path.isabs(folder):
+                folder = self._try_find_folder(folder)
+
+            self.folder_paths.append(folder)
+
+        for folder in self.folder_paths:
+            search_pattern = os.path.join(folder, '*.psc')
+            psc_paths = glob.glob(search_pattern, recursive=not no_recurse)
+
+            # we need path parts, not absolute paths
+            for psc_path in psc_paths:
+                namespace, file_name = PathHelper.nsify(psc_path)
+                path = os.path.join(namespace, file_name) if self.options.game_type == 'fo4' else file_name
+                paths.append(path)
+
+        return PathHelper.uniqify(paths)
+
+    def _get_script_paths_from_scripts_node(self) -> list:
+        """Returns script paths from the Scripts node"""
+        psc_paths: list = []
+
+        scripts_node = ElementHelper.get(self.root_node, 'Scripts')
+        if scripts_node is None:
+            return []
+
+        for psc_path in ElementHelper.get_child_values(self.root_node, 'Scripts'):
+            if os.path.isabs(psc_path):
+                namespace, file_name = PathHelper.nsify(psc_path)
+                path = os.path.join(namespace, file_name)
+            else:
+                path = psc_path.replace(':', os.sep)
+
+            psc_paths.append(path)
+
+        return PathHelper.uniqify(psc_paths)
+
+    def _try_exclude_unmodified_scripts(self) -> list:
+        if self.options.no_incremental_build:
+            return PathHelper.uniqify(self.psc_paths)
+
+        psc_paths: list = []
+
+        for psc_path in self.psc_paths:
+            script_name, script_extension = os.path.splitext(os.path.basename(psc_path))
+
+            # if pex exists, compare time_t in pex header with psc's last modified timestamp
+            matching_path: str = ''
+            for pex_path in self.pex_paths:
+                if pex_path.endswith('%s.pex' % script_name):
+                    matching_path = pex_path
+                    break
+
+            if not os.path.exists(matching_path):
+                continue
+
+            compiled_time: int = PexReader.get_header(matching_path).compilation_time.value
+            if os.path.getmtime(psc_path) < compiled_time:
+                continue
+
+            psc_paths.append(psc_path)
+
+        return PathHelper.uniqify(psc_paths)
+
+    def _try_find_folder(self, folder: str) -> str:
+        """Try to find folder relative to project, or in import paths"""
+        test_path = os.path.join(self.project_path, folder)
+        if os.path.exists(test_path):
+            return test_path
+
+        for import_path in ElementHelper.get_child_values(self.root_node, 'Imports'):
+            if not os.path.isabs(import_path):
+                continue
+
+            import_path = os.path.normpath(import_path)
+
+            test_path = os.path.join(import_path, folder)
+            if os.path.exists(test_path):
+                return test_path
+
+        sys.exit(self.log.error('Cannot find folder relative to project or any import paths: "%s"' % folder))
+
+    def build_commands(self) -> list:
+        commands: list = []
+
+        arguments: CommandArguments = CommandArguments()
+
+        compiler_path: str = self.options.compiler_path
+        flags_path: str = self.options.flags_path
+        output_path: str = self.options.output_path
+        import_paths: str = ';'.join(self.import_paths)
+
+        if self.options.game_type == 'fo4':
+            release: bool = self.root_node.get('Release', default='false').casefold() == 'true'
+            final: bool = self.root_node.get('Final', default='false').casefold() == 'true'
+
+        optimize: bool = self.root_node.get('Optimize', default='false').casefold() == 'true'
+
+        psc_paths: list = self._try_exclude_unmodified_scripts()
+
+        # add .psc scripts whose .pex counterparts do not exist
+        for script_name in self.missing_script_names:
+            for psc_path in self.psc_paths:
+                if psc_path.endswith('%s.psc' % script_name):
+                    psc_paths.append(psc_path)
+                    break
+
+        # generate list of commands
+        for psc_path in psc_paths:
+            if os.path.isabs(psc_path):
+                namespace, file_name = PathHelper.nsify(psc_path)
+                psc_path = os.path.join(namespace, file_name)
 
             arguments.clear()
-            arguments.append_quoted(self.compiler_path)
-            arguments.append_quoted(PathHelper.nsify(real_psc_path))
-            arguments.append_quoted(self.output_path, 'o')
-            arguments.append_quoted(';'.join(unique_imports), 'i')
-            arguments.append_quoted(self.flags_path, 'f')
+            arguments.append_quoted(compiler_path)
+            arguments.append_quoted(psc_path)
+            arguments.append_quoted(output_path, 'o')
+            arguments.append_quoted(import_paths, 'i')
+            arguments.append_quoted(flags_path, 'f')
 
             if self.options.game_type == 'fo4':
-                release = self.root_node.get('Release')
-                if release and release.casefold() == 'true':
+                # noinspection PyUnboundLocalVariable
+                if release:
                     arguments.append('-release')
 
-                final = self.root_node.get('Final')
-                if final and final.casefold() == 'true':
+                # noinspection PyUnboundLocalVariable
+                if final:
                     arguments.append('-final')
 
-            optimize = self.root_node.get('Optimize')
-            if optimize and optimize.casefold() == 'true':
+            if optimize:
                 arguments.append('-op')
 
             commands.append(arguments.join())
 
-        return tuple(commands)
-
-    def _build_commands_bsarch(self, script_folder: str, archive_path: str) -> str:
-        bsarch_path = self.project.get_bsarch_path()
-
-        arguments = Arguments()
-
-        arguments.append_quoted(bsarch_path)
-        arguments.append('pack')
-        arguments.append_quoted(script_folder)
-        arguments.append_quoted(archive_path)
-
-        if self.options.game_type == 'fo4':
-            arguments.append('-fo4')
-        elif self.options.game_type == 'sse':
-            arguments.append('-sse')
-        else:
-            arguments.append('-tes5')
-
-        return arguments.join()
-
-    def _get_imports_from_script_paths(self) -> tuple:
-        """Generate list of unique import paths from script paths"""
-        script_paths: tuple = self.get_script_paths()
-
-        xml_import_paths: list = self._get_node_children_values(self.root_node, 'Imports')
-
-        script_import_paths = list()
-
-        for script_path in script_paths:
-            for xml_import_path in xml_import_paths:
-                test_path = os.path.join(xml_import_path, os.path.dirname(script_path))
-
-                if os.path.exists(test_path):
-                    script_import_paths.append(test_path)
-
-        return self._unique_list(script_import_paths + xml_import_paths)
-
-    def _copy_scripts_to_temp_path(self, script_paths: tuple, tmp_scripts_path: str) -> None:
-        output_path = self.output_path
-
-        if any(dots in output_path.split(os.sep) for dots in ['.', '..']):
-            output_path = os.path.normpath(os.path.join(os.path.dirname(self.input_path), output_path))
-
-        compiled_script_paths: list = [os.path.join(output_path, script_path.replace('.psc', '.pex')) for script_path in script_paths]
-
-        if self.options.game_type != 'fo4':
-            compiled_script_paths = [os.path.join(output_path, os.path.basename(script_path)) for script_path in compiled_script_paths]
-
-        for compiled_script_path in compiled_script_paths:
-            abs_compiled_script_path = os.path.abspath(compiled_script_path)
-            tmp_destination_path = os.path.join(tmp_scripts_path, os.path.basename(abs_compiled_script_path))
-
-            shutil.copy2(abs_compiled_script_path, tmp_destination_path)
-
-    def _get_absolute_script_path(self, target_path: str) -> str:
-        xml_import_paths = self._get_node_children_values(self.root_node, 'Imports')
-
-        script_paths = []
-        for xml_import_path in xml_import_paths:
-            source_paths = glob.glob(os.path.join(xml_import_path, '**\*.psc'), recursive=True)
-            script_paths.extend(source_paths)
-
-        for script_path in script_paths:
-            source_path = target_path.replace('.pex', '.psc')
-            if script_path.endswith(source_path):
-                return script_path
-
-        raise FileExistsError('Cannot find absolute path to file:', target_path)
-
-    def _get_script_paths_from_folders_node(self) -> tuple:
-        """Retrieves script paths from the Folders node"""
-        script_paths = []
-
-        folders_node = self._get_node(self.root_node, 'Folders')
-
-        if not folders_node:
-            return ()
-
-        # defaults to False if the attribute does not exist
-        no_recurse = bool(folders_node.get('NoRecurse'))
-
-        for folder in self._get_node_children_values(self.root_node, 'Folders'):
-            # fix relative paths
-            if folder == '.' or folder == '..':
-                # TODO: may not have parity with how the Papyrus Compiler handles these paths
-                folder = os.path.join(os.path.dirname(self.input_path), folder)
-            elif not os.path.isabs(folder):
-                folder = self._try_find_folder(folder)
-
-            absolute_script_paths = glob.glob(os.path.join(os.path.abspath(folder), '*.psc'), recursive=not no_recurse)
-
-            # we need path parts, not absolute paths - we're assuming namespaces though (critical flaw?)
-            for script_path in absolute_script_paths:
-                namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(script_path), script_path])
-                script_paths.append(os.path.join(namespace, file_name))
-
-        return self._unique_list(script_paths)
-
-    def _try_find_folder(self, folder: str) -> str:
-        """Try to find folder in import paths"""
-        for import_path in self._get_node_children_values(self.root_node, 'Imports'):
-            test_path = os.path.join(import_path, folder)
-            if os.path.exists(test_path):
-                return test_path
-        return folder
-
-    def _get_script_paths_from_scripts_node(self) -> tuple:
-        """Retrieves script paths from the Scripts node"""
-        script_paths = []
-
-        scripts_node = self._get_node(self.root_node, 'Scripts')
-
-        if scripts_node is None:
-            return ()
-
-        # "support" colons by replacing them with path separators so they're proper path parts
-        # but watch out for absolute paths and use the path parts directly instead
-        def fix_path(script_path: str) -> str:
-            if os.path.isabs(script_path):
-                namespace, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(script_path), script_path])
-                return os.path.join(namespace, file_name)
-            return script_path.replace(':', os.sep)
-
-        scripts = [fix_path(script_path) for script_path in self._get_node_children_values(self.root_node, 'Scripts')]
-
-        script_paths.extend(scripts)
-
-        return self._unique_list(script_paths)
-
-    def _get_include_paths_from_includes_node(self) -> tuple:
-        # TODO: support includes for multiple archives
-
-        include_paths = []
-
-        includes = self._get_node(self.root_node, 'Includes')
-        if includes is None:
-            return ()
-
-        try:
-            includes.get('Root')
-        except AttributeError:
-            return ()
-
-        includes_root = includes.get('Root')
-
-        if not os.path.exists(includes_root) or not os.path.isabs(includes_root):
-            return ()
-
-        if includes is not None:
-            include_paths = self._get_node_children_values(self.root_node, 'Includes')
-
-        # ensure all include paths are relative
-        # TODO: support absolute include paths, requires new XML attribute to specify destination path in archive
-        relative_include_paths = [include_path for include_path in include_paths if not os.path.isabs(include_path)]
-        if len(include_paths) != len(relative_include_paths):
-            self.log.warn('Some include paths were removed. Reason: Only relative paths are supported.')
-
-        include_paths = [os.path.join(includes_root, include_path) for include_path in include_paths]
-
-        return self._unique_list(include_paths)
-
-    def get_output_path(self) -> str:
-        output_path = self.output_path
-
-        if any(dots in output_path.split(os.sep) for dots in ['.', '..']):
-            input_folder = os.path.dirname(self.input_path)
-            output_path = os.path.join(input_folder, output_path)
-
-        return output_path
-
-    def get_script_paths(self, absolute_paths: bool = False) -> tuple:
-        """Retrieves script paths both Folders and Scripts nodes"""
-        paths: list = list()
-
-        folders_node_paths = self._get_script_paths_from_folders_node()
-        if folders_node_paths and len(folders_node_paths) > 0:
-            paths.extend(folders_node_paths)
-
-        scripts_node_paths = self._get_script_paths_from_scripts_node()
-        if scripts_node_paths and len(scripts_node_paths) > 0:
-            paths.extend(scripts_node_paths)
-
-        results = list(map(lambda x: os.path.normpath(x), paths))
-
-        if absolute_paths:
-            # TODO: soooo many loops... :(
-            xml_import_paths = self._get_node_children_values(self.root_node, 'Imports')
-            results = [os.path.join(xml_import_path, script_path) for script_path in results for xml_import_path in xml_import_paths]
-            results = [absolute_script_path for absolute_script_path in results if os.path.exists(absolute_script_path)]
-
-        return self._unique_list(results)
-
-    def get_script_paths_compiled(self) -> tuple:
-        output_path = self.get_output_path()
-
-        # only fo4 supports namespaced script names
-        psc_paths = [script_path if self.options.game_type == 'fo4' else os.path.basename(script_path)
-                     for script_path in self.get_script_paths()]
-
-        # return paths to compiled scripts
-        pex_paths = [os.path.join(output_path, script_path).replace('.psc', '.pex') for script_path in psc_paths]
-
-        return tuple(os.path.normpath(pex_path) for pex_path in pex_paths if os.path.exists(pex_path))
-
-    def pack_archive(self) -> None:
-        if self.options.no_bsarch:
-            self.log.warn('BSA/BA2 packing disabled by user.')
-            return
-
-        if not self.use_bsarch:
-            self.log.warn('BSA/BA2 packing not enabled in PPJ.')
-            return
-
-        # create temporary folder
-        tmp_path: str = PathHelper.parse(self.options.temp_path)
-        tmp_scripts_path = os.path.join(tmp_path, 'Scripts')
-
-        # clear temporary data
-        if os.path.exists(tmp_path):
-            shutil.rmtree(tmp_path, ignore_errors=True)
-
-        os.makedirs(tmp_path, exist_ok=True)
-        os.makedirs(tmp_scripts_path, exist_ok=True)
-
-        script_paths = self.get_script_paths()
-
-        self._copy_scripts_to_temp_path(script_paths, tmp_scripts_path)
-
-        # copy includes to archive
-        include_paths = self._get_include_paths_from_includes_node()
-
-        if include_paths and len(include_paths) > 0:
-            root_path = os.path.dirname(self.output_path)
-
-            for include_path in include_paths:
-                relative_include_path = os.path.relpath(include_path, root_path)
-                target_path = os.path.join(tmp_path, relative_include_path)
-                os.makedirs(os.path.dirname(target_path), exist_ok=True)
-                shutil.copy2(include_path, target_path)
-
-        archive_path = self.root_node.get('Archive')
-
-        if not archive_path:
-            PapyrusProject.log.error('Cannot pack archive because Archive attribute not set')
-            return
-
-        commands = self._build_commands_bsarch(*map(lambda x: os.path.normpath(x), [tmp_path, archive_path]))
-
-        self._open_process(commands, use_bsarch=True)
-
-        # clear temporary data
-        if os.path.exists(tmp_path):
-            shutil.rmtree(tmp_path, ignore_errors=True)
+        return commands
