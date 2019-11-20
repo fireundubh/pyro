@@ -2,7 +2,6 @@ import json
 import multiprocessing
 import os
 import time
-
 from copy import deepcopy
 
 from pyro.Anonymizer import Anonymizer
@@ -16,9 +15,7 @@ from pyro.ProcessManager import ProcessManager
 from pyro.TimeElapsed import TimeElapsed
 
 
-class BuildFacade:
-    log = Logger()
-
+class BuildFacade(Logger):
     def __init__(self, ppj: PapyrusProject):
         self.ppj = ppj
 
@@ -54,7 +51,7 @@ class BuildFacade:
             'program_path': ppj.program_path,
             'project_path': ppj.project_path,
             'import_paths': ppj.import_paths,
-            'folder_paths': ppj.folders,
+            'folder_paths': ppj.folder_paths,
             'psc_paths': ppj.psc_paths,
             'pex_paths': ppj.pex_paths
         })
@@ -79,7 +76,7 @@ class BuildFacade:
             try:
                 os.remove(f)
             except PermissionError:
-                self.log.error('Cannot delete log file without permission: %s' % f)
+                BuildFacade.log.error('Cannot delete log file without permission: %s' % f)
 
     def _find_modified_scripts(self) -> list:
         pex_paths: list = []
@@ -127,7 +124,7 @@ class BuildFacade:
         scripts: list = self._find_modified_scripts()
 
         if not scripts and not self.ppj.missing_script_names and not self.ppj.options.no_incremental_build:
-            self.log.error('Cannot anonymize compiled scripts because no source scripts were modified')
+            BuildFacade.log.error('Cannot anonymize compiled scripts because no source scripts were modified')
         else:
             for pex_path in self.ppj.pex_paths:
                 if self.ppj.options.game_type == 'fo4':
@@ -138,10 +135,10 @@ class BuildFacade:
                     target_path = os.path.join(self.ppj.options.output_path, pex_path)
 
                 if not os.path.exists(target_path):
-                    self.log.error('Cannot locate file to anonymize: "%s"' % target_path)
+                    BuildFacade.log.error('Cannot locate file to anonymize: "%s"' % target_path)
                     continue
 
-                self.log.anon('Anonymizing "%s"...' % target_path)
+                BuildFacade.log.info('Anonymizing "%s"...' % target_path)
                 Anonymizer.anonymize_script(target_path)
 
     def try_pack(self) -> None:

@@ -9,9 +9,7 @@ from pyro.PathHelper import PathHelper
 from pyro.ProcessManager import ProcessManager
 
 
-class PackageManager:
-    log = Logger()
-
+class PackageManager(Logger):
     def __init__(self, ppj: PapyrusProject) -> None:
         self.ppj = ppj
         self.includes_root = ''
@@ -52,7 +50,7 @@ class PackageManager:
             self.includes_root = self.ppj.project_path
 
         if self.includes_root == os.pardir:
-            self.log.warn('Cannot use parent folder of project path as includes root')
+            PackageManager.log.warning('Cannot use parent folder of project path as includes root')
             return []
 
         # check if includes root path is relative to project folder
@@ -68,7 +66,7 @@ class PackageManager:
         # remove absolute include paths because we don't know how to handle them
         for include_path in include_paths:
             if os.path.isabs(include_path):
-                self.log.warn('Cannot include absolute path: "%s"' % include_path)
+                PackageManager.log.warning('Cannot include absolute path: "%s"' % include_path)
                 continue
             full_path = os.path.join(self.includes_root, include_path)
             if os.path.exists(full_path):
@@ -108,9 +106,9 @@ class PackageManager:
         # copy includes to archive
         include_paths = self._get_include_paths()
         if include_paths:
-            self.log.pyro('Includes found:')
+            PackageManager.log.info('Includes found:')
             for include_path in include_paths:
-                self.log.pyro('- "%s"' % include_path)
+                PackageManager.log.info('- "%s"' % include_path)
 
             for include_path in include_paths:
                 include_relpath = os.path.relpath(include_path, self.includes_root)
@@ -119,7 +117,7 @@ class PackageManager:
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
                 shutil.copy2(include_path, target_path)
 
-            self.log.pyro('Copied includes to temporary folder.')
+            PackageManager.log.info('Copied includes to temporary folder.')
 
         archive_path = self.ppj.options.archive_path
 

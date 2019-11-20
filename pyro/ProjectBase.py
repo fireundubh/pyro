@@ -5,9 +5,7 @@ from pyro.Logger import Logger
 from pyro.ProjectOptions import ProjectOptions
 
 
-class ProjectBase:
-    log = Logger()
-
+class ProjectBase(Logger):
     def __init__(self, options: ProjectOptions) -> None:
         self.options: ProjectOptions = options
 
@@ -16,6 +14,15 @@ class ProjectBase:
             self.program_path = os.path.abspath(os.path.join(self.program_path, os.pardir))
 
         self.project_path = os.path.dirname(self.options.input_path)
+
+    def __setattr__(self, key: str, value: object) -> None:
+        if key.endswith('path') and isinstance(value, str):
+            value = os.path.normpath(value)
+            if value == '.':
+                value = ''
+        elif key.endswith('paths') and isinstance(value, list):
+            value = [os.path.normpath(path) for path in value]
+        super(ProjectBase, self).__setattr__(key, value)
 
     # compiler arguments
     def get_compiler_path(self) -> str:
@@ -57,7 +64,8 @@ class ProjectBase:
         if sys.platform == 'win32':
             return self.get_registry_path()
 
-        sys.exit(self.log.error('Cannot locate game path'))
+        ProjectBase.log.error('Cannot locate game path')
+        sys.exit(1)
 
     def get_registry_path(self) -> str:
         """Returns absolute game path using Windows Registry"""
@@ -88,11 +96,13 @@ class ProjectBase:
             reg_value, reg_type = winreg.QueryValueEx(registry_key, key_value)
             winreg.CloseKey(registry_key)
         except WindowsError:
-            sys.exit(self.log.error('Game does not exist in Windows Registry. Run the game launcher once, then try again.'))
+            ProjectBase.log.error('Game does not exist in Windows Registry. Run the game launcher once, then try again.')
+            sys.exit(1)
 
         # noinspection PyUnboundLocalVariable
         if not os.path.exists(reg_value):
-            sys.exit(self.log.error('Directory does not exist: %s' % reg_value))
+            ProjectBase.log.error('Directory does not exist: %s' % reg_value)
+            sys.exit(1)
 
         return reg_value
 

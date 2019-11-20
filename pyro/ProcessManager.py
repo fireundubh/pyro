@@ -4,9 +4,7 @@ import subprocess
 from pyro.Logger import Logger
 
 
-class ProcessManager:
-    log = Logger()
-
+class ProcessManager(Logger):
     @staticmethod
     def run(command: str, use_bsarch: bool = False) -> int:
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True)
@@ -26,12 +24,12 @@ class ProcessManager:
 
                     if line.startswith('Packing'):
                         package_path = line.split(':', 1)[1].strip()
-                        ProcessManager.log.bsarch('Packaging folder "%s"...' % package_path)
+                        ProcessManager.log.info('Packaging folder "%s"...' % package_path)
                         continue
 
                     if line.startswith('Archive Name'):
                         archive_path = line.split(':', 1)[1].strip()
-                        ProcessManager.log.bsarch('Building "%s"...' % archive_path)
+                        ProcessManager.log.info('Building "%s"...' % archive_path)
                         continue
 
                     if line.startswith('Done'):
@@ -46,13 +44,16 @@ class ProcessManager:
                         elif hours == 0.0 and minutes == 0.0 and seconds > 0.0:
                             timecode = '%ss' % seconds
 
-                        ProcessManager.log.pyro('Packaging time: %s' % timecode)
+                        ProcessManager.log.info('Packaging time: %s' % timecode)
                         continue
 
-                    ProcessManager.log.bsarch(line) if line else None
+                    if line:
+                        ProcessManager.log.info(line)
                 else:
                     exclude_lines = not line.startswith(papyrus_exclusions)
-                    ProcessManager.log.compiler(line) if line and exclude_lines and 'error(s)' not in line else None
+
+                    if line and exclude_lines and 'error(s)' not in line:
+                        ProcessManager.log.info(line)
 
                     if line_error.match(line) is not None:
                         process.terminate()

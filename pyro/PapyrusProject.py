@@ -33,7 +33,8 @@ class PapyrusProject(ProjectBase):
         self.options.flags_path = self.root_node.get('Flags', default='')
         self.options.no_bsarch = not self.root_node.get('CreateArchive', default='true').casefold() == 'true'
         self.options.no_anonymize = not self.root_node.get('Anonymize', default='true').casefold() == 'true'
-        self.folders: list = []
+
+        self.folder_paths: list = []
 
         self.import_paths: list = self._get_imports()
         if not self.import_paths:
@@ -162,9 +163,7 @@ class PapyrusProject(ProjectBase):
 
         # build paths to source scripts
         for psc_path in self.psc_paths:
-            psc_path = os.path.normpath(psc_path)
-
-            # only fo4 supports namespaced script names
+            # fo4 supports namespaced script names
             if self.options.game_type == 'fo4':
                 psc_paths.append(psc_path)
                 continue
@@ -173,9 +172,7 @@ class PapyrusProject(ProjectBase):
 
         # build paths to compiled scripts
         for psc_path in psc_paths:
-            psc_path = os.path.normpath(psc_path)
-
-            pex_path = os.path.join(self.options.output_path, psc_path).replace('.psc', '.pex')
+            pex_path = os.path.join(self.options.output_path, psc_path.replace('.psc', '.pex'))
             pex_paths.append(pex_path)
 
         return PathHelper.uniqify(pex_paths)
@@ -184,30 +181,29 @@ class PapyrusProject(ProjectBase):
         """Returns script paths from Folders and Scripts nodes"""
         paths: list = []
 
-        folders = ElementHelper.get(self.root_node, 'Folders')
-        if folders is not None:
-            folder_paths = self._get_script_paths_from_folders_node()
-            if folder_paths:
-                paths.extend(folder_paths)
-
-        scripts = ElementHelper.get(self.root_node, 'Scripts')
-        if scripts is not None:
-            script_paths = self._get_script_paths_from_scripts_node()
-            if script_paths:
-                paths.extend(script_paths)
+        # try to populate paths with scripts from Folders and Scripts nodes
+        for tag in ('Folders', 'Scripts'):
+            node = ElementHelper.get(self.root_node, tag)
+            if node is None:
+                continue
+            node_paths = getattr(self, '_get_script_paths_from_%s_node' % tag.lower())()
+            if node_paths:
+                paths.extend(node_paths)
 
         results: list = []
 
+        # convert user paths to absolute paths
         for path in paths:
-            path = os.path.normpath(path)
-
+            # try to add existing absolute paths
             if PathHelper.try_append_abspath(path, results):
                 continue
 
+            # try to add existing project-relative paths
             test_path = os.path.join(self.project_path, path)
             if PathHelper.try_append_existing(test_path, results):
                 continue
 
+            # try to add existing import-relative paths
             for import_path in self.import_paths:
                 if not os.path.isabs(import_path):
                     import_path = os.path.join(self.project_path, import_path)
@@ -240,9 +236,9 @@ class PapyrusProject(ProjectBase):
             elif not os.path.isabs(folder):
                 folder = self._try_find_folder(folder)
 
-            self.folders.append(folder)
+            self.folder_paths.append(folder)
 
-        for folder in self.folders:
+        for folder in self.folder_paths:
             search_pattern = os.path.join(folder, '*.psc')
             psc_paths = glob.glob(search_pattern, recursive=not no_recurse)
 
@@ -263,13 +259,12 @@ class PapyrusProject(ProjectBase):
             return []
 
         for psc_path in ElementHelper.get_child_values(self.root_node, 'Scripts'):
-            if not os.path.isabs(psc_path):
+            if os.path.isabs(psc_path):
+                namespace, file_name = PathHelper.nsify(psc_path)
+                path = os.path.join(namespace, file_name)
+            else:
                 path = psc_path.replace(':', os.sep)
-                psc_paths.append(path)
-                continue
 
-            namespace, file_name = PathHelper.nsify(psc_path)
-            path = os.path.join(namespace, file_name)
             psc_paths.append(path)
 
         return PathHelper.uniqify(psc_paths)

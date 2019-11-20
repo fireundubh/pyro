@@ -11,9 +11,7 @@ from pyro.PyroRawDescriptionHelpFormatter import PyroRawTextHelpFormatter
 from pyro.TimeElapsed import TimeElapsed
 
 
-class Application:
-    log = Logger()
-
+class Application(Logger):
     def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
         self._validate_args()
@@ -23,33 +21,33 @@ class Application:
             sys.exit(print_help())
 
         if not self.args.input_path:
-            self.log.error('required argument missing: -i INPUT.ppj')
+            Application.log.error('required argument missing: -i INPUT.ppj')
             sys.exit(print_help())
 
         if not self.args.input_path.endswith('.ppj'):
-            self.log.error('Single script compilation is no longer supported. Use a PPJ file.')
+            Application.log.error('Single script compilation is no longer supported. Use a PPJ file.')
             sys.exit(print_help())
 
         if not os.path.isabs(self.args.input_path):
-            self.log.warn('Using working directory: "%s"' % os.getcwd())
+            Application.log.warning('Using working directory: "%s"' % os.getcwd())
             self.args.input_path = os.path.join(os.getcwd(), self.args.input_path.replace('file://', ''))
-            self.log.warn('Using input path: "%s"' % self.args.input_path)
+            Application.log.warning('Using input path: "%s"' % self.args.input_path)
 
     def run(self) -> int:
         options = ProjectOptions(self.args.__dict__)
         ppj = PapyrusProject(options)
 
         if not ppj.options.game_path:
-            self.log.error('Cannot determine game type from arguments or Papyrus Project')
+            Application.log.error('Cannot determine game type from arguments or Papyrus Project')
             sys.exit(print_help())
 
-        self.log.pyro('Imports found:')
+        Application.log.info('Imports found:')
         for import_path in ppj.import_paths:
-            self.log.pyro('- "%s"' % import_path)
+            Application.log.info('- "%s"' % import_path)
 
-        self.log.pyro('Scripts found:')
+        Application.log.info('Scripts found:')
         for psc_path in ppj.psc_paths:
-            self.log.pyro('- "%s"' % psc_path)
+            Application.log.info('- "%s"' % psc_path)
 
         time_elapsed = TimeElapsed()
 
@@ -59,16 +57,16 @@ class Application:
         if not ppj.options.no_anonymize:
             build.try_anonymize()
         else:
-            self.log.warn('Cannot anonymize scripts because anonymization was disabled by user')
+            Application.log.warning('Cannot anonymize scripts because anonymization was disabled by user')
 
         if not ppj.options.no_bsarch and ppj.options.bsarch_path:
             build.try_pack()
         else:
-            self.log.warn('Cannot build package because packaging was disabled by user')
+            Application.log.warning('Cannot build package because packaging was disabled by user')
 
-        time_elapsed.print(callback_func=self.log.pyro)
+        time_elapsed.print(callback_func=Application.log.info)
 
-        self.log.pyro('DONE!')
+        Application.log.info('DONE!')
 
         return 0
 
@@ -77,10 +75,10 @@ if __name__ == '__main__':
     _parser = PyroArgumentParser(add_help=False,
                                  formatter_class=PyroRawTextHelpFormatter,
                                  description=os.linesep.join([
-                                     'Pyro CLI by fireundubh',
-                                     'A semi-automated incremental build system for TESV, SSE, and FO4 projects'
-                                 ]),
-                                 epilog='For more help, visit: github.com/fireundubh/pyro')
+                                     '-' * 80,
+                                     ''.join([c.center(3) for c in 'PYRO']).center(80),
+                                     '-' * 53 + ' github.com/fireundubh/pyro'
+                                 ]))
 
     _required_arguments = _parser.add_argument_group('required arguments')
     _required_arguments.add_argument('-i', '--input-path',
