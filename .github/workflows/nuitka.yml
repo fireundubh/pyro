@@ -34,7 +34,7 @@ jobs:
      run: pipenv install
    - name: Run build script
      if: success()
-     run: python D:\a\pyro\pyro\build.py --loose
+     run: python D:\a\pyro\pyro\build.py --no-zip
    - name: Upload artifact
      if: success()
      uses: actions/upload-artifact@v1
