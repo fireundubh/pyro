@@ -51,7 +51,7 @@ class ProjectBase(Logger):
             if os.path.isabs(self.options.output_path):
                 return self.options.output_path
             return os.path.join(self.project_path, self.options.output_path)
-        return os.path.abspath(os.path.join(self.program_path, os.pardir, 'out'))
+        return os.path.abspath(os.path.join(self.program_path, 'out'))
 
     # game arguments
     def get_game_path(self) -> str:
@@ -121,7 +121,7 @@ class ProjectBase(Logger):
             if os.path.isabs(self.options.archive_path):
                 return self.options.archive_path
             return os.path.join(self.project_path, self.options.archive_path)
-        return os.path.abspath(os.path.join(self.program_path, os.pardir, 'dist'))
+        return os.path.abspath(os.path.join(self.program_path, 'dist'))
 
     def get_temp_path(self) -> str:
         """Returns absolute temp path from arguments"""
@@ -129,7 +129,7 @@ class ProjectBase(Logger):
             if os.path.isabs(self.options.temp_path):
                 return self.options.temp_path
             return os.path.join(os.getcwd(), self.options.temp_path)
-        return os.path.abspath(os.path.join(self.program_path, os.pardir, 'temp'))
+        return os.path.abspath(os.path.join(self.program_path, 'temp'))
 
     # program arguments
     def get_log_path(self) -> str:
@@ -138,4 +138,4 @@ class ProjectBase(Logger):
             if os.path.isabs(self.options.log_path):
                 return self.options.log_path
             return os.path.join(os.getcwd(), self.options.log_path)
-        return os.path.abspath(os.path.join(self.program_path, os.pardir, 'logs'))
+        return os.path.abspath(os.path.join(self.program_path, 'logs'))
