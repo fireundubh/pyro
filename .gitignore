@@ -4,10 +4,9 @@
 __pycache__/
 bin/
 dev/
-dist/
-logs/
-out/
 pyro/dist/
+pyro/logs/
+pyro/out/
 pyro/temp/
 pyro/tools/
 pyro.build/
