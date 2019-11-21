@@ -1,5 +1,4 @@
 import os
-import struct
 
 
 class PexData:
