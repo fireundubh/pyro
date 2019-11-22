@@ -143,6 +143,9 @@ class Application:
             while process.poll() is None:
                 line = process.stdout.readline().strip()
 
+                if not line:
+                    continue
+
                 if line.startswith(('Courtesy Notice', 'Executing', 'Nuitka:INFO:Optimizing', 'Nuitka:INFO:Doing', 'Nuitka:INFO:Demoting')):
                     continue
 
