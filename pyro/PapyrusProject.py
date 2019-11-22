@@ -32,24 +32,26 @@ class PapyrusProject(ProjectBase):
         self.options.output_path = self.root_node.get('Output', default='')
         self.options.flags_path = self.root_node.get('Flags', default='')
 
-        bsarch = self.root_node.get('CreateArchive', default='true').casefold()
-        self.options.no_bsarch = not bsarch == 'true' or not bsarch == '1'
+        bsarch = any([self.root_node.get('CreateArchive', default='true').casefold() == value for value in ('true', '1')])
+        if not self.options.no_bsarch:
+            self.options.no_bsarch = not bsarch
 
-        anonymize = self.root_node.get('Anonymize', default='true').casefold()
-        self.options.no_anonymize = not anonymize == 'true' or not anonymize == '1'
+        anonymize = any([self.root_node.get('Anonymize', default='true').casefold() == value for value in ('true', '1')])
+        if not self.options.no_anonymize:
+            self.options.no_anonymize = not anonymize
 
         self.release: bool = False
         self.final: bool = False
 
         if self.options.game_type == 'fo4':
             release = self.root_node.get('Release', default='false').casefold()
-            self.release = release == 'true' or release == '1'
+            self.release = any([release == value for value in ('true', '1')])
 
             final = self.root_node.get('Final', default='false').casefold()
-            self.final = final == 'true' or final == '1'
+            self.final = any([final == value for value in ('true', '1')])
 
         optimize = self.root_node.get('Optimize', default='false').casefold()
-        self.optimize: bool = optimize == 'true' or optimize == '1'
+        self.optimize: bool = any([optimize == value for value in ('true', '1')])
 
         self.folder_paths: list = []
 
