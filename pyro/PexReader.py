@@ -39,6 +39,7 @@ class PexReader:
 
             header.magic.offset, header.magic.data = f.tell(), f.read(4)
             header.magic.value = int.from_bytes(header.magic.data, 'little', signed=False)
+
             if header.magic.value == 0xFA57C0DE:
                 # Fallout 4
                 endianness = 'little'
@@ -46,7 +47,7 @@ class PexReader:
                 # Skyrim LE/SE
                 endianness = 'big'
             else:
-                raise ValueError("Invalid pex file")
+                raise ValueError('Cannot determine endianness from file magic')
 
             header.major_version.offset, header.major_version.data = f.tell(), f.read(1)
             header.major_version.value = int.from_bytes(header.major_version.data, endianness, signed=False)

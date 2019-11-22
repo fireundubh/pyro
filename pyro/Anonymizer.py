@@ -2,17 +2,22 @@ import os
 import random
 import string
 
+from pyro.Logger import Logger
 from pyro.PexReader import PexReader
 
 
-class Anonymizer:
+class Anonymizer(Logger):
     @staticmethod
     def _randomize_str(size: int, uppercase: bool = False) -> str:
         return ''.join([random.choice(string.ascii_lowercase if not uppercase else string.ascii_uppercase) for _ in range(size)])
 
     @staticmethod
     def anonymize_script(path: str) -> None:
-        header = PexReader.get_header(path)
+        try:
+            header = PexReader.get_header(path)
+        except ValueError:
+            Anonymizer.log.error('Cannot anonymize compiled script due to unknown file magic: "%s"' % path)
+            return
 
         file_path: str = header.script_path.value
         user_name: str = header.user_name.value

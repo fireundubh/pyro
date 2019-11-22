@@ -310,7 +310,13 @@ class PapyrusProject(ProjectBase):
             if not os.path.exists(matching_path):
                 continue
 
-            compiled_time: int = PexReader.get_header(matching_path).compilation_time.value
+            try:
+                header = PexReader.get_header(matching_path)
+            except ValueError:
+                PapyrusProject.log.warn('Cannot determine compilation time from compiled script due to unknown file magic: "%s"' % matching_path)
+                continue
+
+            compiled_time: int = header.compilation_time.value
             if os.path.getmtime(psc_path) < compiled_time:
                 continue
 
