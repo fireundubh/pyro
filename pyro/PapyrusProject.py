@@ -31,18 +31,37 @@ class PapyrusProject(ProjectBase):
         self.options.archive_path = self.root_node.get('Archive', default='')
         self.options.output_path = self.root_node.get('Output', default='')
         self.options.flags_path = self.root_node.get('Flags', default='')
-        self.options.no_bsarch = not self.root_node.get('CreateArchive', default='true').casefold() == 'true'
-        self.options.no_anonymize = not self.root_node.get('Anonymize', default='true').casefold() == 'true'
+
+        bsarch = self.root_node.get('CreateArchive', default='false').casefold()
+        self.options.no_bsarch = not bsarch == 'true' or not bsarch == '1'
+
+        anonymize = self.root_node.get('Anonymize', default='false').casefold()
+        self.options.no_anonymize = not anonymize == 'true' or not anonymize == '1'
+
+        self.release: bool = False
+        self.final: bool = False
+
+        if self.options.game_type == 'fo4':
+            release = self.root_node.get('Release', default='false').casefold()
+            self.release = release == 'true' or release == '1'
+
+            final = self.root_node.get('Final', default='false').casefold()
+            self.final = final == 'true' or final == '1'
+
+        optimize = self.root_node.get('Optimize', default='false').casefold()
+        self.optimize: bool = optimize == 'true' or optimize == '1'
 
         self.folder_paths: list = []
 
-        self.import_paths: list = self._get_imports()
+        self.import_paths: list = self._get_import_paths()
         if not self.import_paths:
-            sys.exit(self.log.error('Failed to build list of import paths using arguments or Papyrus Project'))
+            self.log.error('Failed to build list of import paths using arguments or Papyrus Project')
+            sys.exit(1)
 
         self.psc_paths: list = self._get_psc_paths()
         if not self.psc_paths:
-            sys.exit(self.log.error('Failed to build list of script paths using arguments or Papyrus Project'))
+            self.log.error('Failed to build list of script paths using arguments or Papyrus Project')
+            sys.exit(1)
 
         # this adds implicit imports from script paths
         self.import_paths = self._get_implicit_script_imports()
@@ -53,24 +72,29 @@ class PapyrusProject(ProjectBase):
         # these are file names
         self.missing_script_names: list = self._find_missing_script_names()
 
-    @staticmethod
-    def _unique_list(items: list) -> list:
-        return list(OrderedDict.fromkeys(items))
-
     def _find_missing_script_names(self) -> list:
+        """Returns list of script names for compiled scripts that do not exist"""
         script_names: list = []
 
         for pex_path in self.pex_paths:
+            # skip existing pex file paths
             if os.path.exists(pex_path):
                 continue
 
-            file_name, _ = os.path.splitext(os.path.basename(pex_path))
+            pex_basename = os.path.basename(pex_path)
+            file_name, _ = os.path.splitext(pex_basename)
+
             if file_name not in script_names:
                 script_names.append(file_name)
 
         return script_names
 
-    def _add_implicit_imports(self, implicit_paths: list, import_paths: list) -> None:
+    @staticmethod
+    def _merge_implicit_import_paths(implicit_paths: list, import_paths: list) -> None:
+        """Inserts orphan and descendant implicit paths into list of import paths at correct positions"""
+        if not implicit_paths:
+            return
+
         def _get_ancestor_import_index(_import_paths: list, _implicit_path: str) -> int:
             for _i, _import_path in enumerate(_import_paths):
                 if _import_path in _implicit_path:
@@ -84,7 +108,7 @@ class PapyrusProject(ProjectBase):
             if implicit_path in import_paths:
                 continue
 
-            self.log.warn('Using import path implicitly: "%s"' % implicit_path)
+            PapyrusProject.log.warn('Using import path implicitly: "%s"' % implicit_path)
 
             # insert implicit path before ancestor import path, if ancestor exists
             i = _get_ancestor_import_index(import_paths, implicit_path)
@@ -95,19 +119,17 @@ class PapyrusProject(ProjectBase):
             # insert orphan implicit path at the first position
             import_paths.insert(0, implicit_path)
 
-    def _get_imports(self) -> list:
+    def _get_import_paths(self) -> list:
         """Returns absolute import paths from Papyrus Project"""
-        import_paths: list = ElementHelper.get_child_values(self.root_node, 'Imports')
+        import_paths: list = [os.path.normpath(path) for path in ElementHelper.get_child_values(self.root_node, 'Imports')]
 
         # ensure that folder paths are implicitly imported
         folder_paths: list = self._get_implicit_folder_imports()
-        self._add_implicit_imports(folder_paths, import_paths)
+        self._merge_implicit_import_paths(folder_paths, import_paths)
 
         results: list = []
 
         for import_path in import_paths:
-            import_path = os.path.normpath(import_path)
-
             if import_path == os.curdir:
                 import_path = self.project_path
             elif import_path == os.pardir:
@@ -152,7 +174,7 @@ class PapyrusProject(ProjectBase):
                 test_path = os.path.join(import_path, namespace)
                 PathHelper.try_append_existing(test_path, implicit_paths)
 
-        self._add_implicit_imports(implicit_paths, results)
+        self._merge_implicit_import_paths(implicit_paths, results)
 
         return PathHelper.uniqify(results)
 
@@ -186,7 +208,7 @@ class PapyrusProject(ProjectBase):
             node = ElementHelper.get(self.root_node, tag)
             if node is None:
                 continue
-            node_paths = getattr(self, '_get_script_paths_from_%s_node' % tag.lower())()
+            node_paths = getattr(self, '_get_script_paths_from_%s_node' % tag.casefold())()
             if node_paths:
                 paths.extend(node_paths)
 
@@ -302,17 +324,15 @@ class PapyrusProject(ProjectBase):
         if os.path.exists(test_path):
             return test_path
 
-        for import_path in ElementHelper.get_child_values(self.root_node, 'Imports'):
-            if not os.path.isabs(import_path):
-                continue
-
-            import_path = os.path.normpath(import_path)
-
+        # when this runs, import_paths isn't populated with implicit paths from scripts yet.
+        # just something to keep in mind if there's trouble down the road.
+        for import_path in self.import_paths:
             test_path = os.path.join(import_path, folder)
             if os.path.exists(test_path):
                 return test_path
 
-        sys.exit(self.log.error('Cannot find folder relative to project or any import paths: "%s"' % folder))
+        PapyrusProject.log.error('Cannot find folder relative to project or any import paths: "%s"' % folder)
+        sys.exit(1)
 
     def build_commands(self) -> list:
         commands: list = []
@@ -323,12 +343,6 @@ class PapyrusProject(ProjectBase):
         flags_path: str = self.options.flags_path
         output_path: str = self.options.output_path
         import_paths: str = ';'.join(self.import_paths)
-
-        if self.options.game_type == 'fo4':
-            release: bool = self.root_node.get('Release', default='false').casefold() == 'true'
-            final: bool = self.root_node.get('Final', default='false').casefold() == 'true'
-
-        optimize: bool = self.root_node.get('Optimize', default='false').casefold() == 'true'
 
         psc_paths: list = self._try_exclude_unmodified_scripts()
 
@@ -354,14 +368,14 @@ class PapyrusProject(ProjectBase):
 
             if self.options.game_type == 'fo4':
                 # noinspection PyUnboundLocalVariable
-                if release:
+                if self.release:
                     arguments.append('-release')
 
                 # noinspection PyUnboundLocalVariable
-                if final:
+                if self.final:
                     arguments.append('-final')
 
-            if optimize:
+            if self.optimize:
                 arguments.append('-op')
 
             commands.append(arguments.join())
