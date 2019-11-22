@@ -32,10 +32,10 @@ class PapyrusProject(ProjectBase):
         self.options.output_path = self.root_node.get('Output', default='')
         self.options.flags_path = self.root_node.get('Flags', default='')
 
-        bsarch = self.root_node.get('CreateArchive', default='false').casefold()
+        bsarch = self.root_node.get('CreateArchive', default='true').casefold()
         self.options.no_bsarch = not bsarch == 'true' or not bsarch == '1'
 
-        anonymize = self.root_node.get('Anonymize', default='false').casefold()
+        anonymize = self.root_node.get('Anonymize', default='true').casefold()
         self.options.no_anonymize = not anonymize == 'true' or not anonymize == '1'
 
         self.release: bool = False
