@@ -14,7 +14,7 @@
                     <xs:element minOccurs="0" name="Includes" type="includeList" />
                 </xs:choice>
             </xs:sequence>
-            <xs:attribute name="Game" type="xs:string" />
+            <xs:attribute name="Game" type="pyroGameType" />
             <xs:attribute name="Output" type="xs:string" />
             <xs:attribute name="Archive" type="xs:string" />
             <xs:attribute name="Flags" type="xs:string" />
@@ -60,6 +60,13 @@
             <xs:pattern value="[tT][rR][uU][eE]" />
             <xs:pattern value="[fF][aA][lL][sS][eE]" />
             <xs:pattern value="[01]" />
+        </xs:restriction>
+    </xs:simpleType>
+    <xs:simpleType name="pyroGameType">
+        <xs:restriction base="xs:string">
+            <xs:pattern value="[sS][sS][eE]" />
+            <xs:pattern value="[tT][eE][sS]5" />
+            <xs:pattern value="[fF][oO]4" />
         </xs:restriction>
     </xs:simpleType>
     <xs:element name="Folder">
