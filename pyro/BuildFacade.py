@@ -132,20 +132,14 @@ class BuildFacade(Logger):
         if not scripts and not self.ppj.missing_script_names and not self.ppj.options.no_incremental_build:
             BuildFacade.log.error('Cannot anonymize compiled scripts because no source scripts were modified')
         else:
+            # these are absolute paths. there's no reason to manipulate them.
             for pex_path in self.ppj.pex_paths:
-                if self.ppj.options.game_type == 'fo4':
-                    namespace, file_name = PathHelper.nsify(pex_path)
-                    target_path = os.path.join(self.ppj.options.output_path, namespace, file_name)
-                else:
-                    pex_path = os.path.basename(pex_path)
-                    target_path = os.path.join(self.ppj.options.output_path, pex_path)
-
-                if not os.path.exists(target_path):
-                    BuildFacade.log.error('Cannot locate file to anonymize: "%s"' % target_path)
+                if not os.path.exists(pex_path):
+                    BuildFacade.log.warn('Cannot locate file to anonymize: "%s"' % pex_path)
                     continue
 
-                BuildFacade.log.info('Anonymizing "%s"...' % target_path)
-                Anonymizer.anonymize_script(target_path)
+                BuildFacade.log.info('Anonymizing "%s"...' % pex_path)
+                Anonymizer.anonymize_script(pex_path)
 
     def try_pack(self) -> None:
         """Generates ZIP archive for project"""

@@ -18,10 +18,14 @@ class PathHelper:
         return False
 
     @staticmethod
-    def nsify(path: str) -> tuple:
-        """Returns tuple(parent folder, file name) from absolute path"""
-        parent_folder, file_name = map(lambda x: os.path.basename(x), [os.path.dirname(path), path])
-        return parent_folder, file_name
+    def calculate_relative_object_name(path: str, import_paths: list) -> str:
+        """Returns import-relative path from absolute path (should be used only for Fallout 4 paths)"""
+        # reverse the list to find the best import path
+        for import_path in reversed(import_paths):
+            if len(path) > len(import_path) and import_path in path:
+                relative_path = os.path.relpath(path, import_path)
+                return relative_path
+        raise ValueError('Cannot build import-relative path from absolute path: "%s"' % path)
 
     @staticmethod
     def uniqify(items: list) -> list:

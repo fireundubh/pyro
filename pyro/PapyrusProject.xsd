@@ -1,0 +1,82 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<xs:schema id="PapyrusProject"
+           targetNamespace="PapyrusProject.xsd"
+           elementFormDefault="qualified"
+           xmlns="PapyrusProject.xsd"
+           xmlns:xs="http://www.w3.org/2001/XMLSchema"
+>
+    <xs:element name="PapyrusProject">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element minOccurs="0" name="Imports" type="importList" />
+                <xs:element minOccurs="0" name="Folders" type="folderList" />
+                <xs:element minOccurs="0" name="Scripts" type="scriptList" />
+                <xs:element minOccurs="0" name="Includes" type="includeList" />
+            </xs:sequence>
+            <xs:attribute name="Game" type="xs:string" />
+            <xs:attribute name="Output" type="xs:string" />
+            <xs:attribute name="Archive" type="xs:string" />
+            <xs:attribute name="Flags" type="xs:string" />
+            <xs:attribute name="Asm" type="asmType" />
+            <xs:attribute name="Optimize" type="pyroBool" />
+            <xs:attribute name="Release" type="pyroBool" />
+            <xs:attribute name="Final" type="pyroBool" />
+            <xs:attribute name="CreateArchive" type="pyroBool" />
+            <xs:attribute name="Anonymize" type="pyroBool" />
+        </xs:complexType>
+    </xs:element>
+    <xs:complexType name="importList">
+        <xs:sequence>
+            <xs:element maxOccurs="unbounded" name="Import" type="xs:string" />
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="folderList">
+        <xs:sequence>
+            <xs:element maxOccurs="unbounded" ref="Folder" />
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="scriptList">
+        <xs:sequence>
+            <xs:element maxOccurs="unbounded" name="Script" type="xs:string" />
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="includeList">
+        <xs:sequence>
+            <xs:element maxOccurs="unbounded" ref="Include" />
+        </xs:sequence>
+        <xs:attribute name="Root" type="xs:string" />
+    </xs:complexType>
+    <xs:simpleType name="asmType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="None" />
+            <xs:enumeration value="Keep" />
+            <xs:enumeration value="Only" />
+            <xs:enumeration value="Discard" />
+        </xs:restriction>
+    </xs:simpleType>
+    <xs:simpleType name="pyroBool">
+        <xs:restriction base="xs:string">
+            <xs:pattern value="[tT][rR][uU][eE]" />
+            <xs:pattern value="[fF][aA][lL][sS][eE]" />
+            <xs:pattern value="[01]" />
+        </xs:restriction>
+    </xs:simpleType>
+    <xs:element name="Folder">
+        <xs:complexType>
+            <xs:simpleContent>
+                <xs:extension base="xs:string">
+                    <xs:attribute name="NoRecurse" type="pyroBool" />
+                </xs:extension>
+            </xs:simpleContent>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="Include">
+        <xs:complexType>
+            <xs:simpleContent>
+                <xs:extension base="xs:string">
+                    <xs:attribute name="NoRecurse" type="pyroBool" />
+                </xs:extension>
+            </xs:simpleContent>
+        </xs:complexType>
+    </xs:element>
+</xs:schema>

@@ -1,3 +1,4 @@
+import os
 import sys
 
 from lxml import etree
@@ -6,6 +7,19 @@ from pyro.Logger import Logger
 
 
 class ElementHelper(Logger):
+    @staticmethod
+    def validate_schema(parent_element: etree.ElementBase, program_path: str) -> object:
+        namespace = [ns for ns in parent_element.nsmap.values()]
+
+        if namespace:
+            schema_path = os.path.join(program_path, namespace[0])
+
+            if os.path.exists(schema_path):
+                schema = etree.parse(schema_path)
+                return etree.XMLSchema(schema)
+
+        return None
+
     @staticmethod
     def _get_children(parent_element: etree.ElementBase, tag: str) -> list:
         namespace = [ns for ns in parent_element.nsmap.values()]

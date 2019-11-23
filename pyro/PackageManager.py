@@ -1,3 +1,4 @@
+import glob
 import os
 import shutil
 
@@ -23,9 +24,9 @@ class PackageManager(Logger):
 
         for pex_path in pex_paths:
             if self.ppj.options.game_type == 'fo4':
-                namespace, file_name = PathHelper.nsify(pex_path)
-                target_path = os.path.join(self.ppj.options.output_path, namespace, file_name)
-                temp_file_path = os.path.join(temp_path, namespace, file_name)
+                rel_object_name = PathHelper.calculate_relative_object_name(pex_path, self.ppj.import_paths)
+                target_path = os.path.join(self.ppj.options.output_path, rel_object_name)
+                temp_file_path = os.path.join(temp_path, rel_object_name)
             else:
                 target_path = os.path.abspath(pex_path)
                 temp_file_path = os.path.join(temp_path, os.path.basename(pex_path))
@@ -39,11 +40,11 @@ class PackageManager(Logger):
 
     def _get_include_paths(self) -> list:
         # TODO: support includes for multiple archives
-        includes = ElementHelper.get(self.ppj.root_node, 'Includes')
-        if includes is None or len(list(includes)) == 0:
+        include_nodes = ElementHelper.get(self.ppj.root_node, 'Includes')
+        if include_nodes is None or len(list(include_nodes)) == 0:
             return []
 
-        self.includes_root = includes.get('Root', default=self.ppj.project_path)
+        self.includes_root = include_nodes.get('Root', default=self.ppj.project_path)
 
         # treat curdir the same as the project path
         if self.includes_root == os.curdir:
@@ -59,18 +60,35 @@ class PackageManager(Logger):
             if os.path.exists(test_path):
                 self.includes_root = test_path
 
-        include_paths = ElementHelper.get_child_values(self.ppj.root_node, 'Includes')
-
         results: list = []
 
-        # remove absolute include paths because we don't know how to handle them
-        for include_path in include_paths:
+        for include_node in include_nodes:
+            include_path = os.path.normpath(include_node.text)
+
             if os.path.isabs(include_path):
-                PackageManager.log.warning('Cannot include absolute path: "%s"' % include_path)
+                PackageManager.log.warn('Cannot include absolute path: "%s"' % include_path)
                 continue
-            full_path = os.path.join(self.includes_root, include_path)
-            if os.path.exists(full_path):
+
+            if include_path == os.pardir:
+                PackageManager.log.warn('Cannot use ".." as include path')
+                continue
+
+            full_path: str = self.includes_root if include_path == os.curdir else os.path.join(self.includes_root, include_path)
+
+            if not os.path.exists(full_path):
+                PackageManager.log.warn('Cannot use include because path does not exist: "%s"' % full_path)
+                continue
+
+            if os.path.isfile(full_path):
                 results.append(full_path)
+            else:
+                no_recurse: bool = any([include_node.get('NoRecurse', default='false').casefold() == value for value in ('true', '1')])
+
+                search_path: str = os.path.join(full_path, '*') if no_recurse else os.path.join(full_path, '**\*')
+                files = [f for f in glob.glob(search_path, recursive=not no_recurse) if os.path.isfile(f)]
+
+                for f in files:
+                    results.append(f)
 
         return PathHelper.uniqify(results)
 
