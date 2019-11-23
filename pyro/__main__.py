@@ -33,6 +33,10 @@ class Application(Logger):
             self.args.input_path = os.path.join(os.getcwd(), self.args.input_path.replace('file://', ''))
             Application.log.warning('Using input path: "%s"' % self.args.input_path)
 
+        if not os.path.exists(self.args.input_path):
+            Application.log.error('Cannot load PPJ at given path because file does not exist: "%s"' % self.args.input_path)
+            sys.exit(print_help())
+
     def run(self) -> int:
         options = ProjectOptions(self.args.__dict__)
         ppj = PapyrusProject(options)
