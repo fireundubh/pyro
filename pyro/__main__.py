@@ -44,11 +44,11 @@ class Application(Logger):
             Application.log.error('required argument missing: -i INPUT.ppj')
             sys.exit(print_help())
 
-        if not input_path.endswith('.ppj'):
+        if not input_path.casefold().endswith('.ppj'):
             Application.log.error('Single script compilation is no longer supported. Use a PPJ file.')
             sys.exit(print_help())
 
-        if input_path.startswith('file:'):
+        if input_path.casefold().startswith('file:'):
             full_path: str = Application._url2pathname(input_path)
             input_path = os.path.normpath(full_path)
 
