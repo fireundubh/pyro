@@ -217,11 +217,9 @@ class PapyrusProject(ProjectBase):
         # build paths to compiled scripts
         for psc_path in psc_paths:
             if self.options.game_type == 'fo4':
-                namespace, file_name = PathHelper.nsify(psc_path)
-                target_path = os.path.join(self.options.output_path, namespace, file_name.replace('.psc', '.pex'))
-            else:
-                target_path = os.path.join(self.options.output_path, psc_path.replace('.psc', '.pex'))
+                psc_path = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
 
+            target_path = os.path.join(self.options.output_path, psc_path.replace('.psc', '.pex'))
             pex_paths.append(target_path)
 
         return PathHelper.uniqify(pex_paths)
@@ -384,8 +382,7 @@ class PapyrusProject(ProjectBase):
         # generate list of commands
         for psc_path in psc_paths:
             if self.options.game_type == 'fo4':
-                namespace, file_name = PathHelper.nsify(psc_path)
-                psc_path = os.path.join(namespace, file_name)
+                psc_path = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
 
             arguments.clear()
             arguments.append_quoted(compiler_path)

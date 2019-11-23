@@ -24,9 +24,9 @@ class PackageManager(Logger):
 
         for pex_path in pex_paths:
             if self.ppj.options.game_type == 'fo4':
-                namespace, file_name = PathHelper.nsify(pex_path)
-                target_path = os.path.join(self.ppj.options.output_path, namespace, file_name)
-                temp_file_path = os.path.join(temp_path, namespace, file_name)
+                rel_object_name = PathHelper.calculate_relative_object_name(pex_path, self.ppj.import_paths)
+                target_path = os.path.join(self.ppj.options.output_path, rel_object_name)
+                temp_file_path = os.path.join(temp_path, rel_object_name)
             else:
                 target_path = os.path.abspath(pex_path)
                 temp_file_path = os.path.join(temp_path, os.path.basename(pex_path))
