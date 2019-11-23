@@ -1,7 +1,8 @@
 import glob
+import io
 import os
+import re
 import sys
-from collections import OrderedDict
 
 from lxml import etree
 
@@ -17,7 +18,27 @@ class PapyrusProject(ProjectBase):
     def __init__(self, options: ProjectOptions) -> None:
         super().__init__(options)
 
-        self.root_node = etree.parse(self.options.input_path, etree.XMLParser(remove_blank_text=True)).getroot()
+        # strip comments from raw text because lxml.etree.XMLParser does not remove XML-unsupported comments
+        # e.g., '<PapyrusProject <!-- xmlns="PapyrusProject.xsd" -->>'
+        with open(self.options.input_path, mode='r', encoding='utf-8') as f:
+            xml_document: str = f.read()
+            comments_pattern = re.compile('(<!--.*?-->)', flags=re.DOTALL)
+            xml_document = comments_pattern.sub('', xml_document)
+
+        xml_parser: etree.XMLParser = etree.XMLParser(remove_blank_text=True, remove_comments=True)
+        project_xml: etree.ElementTree = etree.parse(io.StringIO(xml_document), xml_parser)
+
+        self.root_node = project_xml.getroot()
+
+        schema: etree.XMLSchema = ElementHelper.validate_schema(self.root_node, self.program_path)
+        if schema:
+            try:
+                validation_result = schema.assertValid(project_xml)
+                if validation_result is None:
+                    PapyrusProject.log.info('Successfully validated XML Schema.')
+            except etree.DocumentInvalid as e:
+                PapyrusProject.log.error('Failed to validate XML Schema.%s\t%s' % (os.linesep, e))
+                sys.exit(1)
 
         # allow xml to set game type but defer to passed argument
         if not self.options.game_type:
