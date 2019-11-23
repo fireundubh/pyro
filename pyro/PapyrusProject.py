@@ -61,7 +61,7 @@ class PapyrusProject(ProjectBase):
             game_type: str = self.root_node.get('Game', default='').casefold()
 
             if game_type and game_type in self.game_types:
-                PapyrusProject.log.warn('Using game type: %s (determined from Papyrus Project)' % self.game_types[game_type])
+                PapyrusProject.log.warning('Using game type: %s (determined from Papyrus Project)' % self.game_types[game_type])
                 self.options.game_type = game_type
 
         if not self.options.game_type:
@@ -99,6 +99,7 @@ class PapyrusProject(ProjectBase):
             self.options.no_anonymize = not any([anonymize_attr == value for value in ('true', '1')])
 
         # get expected pex paths - these paths may not exist and that is okay!
+        # required game type to be set
         self.pex_paths: list = self._get_pex_paths()
 
         # these are file names
@@ -136,11 +137,13 @@ class PapyrusProject(ProjectBase):
         implicit_paths.sort()
 
         for implicit_path in reversed(PathHelper.uniqify(implicit_paths)):
+            implicit_path = os.path.normpath(implicit_path)
+
             # do not add import paths that are already declared
             if implicit_path in import_paths:
                 continue
 
-            PapyrusProject.log.warn('Using import path implicitly: "%s"' % implicit_path)
+            PapyrusProject.log.warning('Using import path implicitly: "%s"' % implicit_path)
 
             # insert implicit path before ancestor import path, if ancestor exists
             i = _get_ancestor_import_index(import_paths, implicit_path)
@@ -165,7 +168,7 @@ class PapyrusProject(ProjectBase):
             if import_path == os.curdir:
                 import_path = self.project_path
             elif import_path == os.pardir:
-                self.log.warn('Cannot use ".." as import path')
+                self.log.warning('Cannot use ".." as import path')
                 continue
             elif not os.path.isabs(import_path):
                 # relative import paths should be relative to the project
@@ -210,27 +213,13 @@ class PapyrusProject(ProjectBase):
         return PathHelper.uniqify(results)
 
     def _get_pex_paths(self) -> list:
-        """Returns compiled script paths from output folder"""
-        psc_paths: list = []
-        pex_paths: list = []
-
-        # build paths to source scripts
-        for psc_path in self.psc_paths:
-            # fo4 supports namespaced script names
-            if self.options.game_type == 'fo4':
-                psc_paths.append(psc_path)
-                continue
-
-            psc_paths.append(os.path.basename(psc_path))
-
-        # build paths to compiled scripts
-        for psc_path in psc_paths:
-            if self.options.game_type == 'fo4':
-                psc_path = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
-
-            target_path = os.path.join(self.options.output_path, psc_path.replace('.psc', '.pex'))
-            pex_paths.append(target_path)
-
+        """
+        Returns absolute paths to compiled scripts in output folder recursively,
+        excluding any compiled scripts without source counterparts
+        """
+        search_path: str = os.path.join(self.options.output_path, '**\*.pex')
+        pex_paths: list = [pex for pex in glob.glob(search_path, recursive=True)
+                           if os.path.basename(pex)[:-4] in [os.path.basename(psc)[:-4] for psc in self.psc_paths]]
         return PathHelper.uniqify(pex_paths)
 
     def _get_psc_paths(self) -> list:
@@ -284,7 +273,7 @@ class PapyrusProject(ProjectBase):
             if folder_path == os.curdir:
                 folder_path = self.project_path
             elif folder_path == os.pardir:
-                self.log.warn('Cannot use ".." as folder path')
+                self.log.warning('Cannot use ".." as folder path')
                 continue
             elif not os.path.isabs(folder_path):
                 folder_path = self._try_find_folder(folder_path)
@@ -342,7 +331,7 @@ class PapyrusProject(ProjectBase):
             try:
                 header = PexReader.get_header(matching_path)
             except ValueError:
-                PapyrusProject.log.warn('Cannot determine compilation time from compiled script due to unknown file magic: "%s"' % matching_path)
+                PapyrusProject.log.warning('Cannot determine compilation time from compiled script due to unknown file magic: "%s"' % matching_path)
                 continue
 
             compiled_time: int = header.compilation_time.value

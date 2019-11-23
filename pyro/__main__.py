@@ -2,6 +2,8 @@ import argparse
 import os
 import sys
 
+from urllib.parse import urlparse, unquote_plus
+
 from pyro.BuildFacade import BuildFacade
 from pyro.Logger import Logger
 from pyro.PapyrusProject import PapyrusProject
@@ -16,22 +18,46 @@ class Application(Logger):
         self.args = args
         self._validate_args()
 
+    # noinspection PyUnresolvedReferences
+    @staticmethod
+    def _url2pathname(url_path: str) -> str:
+        url = urlparse(url_path)
+
+        netloc: str = url.netloc
+        path: str = url.path
+
+        if netloc and netloc.startswith('/'):
+            netloc = netloc[1:]
+
+        if path and path.startswith('/'):
+            path = path[1:]
+
+        return os.path.normpath(unquote_plus(os.path.join(netloc, path)))
+
     def _validate_args(self) -> None:
         if self.args.show_help:
             sys.exit(print_help())
 
-        if not self.args.input_path:
+        input_path: str = self.args.input_path
+
+        if not input_path:
             Application.log.error('required argument missing: -i INPUT.ppj')
             sys.exit(print_help())
 
-        if not self.args.input_path.endswith('.ppj'):
+        if not input_path.endswith('.ppj'):
             Application.log.error('Single script compilation is no longer supported. Use a PPJ file.')
             sys.exit(print_help())
 
-        if not os.path.isabs(self.args.input_path):
+        if input_path.startswith('file:'):
+            full_path: str = Application._url2pathname(input_path)
+            input_path = os.path.normpath(full_path)
+
+        if not os.path.isabs(input_path):
             Application.log.warning('Using working directory: "%s"' % os.getcwd())
-            self.args.input_path = os.path.join(os.getcwd(), self.args.input_path.replace('file://', ''))
-            Application.log.warning('Using input path: "%s"' % self.args.input_path)
+            input_path = os.path.join(os.getcwd(), input_path)
+            Application.log.warning('Using input path: "%s"' % input_path)
+
+        self.args.input_path = input_path
 
         if not os.path.exists(self.args.input_path):
             Application.log.error('Cannot load PPJ at given path because file does not exist: "%s"' % self.args.input_path)

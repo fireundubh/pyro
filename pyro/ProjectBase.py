@@ -156,40 +156,54 @@ class ProjectBase(Logger):
                 return game_type
 
         if self.options.game_path:
-            if self.options.game_path.endswith('Skyrim Special Edition'):
-                ProjectBase.log.warn('Using game type: Skyrim Special Edition (determined from game path)')
+            game_path = self.options.game_path.casefold()
+            if game_path.endswith('skyrim special edition'):
+                ProjectBase.log.warning('Using game type: Skyrim Special Edition (determined from game path)')
                 return 'sse'
-            if self.options.game_path.endswith('Skyrim'):
-                ProjectBase.log.warn('Using game type: Skyrim (determined from game path)')
+            if game_path.endswith('skyrim'):
+                ProjectBase.log.warning('Using game type: Skyrim (determined from game path)')
                 return 'tesv'
-            if self.options.game_path.endswith('Fallout 4'):
-                ProjectBase.log.warn('Using game type: Fallout 4 (determined from game path)')
+            if game_path.endswith('fallout 4'):
+                ProjectBase.log.warning('Using game type: Fallout 4 (determined from game path)')
+                return 'fo4'
+
+        if self.options.registry_path:
+            registry_path_parts = self.options.registry_path.casefold().split(os.sep)
+            if 'skyrim special edition' in registry_path_parts:
+                ProjectBase.log.warning('Using game type: Skyrim Special Edition (determined from registry path)')
+                return 'sse'
+            if 'skyrim' in registry_path_parts:
+                ProjectBase.log.warning('Using game type: Skyrim (determined from registry path)')
+                return 'tesv'
+            if 'fallout 4' in registry_path_parts:
+                ProjectBase.log.warning('Using game type: Fallout 4 (determined from registry path)')
                 return 'fo4'
 
         if self.import_paths:
             for import_path in reversed(self.import_paths):
-                if 'skyrim special edition\\' in import_path.casefold():
-                    ProjectBase.log.warn('Using game type: Skyrim Special Edition (determined from import paths)')
+                path_parts: list = import_path.casefold().split(os.sep)
+                if 'skyrim special edition' in path_parts:
+                    ProjectBase.log.warning('Using game type: Skyrim Special Edition (determined from import paths)')
                     return 'sse'
-                if 'skyrim\\' in import_path.casefold():
-                    ProjectBase.log.warn('Using game type: Skyrim (determined from import paths)')
+                if 'skyrim' in path_parts:
+                    ProjectBase.log.warning('Using game type: Skyrim (determined from import paths)')
                     return 'tesv'
-                if 'fallout 4\\' in import_path.casefold():
-                    ProjectBase.log.warn('Using game type: Fallout 4 (determined from import paths)')
+                if 'fallout 4' in path_parts:
+                    ProjectBase.log.warning('Using game type: Fallout 4 (determined from import paths)')
                     return 'fo4'
 
         if self.options.flags_path:
             flags_path: str = self.options.flags_path.casefold()
             if flags_path.endswith('institute_papyrus_flags.flg'):
-                ProjectBase.log.warn('Using game type: Fallout 4 (determined from flags path)')
+                ProjectBase.log.warning('Using game type: Fallout 4 (determined from flags path)')
                 return 'fo4'
             if flags_path.endswith('tesv_papyrus_flags.flg'):
                 try:
                     self.get_game_path('sse')
-                    ProjectBase.log.warn('Using game type: Skyrim Special Edition (determined from flags path)')
+                    ProjectBase.log.warning('Using game type: Skyrim Special Edition (determined from flags path)')
                     return 'sse'
                 except FileNotFoundError:
-                    ProjectBase.log.warn('Using game type: Skyrim (determined from flags path)')
+                    ProjectBase.log.warning('Using game type: Skyrim (determined from flags path)')
                     return 'tesv'
 
         return ''
