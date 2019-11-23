@@ -32,9 +32,8 @@
     </xs:complexType>
     <xs:complexType name="folderList">
         <xs:sequence>
-            <xs:element maxOccurs="unbounded" name="Folder" type="xs:string" />
+            <xs:element maxOccurs="unbounded" ref="Folder" />
         </xs:sequence>
-        <xs:attribute name="NoRecurse" type="pyroBool" />
     </xs:complexType>
     <xs:complexType name="scriptList">
         <xs:sequence>
@@ -43,7 +42,7 @@
     </xs:complexType>
     <xs:complexType name="includeList">
         <xs:sequence>
-            <xs:element maxOccurs="unbounded" name="Include" type="xs:string" />
+            <xs:element maxOccurs="unbounded" ref="Include" />
         </xs:sequence>
         <xs:attribute name="Root" type="xs:string" />
     </xs:complexType>
@@ -62,4 +61,22 @@
             <xs:pattern value="[01]" />
         </xs:restriction>
     </xs:simpleType>
+    <xs:element name="Folder">
+        <xs:complexType>
+            <xs:simpleContent>
+                <xs:extension base="xs:string">
+                    <xs:attribute name="NoRecurse" type="pyroBool" />
+                </xs:extension>
+            </xs:simpleContent>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="Include">
+        <xs:complexType>
+            <xs:simpleContent>
+                <xs:extension base="xs:string">
+                    <xs:attribute name="NoRecurse" type="pyroBool" />
+                </xs:extension>
+            </xs:simpleContent>
+        </xs:complexType>
+    </xs:element>
 </xs:schema>

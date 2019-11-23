@@ -191,11 +191,10 @@ class PapyrusProject(ProjectBase):
         implicit_paths: list = []
 
         for psc_path in self.psc_paths:
-            namespace, file_name = PathHelper.nsify(psc_path)
-
             for import_path in self.import_paths:
-                test_path = os.path.join(import_path, namespace)
-                PathHelper.try_append_existing(test_path, implicit_paths)
+                relpath = os.path.relpath(os.path.dirname(psc_path), import_path)
+                test_path = os.path.join(import_path, relpath)
+                PathHelper.try_append_existing(os.path.normpath(test_path), implicit_paths)
 
         self._merge_implicit_import_paths(implicit_paths, results)
 
@@ -217,8 +216,13 @@ class PapyrusProject(ProjectBase):
 
         # build paths to compiled scripts
         for psc_path in psc_paths:
-            pex_path = os.path.join(self.options.output_path, psc_path.replace('.psc', '.pex'))
-            pex_paths.append(pex_path)
+            if self.options.game_type == 'fo4':
+                namespace, file_name = PathHelper.nsify(psc_path)
+                target_path = os.path.join(self.options.output_path, namespace, file_name.replace('.psc', '.pex'))
+            else:
+                target_path = os.path.join(self.options.output_path, psc_path.replace('.psc', '.pex'))
+
+            pex_paths.append(target_path)
 
         return PathHelper.uniqify(pex_paths)
 
@@ -263,56 +267,51 @@ class PapyrusProject(ProjectBase):
         """Returns script paths from the Folders element array"""
         paths: list = []
 
-        folders_node = ElementHelper.get(self.root_node, 'Folders')
-        if folders_node is None:
+        folder_nodes = ElementHelper.get(self.root_node, 'Folders')
+        if folder_nodes is None:
             return []
 
-        # defaults to False if the attribute does not exist
-        no_recurse = folders_node.get('NoRecurse', default='false').casefold() == 'true'
+        for folder_node in folder_nodes:
+            folder_path = os.path.normpath(folder_node.text)
 
-        for folder in ElementHelper.get_child_values(self.root_node, 'Folders'):
-            folder = os.path.normpath(folder)
-
-            if folder == os.curdir:
-                folder = self.project_path
-            elif folder == os.pardir:
+            if folder_path == os.curdir:
+                folder_path = self.project_path
+            elif folder_path == os.pardir:
                 self.log.warn('Cannot use ".." as folder path')
                 continue
-            elif not os.path.isabs(folder):
-                folder = self._try_find_folder(folder)
+            elif not os.path.isabs(folder_path):
+                folder_path = self._try_find_folder(folder_path)
 
-            self.folder_paths.append(folder)
+            no_recurse: bool = any([folder_node.get('NoRecurse', default='false').casefold() == value for value in ('true', '1')])
 
-        for folder in self.folder_paths:
-            search_pattern = os.path.join(folder, '*.psc')
-            psc_paths = glob.glob(search_pattern, recursive=not no_recurse)
+            search_path: str = os.path.join(folder_path, '*.psc') if no_recurse or self.options.game_type != 'fo4' else os.path.join(folder_path, '**\*.psc')
+            psc_paths = [f for f in glob.glob(search_path, recursive=not no_recurse) if os.path.isfile(f)]
 
-            # we need path parts, not absolute paths
-            for psc_path in psc_paths:
-                namespace, file_name = PathHelper.nsify(psc_path)
-                path = os.path.join(namespace, file_name) if self.options.game_type == 'fo4' else file_name
-                paths.append(path)
+            paths.extend(psc_paths)
+
+            self.folder_paths.append(folder_path)
 
         return PathHelper.uniqify(paths)
 
     def _get_script_paths_from_scripts_node(self) -> list:
         """Returns script paths from the Scripts node"""
-        psc_paths: list = []
+        paths: list = []
 
-        scripts_node = ElementHelper.get(self.root_node, 'Scripts')
-        if scripts_node is None:
+        script_nodes = ElementHelper.get(self.root_node, 'Scripts')
+        if script_nodes is None:
             return []
 
-        for psc_path in ElementHelper.get_child_values(self.root_node, 'Scripts'):
-            if os.path.isabs(psc_path):
-                namespace, file_name = PathHelper.nsify(psc_path)
-                path = os.path.join(namespace, file_name)
-            else:
-                path = psc_path.replace(':', os.sep)
+        for script_node in script_nodes:
+            psc_path: str = script_node.text
 
-            psc_paths.append(path)
+            if ':' in psc_path:
+                psc_path = psc_path.replace(':', os.sep)
 
-        return PathHelper.uniqify(psc_paths)
+            psc_path = os.path.normpath(psc_path)
+
+            paths.append(psc_path)
+
+        return PathHelper.uniqify(paths)
 
     def _try_exclude_unmodified_scripts(self) -> list:
         if self.options.no_incremental_build:
@@ -384,7 +383,7 @@ class PapyrusProject(ProjectBase):
 
         # generate list of commands
         for psc_path in psc_paths:
-            if os.path.isabs(psc_path):
+            if self.options.game_type == 'fo4':
                 namespace, file_name = PathHelper.nsify(psc_path)
                 psc_path = os.path.join(namespace, file_name)
 
