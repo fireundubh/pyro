@@ -45,12 +45,12 @@ class PapyrusProject(ProjectBase):
         # because the game type can be determined from import paths
         self.import_paths: list = self._get_import_paths()
         if not self.import_paths:
-            self.log.error('Failed to build list of import paths using arguments or Papyrus Project')
+            PapyrusProject.log.error('Failed to build list of import paths using arguments or Papyrus Project')
             sys.exit(1)
 
         self.psc_paths: list = self._get_psc_paths()
         if not self.psc_paths:
-            self.log.error('Failed to build list of script paths using arguments or Papyrus Project')
+            PapyrusProject.log.error('Failed to build list of script paths using arguments or Papyrus Project')
             sys.exit(1)
 
         # this adds implicit imports from script paths
@@ -232,6 +232,7 @@ class PapyrusProject(ProjectBase):
             if node is None:
                 continue
             node_paths = getattr(self, '_get_script_paths_from_%s_node' % tag.casefold())()
+            PapyrusProject.log.info('%s script paths discovered from %s nodes.' % (len(node_paths), tag[:-1]))
             if node_paths:
                 paths.extend(node_paths)
 
@@ -257,7 +258,11 @@ class PapyrusProject(ProjectBase):
                 if PathHelper.try_append_existing(test_path, results):
                     break
 
-        return PathHelper.uniqify(results)
+        results = PathHelper.uniqify(results)
+
+        PapyrusProject.log.info('%s unique script paths resolved to absolute paths.' % len(results))
+
+        return results
 
     def _get_script_paths_from_folders_node(self) -> list:
         """Returns script paths from the Folders element array"""
