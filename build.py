@@ -180,6 +180,11 @@ class Application:
             Application.log.info('Removing unnecessary files...')
             self._clean_dist_folder()
 
+            Application.log.info('Copying schemas...')
+            for schema_file_name in ['PapyrusProject.xsd']:
+                shutil.copy2(os.path.join(self.root_path, self.package_name, schema_file_name),
+                             os.path.join(self.dist_path, schema_file_name))
+
             Application.log.info('Copying tools...')
             os.makedirs(self.dist_tools_path, exist_ok=True)
 
