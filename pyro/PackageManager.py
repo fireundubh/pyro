@@ -87,17 +87,17 @@ class PackageManager(Logger):
             include_path = os.path.normpath(include_node.text)
 
             if os.path.isabs(include_path):
-                PackageManager.log.warn('Cannot include absolute path: "%s"' % include_path)
+                PackageManager.log.warning('Cannot include absolute path: "%s"' % include_path)
                 continue
 
             if include_path == os.pardir:
-                PackageManager.log.warn('Cannot use ".." as include path')
+                PackageManager.log.warning('Cannot use ".." as include path')
                 continue
 
             full_path: str = self.includes_root if include_path == os.curdir else os.path.join(self.includes_root, include_path)
 
             if not os.path.exists(full_path):
-                PackageManager.log.warn('Cannot use include because path does not exist: "%s"' % full_path)
+                PackageManager.log.warning('Cannot use include because path does not exist: "%s"' % full_path)
                 continue
 
             if os.path.isfile(full_path):
