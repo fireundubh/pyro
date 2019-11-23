@@ -39,5 +39,5 @@ jobs:
      if: success()
      uses: actions/upload-artifact@v1
      with:
-      name: pyro
+      name: pyro-master-${{ github.event.repository.pushed_at }}
       path: D:\a\pyro\pyro\pyro.dist
