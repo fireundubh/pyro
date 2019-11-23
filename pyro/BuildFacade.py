@@ -21,12 +21,12 @@ class BuildFacade(Logger):
 
         # WARN: if methods are renamed and their respective option names are not, this will break.
         for key in self.ppj.options.__dict__:
-            if key in ('args', 'input_path', 'game_type', 'game_path', 'registry_path', 'worker_limit') or key.startswith('no_'):
+            if key in ('args', 'input_path', 'worker_limit') or key.startswith('no_'):
                 continue
             setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
 
         if not self.ppj.options.worker_limit:
-            worker_limit = 2
+            worker_limit: int = 2
 
             try:
                 # noinspection Mypy
