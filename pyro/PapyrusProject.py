@@ -28,8 +28,9 @@ class PapyrusProject(ProjectBase):
         xml_parser: etree.XMLParser = etree.XMLParser(remove_blank_text=True, remove_comments=True)
         project_xml: etree.ElementTree = etree.parse(io.StringIO(xml_document), xml_parser)
 
-        self.root_node = project_xml.getroot()
+        self.root_node: etree.ElementBase = project_xml.getroot()
 
+        # TODO: validate earlier
         schema: etree.XMLSchema = ElementHelper.validate_schema(self.root_node, self.program_path)
         if schema:
             try:
@@ -40,42 +41,8 @@ class PapyrusProject(ProjectBase):
                 PapyrusProject.log.error('Failed to validate XML Schema.%s\t%s' % (os.linesep, e))
                 sys.exit(1)
 
-        # allow xml to set game type but defer to passed argument
-        if not self.options.game_type:
-            game_type = self.root_node.get('Game', default='').casefold()
-            if game_type:
-                self.options.game_type = game_type
-
-        # game type must be set before we call this
-        self.options.game_path = self.get_game_path()
-
-        self.options.archive_path = self.root_node.get('Archive', default='')
-        self.options.output_path = self.root_node.get('Output', default='')
-        self.options.flags_path = self.root_node.get('Flags', default='')
-
-        bsarch = any([self.root_node.get('CreateArchive', default='true').casefold() == value for value in ('true', '1')])
-        if not self.options.no_bsarch:
-            self.options.no_bsarch = not bsarch
-
-        anonymize = any([self.root_node.get('Anonymize', default='true').casefold() == value for value in ('true', '1')])
-        if not self.options.no_anonymize:
-            self.options.no_anonymize = not anonymize
-
-        self.release: bool = False
-        self.final: bool = False
-
-        if self.options.game_type == 'fo4':
-            release = self.root_node.get('Release', default='false').casefold()
-            self.release = any([release == value for value in ('true', '1')])
-
-            final = self.root_node.get('Final', default='false').casefold()
-            self.final = any([final == value for value in ('true', '1')])
-
-        optimize = self.root_node.get('Optimize', default='false').casefold()
-        self.optimize: bool = any([optimize == value for value in ('true', '1')])
-
-        self.folder_paths: list = []
-
+        # we need to populate the list of import paths before we try to determine the game type
+        # because the game type can be determined from import paths
         self.import_paths: list = self._get_import_paths()
         if not self.import_paths:
             self.log.error('Failed to build list of import paths using arguments or Papyrus Project')
@@ -88,6 +55,48 @@ class PapyrusProject(ProjectBase):
 
         # this adds implicit imports from script paths
         self.import_paths = self._get_implicit_script_imports()
+
+        # allow xml to set game type but defer to passed argument
+        if not self.options.game_type:
+            game_type: str = self.root_node.get('Game', default='').casefold()
+
+            if game_type and game_type in self.game_types:
+                PapyrusProject.log.warn('Using game type: %s (determined from Papyrus Project)' % self.game_types[game_type])
+                self.options.game_type = game_type
+
+        if not self.options.game_type:
+            self.options.game_type = self.get_game_type()
+
+        if not self.options.game_type:
+            PapyrusProject.log.error('Cannot determine game type from arguments or Papyrus Project')
+            sys.exit(1)
+
+        # game type must be set before we call this
+        if not self.options.game_path:
+            self.options.game_path = self.get_game_path()
+
+        # can be overridden by arguments
+        self.options.archive_path = self.root_node.get('Archive', default='')
+        self.options.output_path = self.root_node.get('Output', default='')
+        self.options.flags_path = self.root_node.get('Flags', default='')
+
+        optimize_attr: str = self.root_node.get('Optimize', default='false').casefold()
+        self.optimize: bool = any([optimize_attr == value for value in ('true', '1')])
+
+        if self.options.game_type == 'fo4':
+            release_attr: str = self.root_node.get('Release', default='false').casefold()
+            self.release = any([release_attr == value for value in ('true', '1')])
+
+            final_attr: str = self.root_node.get('Final', default='false').casefold()
+            self.final = any([final_attr == value for value in ('true', '1')])
+
+        create_archive_attr: str = self.root_node.get('CreateArchive', default='true').casefold()
+        if not self.options.no_bsarch:
+            self.options.no_bsarch = not any([create_archive_attr == value for value in ('true', '1')])
+
+        anonymize_attr: str = self.root_node.get('Anonymize', default='true').casefold()
+        if not self.options.no_anonymize:
+            self.options.no_anonymize = not any([anonymize_attr == value for value in ('true', '1')])
 
         # get expected pex paths - these paths may not exist and that is okay!
         self.pex_paths: list = self._get_pex_paths()

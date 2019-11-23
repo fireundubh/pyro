@@ -15,7 +15,28 @@ class PackageManager(Logger):
         self.ppj = ppj
         self.includes_root = ''
 
+    def _copy_includes_to_temp_path(self) -> None:
+        # copy includes to archive
+        include_paths: list = self._get_include_paths()
+        if not include_paths:
+            return
+
+        PackageManager.log.info('Includes found:')
+
+        for include_path in include_paths:
+            PackageManager.log.info('- "%s"' % include_path)
+
+            include_relpath: str = os.path.relpath(include_path, self.includes_root)
+            target_path: str = os.path.join(self.ppj.options.temp_path, include_relpath)
+            target_folder: str = os.path.dirname(target_path)
+
+            os.makedirs(target_folder, exist_ok=True)
+            shutil.copy2(include_path, target_path)
+
+        PackageManager.log.info('Copied includes to temporary folder.')
+
     def _copy_scripts_to_temp_path(self, psc_paths: list, temp_path: str) -> None:
+        """Copies compiled scripts to temporary folder"""
         pex_paths = [os.path.join(self.ppj.options.output_path, psc_path.replace('.psc', '.pex')) for psc_path in psc_paths]
 
         if self.ppj.options.game_type != 'fo4':
@@ -39,7 +60,7 @@ class PackageManager(Logger):
             shutil.copy2(target_path, temp_file_path)
 
     def _get_include_paths(self) -> list:
-        # TODO: support includes for multiple archives
+        """Returns list of absolute include paths"""
         include_nodes = ElementHelper.get(self.ppj.root_node, 'Includes')
         if include_nodes is None or len(list(include_nodes)) == 0:
             return []
@@ -93,6 +114,7 @@ class PackageManager(Logger):
         return PathHelper.uniqify(results)
 
     def build_commands(self, script_folder: str, archive_path: str) -> str:
+        """Returns arguments for BSArch as a string"""
         arguments = CommandArguments()
 
         arguments.append_quoted(self.ppj.options.bsarch_path)
@@ -110,45 +132,31 @@ class PackageManager(Logger):
         return arguments.join()
 
     def create_archive(self) -> None:
-        # create temporary folder
-        temp_scripts_path = os.path.join(self.ppj.options.temp_path, 'Scripts')
-
         # clear temporary data
         if os.path.exists(self.ppj.options.temp_path):
             shutil.rmtree(self.ppj.options.temp_path, ignore_errors=True)
 
+        # create temporary folder for compiled scripts
+        temp_scripts_path: str = os.path.join(self.ppj.options.temp_path, 'Scripts')
         os.makedirs(temp_scripts_path, exist_ok=True)
 
         self._copy_scripts_to_temp_path(self.ppj.psc_paths, temp_scripts_path)
 
-        # copy includes to archive
-        include_paths = self._get_include_paths()
-        if include_paths:
-            PackageManager.log.info('Includes found:')
-            for include_path in include_paths:
-                PackageManager.log.info('- "%s"' % include_path)
+        self._copy_includes_to_temp_path()
 
-            for include_path in include_paths:
-                include_relpath = os.path.relpath(include_path, self.includes_root)
-                target_path = os.path.join(self.ppj.options.temp_path, include_relpath)
+        archive_path: str = self.ppj.options.archive_path
 
-                os.makedirs(os.path.dirname(target_path), exist_ok=True)
-                shutil.copy2(include_path, target_path)
-
-            PackageManager.log.info('Copied includes to temporary folder.')
-
-        archive_path = self.ppj.options.archive_path
-
-        # handle file paths
+        # if the archive path is a folder, use the project name as the package name
         if not archive_path.casefold().endswith(('.ba2', '.bsa')):
             archive_name, _ = os.path.splitext(os.path.basename(self.ppj.options.input_path))
             archive_path = os.path.join(archive_path, '%s%s' % (archive_name, '.ba2' if self.ppj.options.game_type == 'fo4' else '.bsa'))
 
         # create archive directory
-        os.makedirs(os.path.dirname(archive_path), exist_ok=True)
+        archive_folder: str = os.path.dirname(archive_path)
+        os.makedirs(archive_folder, exist_ok=True)
 
         # run bsarch
-        commands = self.build_commands(*map(lambda x: os.path.normpath(x), [self.ppj.options.temp_path, archive_path]))
+        commands: str = self.build_commands(*map(lambda x: os.path.normpath(x), [self.ppj.options.temp_path, archive_path]))
         ProcessManager.run(commands, use_bsarch=True)
 
         # clear temporary data

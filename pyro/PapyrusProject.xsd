@@ -1,17 +1,18 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<xs:schema id="PapyrusProject"
+<xs:schema elementFormDefault="qualified"
+           id="PapyrusProject"
            targetNamespace="PapyrusProject.xsd"
-           elementFormDefault="qualified"
            xmlns="PapyrusProject.xsd"
-           xmlns:xs="http://www.w3.org/2001/XMLSchema"
->
+           xmlns:xs="http://www.w3.org/2001/XMLSchema">
     <xs:element name="PapyrusProject">
         <xs:complexType>
             <xs:sequence>
-                <xs:element minOccurs="0" name="Imports" type="importList" />
-                <xs:element minOccurs="0" name="Folders" type="folderList" />
-                <xs:element minOccurs="0" name="Scripts" type="scriptList" />
-                <xs:element minOccurs="0" name="Includes" type="includeList" />
+                <xs:choice maxOccurs="unbounded">
+                    <xs:element minOccurs="0" name="Imports" type="importList" />
+                    <xs:element minOccurs="0" name="Folders" type="folderList" />
+                    <xs:element minOccurs="0" name="Scripts" type="scriptList" />
+                    <xs:element minOccurs="0" name="Includes" type="includeList" />
+                </xs:choice>
             </xs:sequence>
             <xs:attribute name="Game" type="xs:string" />
             <xs:attribute name="Output" type="xs:string" />

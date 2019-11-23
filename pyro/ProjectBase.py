@@ -9,11 +9,20 @@ class ProjectBase(Logger):
     def __init__(self, options: ProjectOptions) -> None:
         self.options: ProjectOptions = options
 
-        self.program_path = os.path.dirname(__file__)
+        self.game_types: dict = {'sse': 'Skyrim Special Edition', 'tesv': 'Skyrim', 'fo4': 'Fallout 4'}
+
+        self.program_path: str = os.path.dirname(__file__)
         if sys.argv[0].endswith(('pyro', '.exe')):
             self.program_path = os.path.abspath(os.path.join(self.program_path, os.pardir))
 
-        self.project_path = os.path.dirname(self.options.input_path)
+        self.project_path: str = os.path.dirname(self.options.input_path)
+
+        self.folder_paths: list = []
+        self.import_paths: list = []
+
+        self.optimize: bool = False
+        self.release: bool = False
+        self.final: bool = False
 
     def __setattr__(self, key: str, value: object) -> None:
         if key.endswith('path') and isinstance(value, str):
@@ -54,7 +63,7 @@ class ProjectBase(Logger):
         return os.path.abspath(os.path.join(self.program_path, 'out'))
 
     # game arguments
-    def get_game_path(self) -> str:
+    def get_game_path(self, game_type: str = '') -> str:
         """Returns absolute game path from arguments or Windows Registry"""
         if self.options.game_path:
             if os.path.isabs(self.options.game_path):
@@ -62,46 +71,53 @@ class ProjectBase(Logger):
             return os.path.join(os.getcwd(), self.options.game_path)
 
         if sys.platform == 'win32':
-            return self.get_registry_path()
+            return self.get_installed_path(game_type)
 
-        ProjectBase.log.error('Cannot locate game path')
-        sys.exit(1)
+        raise FileNotFoundError('Cannot determine game path')
 
-    def get_registry_path(self) -> str:
+    def get_registry_path(self, game_type: str = '') -> str:
+        if not self.options.registry_path:
+            game_type = self.options.game_type if not game_type else game_type
+            if game_type == 'fo4':
+                return 'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\Fallout4\Installed Path'
+            if game_type == 'tesv':
+                return 'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\Skyrim\Installed Path'
+            if game_type == 'sse':
+                return 'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\Skyrim Special Edition\Installed Path'
+            raise ValueError('Cannot determine registry path from game type')
+        return self.options.registry_path.replace('/', '\\')
+
+    def get_installed_path(self, game_type: str = '') -> str:
         """Returns absolute game path using Windows Registry"""
         import winreg
 
-        registry_path = self.options.registry_path
+        registry_path: str = self.options.registry_path
         registry_type = winreg.HKEY_LOCAL_MACHINE
 
-        if not registry_path:
-            if self.options.game_type == 'fo4':
-                registry_path = r'SOFTWARE\WOW6432Node\Bethesda Softworks\Fallout4\Installed Path'
-            elif self.options.game_type == 'tesv':
-                registry_path = r'SOFTWARE\WOW6432Node\Bethesda Softworks\Skyrim\Installed Path'
-            elif self.options.game_type == 'sse':
-                registry_path = r'SOFTWARE\WOW6432Node\Bethesda Softworks\Skyrim Special Edition\Installed Path'
+        game_type = self.options.game_type if not game_type else game_type
 
-        key_path, key_value = os.path.split(registry_path)
+        if not registry_path:
+            registry_path = self.get_registry_path(game_type)
+
+        hkey, key_path = registry_path.split(os.sep, maxsplit=1)
+        key_head, key_tail = os.path.split(key_path)
 
         # fix absolute registry paths, if needed
-        key_parts = key_path.split(os.sep)
-        if key_parts[0] in ('HKCU', 'HKEY_CURRENT_USER', 'HKLM', 'HKEY_LOCAL_MACHINE'):
-            if key_parts[0] in ('HKCU', 'HKEY_CURRENT_USER'):
+        if any([hkey == value for value in ('HKCU', 'HKEY_CURRENT_USER', 'HKLM', 'HKEY_LOCAL_MACHINE')]):
+            if any([hkey == value for value in ('HKCU', 'HKEY_CURRENT_USER')]):
                 registry_type = winreg.HKEY_CURRENT_USER
-            key_path = os.sep.join(key_parts[1:])
 
         try:
-            registry_key = winreg.OpenKey(registry_type, key_path, 0, winreg.KEY_READ)
-            reg_value, reg_type = winreg.QueryValueEx(registry_key, key_value)
+            registry_key = winreg.OpenKey(registry_type, key_head, 0, winreg.KEY_READ)
+            reg_value, reg_type = winreg.QueryValueEx(registry_key, key_tail)
             winreg.CloseKey(registry_key)
         except WindowsError:
-            ProjectBase.log.error('Game does not exist in Windows Registry. Run the game launcher once, then try again.')
+            ProjectBase.log.error('Installed Path for %s does not exist in Windows Registry. Run the game launcher once, then try again.' % self.game_types[game_type])
             sys.exit(1)
 
         # noinspection PyUnboundLocalVariable
         if not os.path.exists(reg_value):
-            ProjectBase.log.error('Directory does not exist: %s' % reg_value)
+            ProjectBase.log.error('Installed Path for %s does not exist: %s' % (self.game_types[game_type], reg_value))
             sys.exit(1)
 
         return reg_value
@@ -132,6 +148,52 @@ class ProjectBase(Logger):
         return os.path.abspath(os.path.join(self.program_path, 'temp'))
 
     # program arguments
+    def get_game_type(self) -> str:
+        """Returns game type from arguments or Papyrus Project"""
+        if self.options.game_type:
+            game_type: str = self.options.game_type.casefold()
+            if game_type and game_type in self.game_types:
+                return game_type
+
+        if self.options.game_path:
+            if self.options.game_path.endswith('Skyrim Special Edition'):
+                ProjectBase.log.warn('Using game type: Skyrim Special Edition (determined from game path)')
+                return 'sse'
+            if self.options.game_path.endswith('Skyrim'):
+                ProjectBase.log.warn('Using game type: Skyrim (determined from game path)')
+                return 'tesv'
+            if self.options.game_path.endswith('Fallout 4'):
+                ProjectBase.log.warn('Using game type: Fallout 4 (determined from game path)')
+                return 'fo4'
+
+        if self.import_paths:
+            for import_path in reversed(self.import_paths):
+                if 'skyrim special edition\\' in import_path.casefold():
+                    ProjectBase.log.warn('Using game type: Skyrim Special Edition (determined from import paths)')
+                    return 'sse'
+                if 'skyrim\\' in import_path.casefold():
+                    ProjectBase.log.warn('Using game type: Skyrim (determined from import paths)')
+                    return 'tesv'
+                if 'fallout 4\\' in import_path.casefold():
+                    ProjectBase.log.warn('Using game type: Fallout 4 (determined from import paths)')
+                    return 'fo4'
+
+        if self.options.flags_path:
+            flags_path: str = self.options.flags_path.casefold()
+            if flags_path.endswith('institute_papyrus_flags.flg'):
+                ProjectBase.log.warn('Using game type: Fallout 4 (determined from flags path)')
+                return 'fo4'
+            if flags_path.endswith('tesv_papyrus_flags.flg'):
+                try:
+                    self.get_game_path('sse')
+                    ProjectBase.log.warn('Using game type: Skyrim Special Edition (determined from flags path)')
+                    return 'sse'
+                except FileNotFoundError:
+                    ProjectBase.log.warn('Using game type: Skyrim (determined from flags path)')
+                    return 'tesv'
+
+        return ''
+
     def get_log_path(self) -> str:
         """Returns absolute log path from arguments"""
         if self.options.log_path:
