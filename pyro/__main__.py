@@ -1,8 +1,7 @@
 import argparse
 import os
 import sys
-
-from urllib.parse import urlparse, unquote_plus
+from urllib.parse import unquote_plus, urlparse
 
 from pyro.BuildFacade import BuildFacade
 from pyro.Logger import Logger
@@ -84,12 +83,12 @@ class Application(Logger):
         build = BuildFacade(ppj)
         build.try_compile(time_elapsed)
 
-        if not ppj.options.no_anonymize:
+        if ppj.options.anonymize:
             build.try_anonymize()
         else:
             Application.log.warning('Cannot anonymize scripts because anonymization was disabled by user')
 
-        if not ppj.options.no_bsarch and ppj.options.bsarch_path:
+        if ppj.options.bsarch and ppj.options.bsarch_path:
             build.try_pack()
         else:
             Application.log.warning('Cannot build package because packaging was disabled by user')
@@ -113,20 +112,16 @@ if __name__ == '__main__':
     _required_arguments = _parser.add_argument_group('required arguments')
     _required_arguments.add_argument('-i', '--input-path',
                                      action='store', type=str,
-                                     help='relative or absolute path to input ppj file\n'
+                                     help='relative or absolute path to ppj file\n'
                                           '(if relative, must be relative to current working directory)')
 
     _build_arguments = _parser.add_argument_group('build arguments')
-    _build_arguments.add_argument('--log-path',
-                                  action='store', type=str,
-                                  help='relative or absolute path to build log folder\n'
-                                       '(if relative, must be relative to current working directory)')
-    _build_arguments.add_argument('--no-anonymize',
+    _build_arguments.add_argument('--anonymize',
                                   action='store_true', default=False,
-                                  help='do not anonymize metadata')
-    _build_arguments.add_argument('--no-bsarch',
+                                  help='anonymize metadata')
+    _build_arguments.add_argument('--bsarch',
                                   action='store_true', default=False,
-                                  help='do not pack scripts with bsarch')
+                                  help='create package with bsarch')
     _build_arguments.add_argument('--no-incremental-build',
                                   action='store_true', default=False,
                                   help='do not build incrementally')
@@ -183,6 +178,10 @@ if __name__ == '__main__':
                                         '(if relative, must be relative to current working directory)')
 
     _program_arguments = _parser.add_argument_group('program arguments')
+    _program_arguments.add_argument('--log-path',
+                                    action='store', type=str,
+                                    help='relative or absolute path to log folder\n'
+                                         '(if relative, must be relative to current working directory)')
     _program_arguments.add_argument('--help', dest='show_help',
                                     action='store_true', default=False,
                                     help='show help and exit')

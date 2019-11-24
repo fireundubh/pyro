@@ -21,7 +21,7 @@ class BuildFacade(Logger):
 
         # WARN: if methods are renamed and their respective option names are not, this will break.
         for key in self.ppj.options.__dict__:
-            if key in ('args', 'input_path', 'worker_limit') or key.startswith('no_'):
+            if key in ('args', 'input_path', 'worker_limit', 'anonymize', 'bsarch') or key.startswith('no_'):
                 continue
             setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
 
@@ -129,7 +129,7 @@ class BuildFacade(Logger):
         """Obfuscates identifying metadata in compiled scripts"""
         scripts: list = self._find_modified_scripts()
 
-        if not scripts and not self.ppj.missing_script_names and not self.ppj.options.no_incremental_build:
+        if not scripts and not self.ppj.missing_scripts and not self.ppj.options.no_incremental_build:
             BuildFacade.log.error('Cannot anonymize compiled scripts because no source scripts were modified')
         else:
             # these are absolute paths. there's no reason to manipulate them.

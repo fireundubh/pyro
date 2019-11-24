@@ -35,29 +35,18 @@ class PackageManager(Logger):
 
         PackageManager.log.info('Copied includes to temporary folder.')
 
-    def _copy_scripts_to_temp_path(self, psc_paths: list, temp_path: str) -> None:
+    def _copy_scripts_to_temp_path(self) -> None:
         """Copies compiled scripts to temporary folder"""
-        pex_paths = [os.path.join(self.ppj.options.output_path, psc_path.replace('.psc', '.pex')) for psc_path in psc_paths]
-
-        if self.ppj.options.game_type != 'fo4':
-            # removes parent and ancestor folders from paths
-            pex_paths = [os.path.join(self.ppj.options.output_path, os.path.basename(pex_path)) for pex_path in pex_paths]
-
-        for pex_path in pex_paths:
-            if self.ppj.options.game_type == 'fo4':
-                rel_object_name = PathHelper.calculate_relative_object_name(pex_path, self.ppj.import_paths)
-                target_path = os.path.join(self.ppj.options.output_path, rel_object_name)
-                temp_file_path = os.path.join(temp_path, rel_object_name)
-            else:
-                target_path = os.path.abspath(pex_path)
-                temp_file_path = os.path.join(temp_path, os.path.basename(pex_path))
-
-            if not os.path.exists(target_path):
-                self.log.error('Cannot locate file to copy: %s' % target_path)
+        for pex_path in self.ppj.pex_paths:
+            if not os.path.exists(pex_path):
+                self.log.error('Cannot locate file to copy: %s' % pex_path)
                 continue
 
-            os.makedirs(os.path.dirname(temp_file_path), exist_ok=True)
-            shutil.copy2(target_path, temp_file_path)
+            relative_output_path = os.path.relpath(pex_path, self.ppj.options.output_path)
+            target_path = os.path.join(self.ppj.options.temp_path, 'Scripts', relative_output_path)
+
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            shutil.copy2(pex_path, target_path)
 
     def _get_include_paths(self) -> list:
         """Returns list of absolute include paths"""
@@ -140,7 +129,7 @@ class PackageManager(Logger):
         temp_scripts_path: str = os.path.join(self.ppj.options.temp_path, 'Scripts')
         os.makedirs(temp_scripts_path, exist_ok=True)
 
-        self._copy_scripts_to_temp_path(self.ppj.psc_paths, temp_scripts_path)
+        self._copy_scripts_to_temp_path()
 
         self._copy_includes_to_temp_path()
 
