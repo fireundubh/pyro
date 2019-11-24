@@ -129,7 +129,7 @@ class BuildFacade(Logger):
         """Obfuscates identifying metadata in compiled scripts"""
         scripts: list = self._find_modified_scripts()
 
-        if not scripts and not self.ppj.missing_script_names and not self.ppj.options.no_incremental_build:
+        if not scripts and not self.ppj.missing_scripts and not self.ppj.options.no_incremental_build:
             BuildFacade.log.error('Cannot anonymize compiled scripts because no source scripts were modified')
         else:
             # these are absolute paths. there's no reason to manipulate them.
