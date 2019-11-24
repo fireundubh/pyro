@@ -90,13 +90,13 @@ class PapyrusProject(ProjectBase):
             final_attr: str = self.root_node.get('Final', default='false').casefold()
             self.final = any([final_attr == value for value in ('true', '1')])
 
-        create_archive_attr: str = self.root_node.get('CreateArchive', default='true').casefold()
-        if not self.options.no_bsarch:
-            self.options.no_bsarch = not any([create_archive_attr == value for value in ('true', '1')])
+        create_archive_attr: str = self.root_node.get('CreateArchive', default='false').casefold()
+        if not self.options.bsarch:
+            self.options.bsarch = any([create_archive_attr == value for value in ('true', '1')])
 
-        anonymize_attr: str = self.root_node.get('Anonymize', default='true').casefold()
-        if not self.options.no_anonymize:
-            self.options.no_anonymize = not any([anonymize_attr == value for value in ('true', '1')])
+        anonymize_attr: str = self.root_node.get('Anonymize', default='false').casefold()
+        if not self.options.anonymize:
+            self.options.anonymize = any([anonymize_attr == value for value in ('true', '1')])
 
         # get expected pex paths - these paths may not exist and that is okay!
         # required game type to be set
