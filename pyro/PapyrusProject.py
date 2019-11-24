@@ -37,60 +37,8 @@ class PapyrusProject(ProjectBase):
                 PapyrusProject.log.error('Failed to validate XML Schema.%s\t%s' % (os.linesep, e))
                 sys.exit(1)
 
-        # we need to populate the list of import paths before we try to determine the game type
-        # because the game type can be determined from import paths
-        self.import_paths: list = self._get_import_paths()
-        if not self.import_paths:
-            PapyrusProject.log.error('Failed to build list of import paths using arguments or Papyrus Project')
-            sys.exit(1)
-
-        # ensure that folder paths are implicitly imported
-        implicit_folder_paths: list = self._get_implicit_folder_imports()
-        PathHelper.merge_implicit_import_paths(implicit_folder_paths, self.import_paths)
-
-        for path in implicit_folder_paths:
-            if path in self.import_paths:
-                PapyrusProject.log.warn('Using import path implicitly: "%s"' % path)
-
-        self.psc_paths: list = self._get_psc_paths()
-        if not self.psc_paths:
-            PapyrusProject.log.error('Failed to build list of script paths using arguments or Papyrus Project')
-            sys.exit(1)
-
-        # this adds implicit imports from script paths
-        implicit_script_paths: list = self._get_implicit_script_imports()
-        PathHelper.merge_implicit_import_paths(implicit_script_paths, self.import_paths)
-
-        for path in implicit_script_paths:
-            if path in self.import_paths:
-                PapyrusProject.log.warn('Using import path implicitly: "%s"' % path)
-
-        # get expected pex paths - these paths may not exist and that is okay!
-        self.pex_paths: list = self._get_pex_paths()
-
-        # these are relative paths to psc scripts whose pex counterparts are missing
-        self.missing_scripts: list = self._find_missing_script_paths()
-
-        # allow xml to set game type but defer to passed argument
-        if not self.options.game_type:
-            game_type: str = self.root_node.get('Game', default='').casefold()
-
-            if game_type and game_type in self.game_types:
-                PapyrusProject.log.warning('Using game type: %s (determined from Papyrus Project)' % self.game_types[game_type])
-                self.options.game_type = game_type
-
-        if not self.options.game_type:
-            self.options.game_type = self.get_game_type()
-
-        if not self.options.game_type:
-            PapyrusProject.log.error('Cannot determine game type from arguments or Papyrus Project')
-            sys.exit(1)
-
-        # game type must be set before we call this
-        if not self.options.game_path:
-            self.options.game_path = self.get_game_path()
-
-        # can be overridden by arguments
+        # we need to parse all PapyrusProject attributes after validating and before we do anything else
+        # options can be overridden by arguments when the BuildFacade is initialized
         self.options.archive_path = self.root_node.get('Archive', default='')
         self.options.output_path = self.root_node.get('Output', default='')
         self.options.flags_path = self.root_node.get('Flags', default='')
@@ -113,6 +61,60 @@ class PapyrusProject(ProjectBase):
         if not self.options.anonymize:
             self.options.anonymize = any([anonymize_attr == value for value in ('true', '1')])
 
+        # we need to populate the list of import paths before we try to determine the game type
+        # because the game type can be determined from import paths
+        self.import_paths: list = self._get_import_paths()
+        if not self.import_paths:
+            PapyrusProject.log.error('Failed to build list of import paths')
+            sys.exit(1)
+
+        # ensure that folder paths are implicitly imported
+        implicit_folder_paths: list = self._get_implicit_folder_imports()
+        PathHelper.merge_implicit_import_paths(implicit_folder_paths, self.import_paths)
+
+        for path in implicit_folder_paths:
+            if path in self.import_paths:
+                PapyrusProject.log.warn('Using import path implicitly: "%s"' % path)
+
+        self.psc_paths: list = self._get_psc_paths()
+        if not self.psc_paths:
+            PapyrusProject.log.error('Failed to build list of script paths')
+            sys.exit(1)
+
+        # this adds implicit imports from script paths
+        implicit_script_paths: list = self._get_implicit_script_imports()
+        PathHelper.merge_implicit_import_paths(implicit_script_paths, self.import_paths)
+
+        for path in implicit_script_paths:
+            if path in self.import_paths:
+                PapyrusProject.log.warn('Using import path implicitly: "%s"' % path)
+
+        # we need to set the game type after imports are populated but before pex paths are populated
+        # allow xml to set game type but defer to passed argument
+        if not self.options.game_type:
+            game_type: str = self.root_node.get('Game', default='').casefold()
+
+            if game_type and game_type in self.game_types:
+                PapyrusProject.log.warning('Using game type: %s (determined from Papyrus Project)' % self.game_types[game_type])
+                self.options.game_type = game_type
+
+        if not self.options.game_type:
+            self.options.game_type = self.get_game_type()
+
+        if not self.options.game_type:
+            PapyrusProject.log.error('Cannot determine game type from arguments or Papyrus Project')
+            sys.exit(1)
+
+        # get expected pex paths - these paths may not exist and that is okay!
+        self.pex_paths: list = self._get_pex_paths()
+
+        # these are relative paths to psc scripts whose pex counterparts are missing
+        self.missing_scripts: list = self._find_missing_script_paths()
+
+        # game type must be set before we call this
+        if not self.options.game_path:
+            self.options.game_path = self.get_game_path()
+
     @staticmethod
     def _strip_xml_comments(path: str) -> io.StringIO:
         with open(path, mode='r', encoding='utf-8') as f:
@@ -127,11 +129,11 @@ class PapyrusProject(ProjectBase):
 
         for psc_path in self.psc_paths:
             if self.options.game_type == 'fo4':
-                psc_file = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
+                object_name = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
             else:
-                psc_file = os.path.basename(psc_path)
+                object_name = os.path.basename(psc_path)
 
-            pex_path: str = os.path.join(self.options.output_path, psc_file.replace('.psc', '.pex'))
+            pex_path: str = os.path.join(self.options.output_path, object_name.replace('.psc', '.pex'))
             if os.path.exists(pex_path):
                 continue
 
@@ -207,12 +209,20 @@ class PapyrusProject(ProjectBase):
 
     def _get_pex_paths(self) -> list:
         """
-        Returns absolute paths to compiled scripts in output folder recursively,
-        excluding any compiled scripts without source counterparts
+        Returns absolute paths to compiled scripts that may not exist yet in output folder
         """
-        search_path: str = os.path.join(self.options.output_path, '**\*.pex')
-        pex_paths: list = [pex for pex in glob.glob(search_path, recursive=True)
-                           if os.path.basename(pex)[:-4] in [os.path.basename(psc)[:-4] for psc in self.psc_paths]]
+        pex_paths: list = []
+
+        for psc_path in self.psc_paths:
+            if self.options.game_type == 'fo4':
+                object_name = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
+            else:
+                object_name = os.path.basename(psc_path)
+
+            pex_path = os.path.join(self.options.output_path, object_name.replace('.psc', '.pex'))
+
+            pex_paths.append(pex_path)
+
         return PathHelper.uniqify(pex_paths)
 
     def _get_psc_paths(self) -> list:

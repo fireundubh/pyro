@@ -7,9 +7,9 @@ class PathHelper:
     def calculate_relative_object_name(path: str, import_paths: list) -> str:
         """Returns import-relative path from absolute path (should be used only for Fallout 4 paths)"""
         # reverse the list to find the best import path
-        for import_path in reversed(import_paths):
+        for import_path in reversed(PathHelper.uniqify(import_paths)):
             import_path = os.path.normpath(import_path)
-            if len(path) > len(import_path) and import_path in path:
+            if import_path in path:
                 relative_path = os.path.relpath(path, import_path)
                 return relative_path
         raise ValueError('Cannot build import-relative path from absolute path: "%s"' % path)
