@@ -72,11 +72,11 @@ class Application(Logger):
 
         Application.log.info('Imports found:')
         for import_path in ppj.import_paths:
-            Application.log.info('- "%s"' % import_path)
+            Application.log.info('+ "%s"' % import_path)
 
         Application.log.info('Scripts found:')
         for psc_path in ppj.psc_paths:
-            Application.log.info('- "%s"' % psc_path)
+            Application.log.info('+ "%s"' % psc_path)
 
         time_elapsed = TimeElapsed()
 
@@ -168,9 +168,9 @@ if __name__ == '__main__':
                                    action='store', type=str,
                                    help='relative or absolute path to bsarch.exe\n'
                                         '(if relative, must be relative to current working directory)')
-    _bsarch_arguments.add_argument('--archive-path',
+    _bsarch_arguments.add_argument('--package-path',
                                    action='store', type=str,
-                                   help='relative or absolute path to bsa/ba2 file\n'
+                                   help='relative or absolute path to bsa/ba2 output folder\n'
                                         '(if relative, must be relative to project)')
     _bsarch_arguments.add_argument('--temp-path',
                                    action='store', type=str,

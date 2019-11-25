@@ -1,90 +1,97 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<xs:schema elementFormDefault="qualified"
-           id="PapyrusProject"
-           targetNamespace="PapyrusProject.xsd"
-           xmlns="PapyrusProject.xsd"
-           xmlns:xs="http://www.w3.org/2001/XMLSchema">
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema
+    elementFormDefault="qualified"
+    id="PapyrusProject"
+    targetNamespace="PapyrusProject.xsd"
+    xmlns="PapyrusProject.xsd"
+    xmlns:ppj="PapyrusProject.xsd"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema">
     <xs:element name="PapyrusProject">
         <xs:complexType>
             <xs:sequence>
                 <xs:choice maxOccurs="unbounded">
-                    <xs:element minOccurs="0" name="Imports" type="importList" />
-                    <xs:element minOccurs="0" name="Folders" type="folderList" />
-                    <xs:element minOccurs="0" name="Scripts" type="scriptList" />
-                    <xs:element minOccurs="0" name="Includes" type="includeList" />
+                    <xs:element minOccurs="0" name="Imports" type="ppj:importList"/>
+                    <xs:element minOccurs="0" name="Folders" type="ppj:folderList"/>
+                    <xs:element minOccurs="0" name="Scripts" type="ppj:scriptList"/>
+                    <xs:element minOccurs="0" name="Packages" type="ppj:packageList"/>
                 </xs:choice>
             </xs:sequence>
-            <xs:attribute name="Game" type="pyroGameType" />
-            <xs:attribute name="Output" type="xs:string" />
-            <xs:attribute name="Archive" type="xs:string" />
-            <xs:attribute name="Flags" type="xs:string" />
-            <xs:attribute name="Asm" type="asmType" />
-            <xs:attribute name="Optimize" type="pyroBool" />
-            <xs:attribute name="Release" type="pyroBool" />
-            <xs:attribute name="Final" type="pyroBool" />
-            <xs:attribute name="CreateArchive" type="pyroBool" />
-            <xs:attribute name="Anonymize" type="pyroBool" />
+            <xs:attribute name="Game" type="ppj:gameType"/>
+            <xs:attribute name="Output" type="xs:string"/>
+            <xs:attribute name="Flags" type="xs:string"/>
+            <xs:attribute name="Asm" type="ppj:asmType"/>
+            <xs:attribute name="Optimize" type="ppj:bool"/>
+            <xs:attribute name="Release" type="ppj:bool"/>
+            <xs:attribute name="Final" type="ppj:bool"/>
+            <xs:attribute name="Anonymize" type="ppj:bool"/>
+            <xs:attribute name="Package" type="ppj:bool"/>
         </xs:complexType>
     </xs:element>
     <xs:complexType name="importList">
         <xs:sequence>
-            <xs:element maxOccurs="unbounded" name="Import" type="xs:string" />
+            <xs:element maxOccurs="unbounded" name="Import" type="xs:string"/>
         </xs:sequence>
     </xs:complexType>
     <xs:complexType name="folderList">
         <xs:sequence>
-            <xs:element maxOccurs="unbounded" ref="Folder" />
+            <xs:element maxOccurs="unbounded" ref="Folder"/>
         </xs:sequence>
     </xs:complexType>
     <xs:complexType name="scriptList">
         <xs:sequence>
-            <xs:element maxOccurs="unbounded" name="Script" type="xs:string" />
+            <xs:element maxOccurs="unbounded" name="Script" type="xs:string"/>
         </xs:sequence>
     </xs:complexType>
     <xs:complexType name="includeList">
         <xs:sequence>
-            <xs:element maxOccurs="unbounded" ref="Include" />
+            <xs:element maxOccurs="unbounded" ref="Include"/>
         </xs:sequence>
-        <xs:attribute name="Root" type="xs:string" />
+    </xs:complexType>
+    <xs:complexType name="packageList">
+        <xs:sequence>
+            <xs:element maxOccurs="unbounded" ref="Package"/>
+        </xs:sequence>
+        <xs:attribute name="Output" type="xs:string"/>
     </xs:complexType>
     <xs:simpleType name="asmType">
         <xs:restriction base="xs:string">
-            <xs:enumeration value="None" />
-            <xs:enumeration value="Keep" />
-            <xs:enumeration value="Only" />
-            <xs:enumeration value="Discard" />
+            <xs:enumeration value="None"/>
+            <xs:enumeration value="Keep"/>
+            <xs:enumeration value="Only"/>
+            <xs:enumeration value="Discard"/>
         </xs:restriction>
     </xs:simpleType>
-    <xs:simpleType name="pyroBool">
+    <xs:simpleType name="bool">
         <xs:restriction base="xs:string">
-            <xs:pattern value="[tT][rR][uU][eE]" />
-            <xs:pattern value="[fF][aA][lL][sS][eE]" />
-            <xs:pattern value="[01]" />
+            <xs:pattern value="[tT][rR][uU][eE]"/>
+            <xs:pattern value="[fF][aA][lL][sS][eE]"/>
+            <xs:pattern value="[01]"/>
         </xs:restriction>
     </xs:simpleType>
-    <xs:simpleType name="pyroGameType">
+    <xs:simpleType name="gameType">
         <xs:restriction base="xs:string">
-            <xs:pattern value="[sS][sS][eE]" />
-            <xs:pattern value="[tT][eE][sS]5" />
-            <xs:pattern value="[fF][oO]4" />
+            <xs:pattern value="[sS][sS][eE]"/>
+            <xs:pattern value="[tT][eE][sS]5"/>
+            <xs:pattern value="[fF][oO]4"/>
         </xs:restriction>
     </xs:simpleType>
     <xs:element name="Folder">
-        <xs:complexType>
-            <xs:simpleContent>
-                <xs:extension base="xs:string">
-                    <xs:attribute name="NoRecurse" type="pyroBool" />
-                </xs:extension>
-            </xs:simpleContent>
+        <xs:complexType mixed="true">
+            <xs:attribute name="NoRecurse" type="ppj:bool"/>
         </xs:complexType>
     </xs:element>
     <xs:element name="Include">
+        <xs:complexType mixed="true">
+            <xs:attribute name="NoRecurse" type="ppj:bool"/>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="Package">
         <xs:complexType>
-            <xs:simpleContent>
-                <xs:extension base="xs:string">
-                    <xs:attribute name="NoRecurse" type="pyroBool" />
-                </xs:extension>
-            </xs:simpleContent>
+            <xs:sequence>
+                <xs:element maxOccurs="unbounded" ref="Include"/>
+            </xs:sequence>
+            <xs:attribute name="Name" type="xs:string"/>
+            <xs:attribute name="RootDir" use="required" type="xs:string"/>
         </xs:complexType>
     </xs:element>
 </xs:schema>

@@ -51,7 +51,6 @@ class BuildFacade(Logger):
             'program_path': ppj.program_path,
             'project_path': ppj.project_path,
             'import_paths': ppj.import_paths,
-            'folder_paths': ppj.folder_paths,
             'psc_paths': ppj.psc_paths,
             'pex_paths': ppj.pex_paths
         })

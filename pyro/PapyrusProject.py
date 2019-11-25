@@ -39,27 +39,18 @@ class PapyrusProject(ProjectBase):
 
         # we need to parse all PapyrusProject attributes after validating and before we do anything else
         # options can be overridden by arguments when the BuildFacade is initialized
-        self.options.archive_path = self.root_node.get('Archive', default='')
         self.options.output_path = self.root_node.get('Output', default='')
         self.options.flags_path = self.root_node.get('Flags', default='')
 
-        optimize_attr: str = self.root_node.get('Optimize', default='false').casefold()
-        self.optimize: bool = any([optimize_attr == value for value in ('true', '1')])
+        self.optimize: bool = PapyrusProject._get_attr_as_bool(self.root_node, 'Optimize')
+        self.release: bool = PapyrusProject._get_attr_as_bool(self.root_node, 'Release')
+        self.final: bool = PapyrusProject._get_attr_as_bool(self.root_node, 'Final')
 
-        if self.options.game_type == 'fo4':
-            release_attr: str = self.root_node.get('Release', default='false').casefold()
-            self.release = any([release_attr == value for value in ('true', '1')])
-
-            final_attr: str = self.root_node.get('Final', default='false').casefold()
-            self.final = any([final_attr == value for value in ('true', '1')])
-
-        create_archive_attr: str = self.root_node.get('CreateArchive', default='false').casefold()
         if not self.options.bsarch:
-            self.options.bsarch = any([create_archive_attr == value for value in ('true', '1')])
+            self.options.bsarch = PapyrusProject._get_attr_as_bool(self.root_node, 'Package')
 
-        anonymize_attr: str = self.root_node.get('Anonymize', default='false').casefold()
         if not self.options.anonymize:
-            self.options.anonymize = any([anonymize_attr == value for value in ('true', '1')])
+            self.options.anonymize = PapyrusProject._get_attr_as_bool(self.root_node, 'Anonymize')
 
         # we need to populate the list of import paths before we try to determine the game type
         # because the game type can be determined from import paths
@@ -74,7 +65,7 @@ class PapyrusProject(ProjectBase):
 
         for path in implicit_folder_paths:
             if path in self.import_paths:
-                PapyrusProject.log.warn('Using import path implicitly: "%s"' % path)
+                PapyrusProject.log.warning('Using import path implicitly: "%s"' % path)
 
         self.psc_paths: list = self._get_psc_paths()
         if not self.psc_paths:
@@ -87,7 +78,7 @@ class PapyrusProject(ProjectBase):
 
         for path in implicit_script_paths:
             if path in self.import_paths:
-                PapyrusProject.log.warn('Using import path implicitly: "%s"' % path)
+                PapyrusProject.log.warning('Using import path implicitly: "%s"' % path)
 
         # we need to set the game type after imports are populated but before pex paths are populated
         # allow xml to set game type but defer to passed argument
@@ -114,6 +105,11 @@ class PapyrusProject(ProjectBase):
         # game type must be set before we call this
         if not self.options.game_path:
             self.options.game_path = self.get_game_path()
+
+    @staticmethod
+    def _get_attr_as_bool(node: etree.ElementBase, attribute_name: str, default_value: str = 'false') -> bool:
+        attr: str = node.get(attribute_name, default=default_value).casefold()
+        return any([attr == value for value in ('true', '1')])
 
     @staticmethod
     def _strip_xml_comments(path: str) -> io.StringIO:
@@ -163,7 +159,7 @@ class PapyrusProject(ProjectBase):
                 import_path = self.project_path
             elif not os.path.isabs(import_path):
                 # relative import paths should be relative to the project
-                import_path = os.path.join(self.project_path, import_path)
+                import_path = os.path.normpath(os.path.join(self.project_path, import_path))
 
             if os.path.exists(import_path):
                 results.append(import_path)
@@ -272,34 +268,52 @@ class PapyrusProject(ProjectBase):
 
     def _get_script_paths_from_folders_node(self) -> list:
         """Returns script paths from the Folders element array"""
-        paths: list = []
-
         folder_nodes = ElementHelper.get(self.root_node, 'Folders')
         if folder_nodes is None:
             return []
 
-        for folder_node in folder_nodes:
-            folder_path = os.path.normpath(folder_node.text)
+        script_paths: list = []
+        folder_paths: list = []
 
-            if folder_path == os.curdir:
-                folder_path = self.project_path
-            elif folder_path == os.pardir:
+        for folder_node in folder_nodes:
+            if folder_node.text == os.pardir:
                 self.log.warning('Cannot use ".." as folder path')
                 continue
-            elif not os.path.isabs(folder_path):
-                folder_path = self._try_find_folder(folder_path)
 
-            no_recurse_attr: str = folder_node.get('NoRecurse', default='false').casefold()
-            no_recurse: bool = any([no_recurse_attr == value for value in ('true', '1')])
+            no_recurse: bool = self._get_attr_as_bool(folder_node, 'NoRecurse')
 
-            search_path: str = os.path.join(folder_path, '*.psc') if no_recurse or self.options.game_type != 'fo4' else os.path.join(folder_path, '**\*.psc')
-            psc_paths: list = [f for f in glob.glob(search_path, recursive=not no_recurse) if os.path.isfile(f)]
+            # try to add project path
+            if folder_node.text == os.curdir:
+                folder_paths.append((self.project_path, no_recurse))
+                continue
 
-            paths.extend(psc_paths)
+            folder_path: str = os.path.normpath(folder_node.text)
 
-            self.folder_paths.append(folder_path)
+            # try to add absolute path
+            if os.path.isabs(folder_path) and os.path.isdir(folder_path):
+                folder_paths.append((folder_path, no_recurse))
+                continue
 
-        return PathHelper.uniqify(paths)
+            # try to add project-relative folder path
+            test_path = os.path.join(self.project_path, folder_path)
+            if os.path.isdir(test_path):
+                folder_paths.append((test_path, no_recurse))
+                continue
+
+            # try to add import-relative folder path
+            for import_path in self.import_paths:
+                test_path = os.path.join(import_path, folder_path)
+                if os.path.isdir(test_path):
+                    folder_paths.append((test_path, no_recurse))
+                    continue
+
+            PapyrusProject.log.warning('Cannot resolve folder path: "%s"' % folder_node.text)
+
+        for folder_path, no_recurse in folder_paths:
+            search_path: str = os.path.join(folder_path, '%s.psc' % '*' if no_recurse else '**\*')
+            script_paths.extend([f for f in glob.iglob(search_path, recursive=not no_recurse) if os.path.isfile(f)])
+
+        return PathHelper.uniqify(script_paths)
 
     def _get_script_paths_from_scripts_node(self) -> list:
         """Returns script paths from the Scripts node"""
@@ -348,22 +362,6 @@ class PapyrusProject(ProjectBase):
             psc_paths.append(psc_path)
 
         return PathHelper.uniqify(psc_paths)
-
-    def _try_find_folder(self, folder: str) -> str:
-        """Try to find folder relative to project, or in import paths"""
-        test_path = os.path.join(self.project_path, folder)
-        if os.path.exists(test_path):
-            return test_path
-
-        # when this runs, import_paths isn't populated with implicit paths from scripts yet.
-        # just something to keep in mind if there's trouble down the road.
-        for import_path in self.import_paths:
-            test_path = os.path.join(import_path, folder)
-            if os.path.exists(test_path):
-                return test_path
-
-        PapyrusProject.log.error('Cannot find folder relative to project or any import paths: "%s"' % folder)
-        sys.exit(1)
 
     def build_commands(self) -> list:
         commands: list = []

@@ -1,3 +1,4 @@
+import fnmatch
 import glob
 import os
 import shutil
@@ -13,103 +14,45 @@ from pyro.ProcessManager import ProcessManager
 class PackageManager(Logger):
     def __init__(self, ppj: PapyrusProject) -> None:
         self.ppj = ppj
-        self.includes_root = ''
+        self.ppj.options.package_path = self._get_output_path()
 
-    def _copy_includes_to_temp_path(self) -> None:
-        # copy includes to archive
-        include_paths: list = self._get_include_paths()
-        if not include_paths:
-            return
+        if not os.path.exists(self.ppj.options.package_path):
+            os.makedirs(self.ppj.options.package_path, exist_ok=True)
 
-        PackageManager.log.info('Includes found:')
+        self.extension: str = '.ba2' if self.ppj.options.game_type == 'fo4' else '.bsa'
 
-        for include_path in include_paths:
-            PackageManager.log.info('- "%s"' % include_path)
+    def _get_output_path(self) -> str:
+        # use package output path if set in ppj, otherwise use default path
+        packages_node = ElementHelper.get(self.ppj.root_node, 'Packages')
 
-            include_relpath: str = os.path.relpath(include_path, self.includes_root)
-            target_path: str = os.path.join(self.ppj.options.temp_path, include_relpath)
-            target_folder: str = os.path.dirname(target_path)
+        if packages_node is None:
+            return self.ppj.options.package_path
 
-            os.makedirs(target_folder, exist_ok=True)
-            shutil.copy2(include_path, target_path)
+        output_path: str = packages_node.get('Output', default='')
 
-        PackageManager.log.info('Copied includes to temporary folder.')
+        if not output_path:
+            return self.ppj.options.package_path
 
-    def _copy_scripts_to_temp_path(self) -> None:
-        """Copies compiled scripts to temporary folder"""
-        for pex_path in self.ppj.pex_paths:
-            if not os.path.exists(pex_path):
-                self.log.error('Cannot locate file to copy: %s' % pex_path)
-                continue
+        if output_path == os.curdir:
+            output_path = self.ppj.project_path
+        elif output_path == os.pardir or not os.path.isabs(output_path):
+            output_path = os.path.join(self.ppj.project_path, output_path)
 
-            relative_output_path = os.path.relpath(pex_path, self.ppj.options.output_path)
-            target_path = os.path.join(self.ppj.options.temp_path, 'Scripts', relative_output_path)
+        return os.path.normpath(output_path)
 
-            os.makedirs(os.path.dirname(target_path), exist_ok=True)
-            shutil.copy2(pex_path, target_path)
+    def _fix_package_extension(self, package_name: str) -> str:
+        if not package_name.casefold().endswith(('.ba2', '.bsa')):
+            return '%s%s' % (package_name, self.extension)
+        return '%s%s' % (os.path.splitext(package_name)[0], self.extension)
 
-    def _get_include_paths(self) -> list:
-        """Returns list of absolute include paths"""
-        include_nodes = ElementHelper.get(self.ppj.root_node, 'Includes')
-        if include_nodes is None or len(list(include_nodes)) == 0:
-            return []
-
-        self.includes_root = include_nodes.get('Root', default=self.ppj.project_path)
-
-        # treat curdir the same as the project path
-        if self.includes_root == os.curdir:
-            self.includes_root = self.ppj.project_path
-
-        if self.includes_root == os.pardir:
-            PackageManager.log.warning('Cannot use parent folder of project path as includes root')
-            return []
-
-        # check if includes root path is relative to project folder
-        if not os.path.isabs(self.includes_root):
-            test_path = os.path.join(self.ppj.project_path, self.includes_root)
-            if os.path.exists(test_path):
-                self.includes_root = test_path
-
-        results: list = []
-
-        for include_node in include_nodes:
-            include_path = os.path.normpath(include_node.text)
-
-            if os.path.isabs(include_path):
-                PackageManager.log.warning('Cannot include absolute path: "%s"' % include_path)
-                continue
-
-            if include_path == os.pardir:
-                PackageManager.log.warning('Cannot use ".." as include path')
-                continue
-
-            full_path: str = self.includes_root if include_path == os.curdir else os.path.join(self.includes_root, include_path)
-
-            if not os.path.exists(full_path):
-                PackageManager.log.warning('Cannot use include because path does not exist: "%s"' % full_path)
-                continue
-
-            if os.path.isfile(full_path):
-                results.append(full_path)
-            else:
-                no_recurse: bool = any([include_node.get('NoRecurse', default='false').casefold() == value for value in ('true', '1')])
-
-                search_path: str = os.path.join(full_path, '*') if no_recurse else os.path.join(full_path, '**\*')
-                files = [f for f in glob.glob(search_path, recursive=not no_recurse) if os.path.isfile(f)]
-
-                for f in files:
-                    results.append(f)
-
-        return PathHelper.uniqify(results)
-
-    def build_commands(self, script_folder: str, archive_path: str) -> str:
+    def build_commands(self, containing_folder: str, output_path: str) -> str:
         """Returns arguments for BSArch as a string"""
         arguments = CommandArguments()
 
         arguments.append_quoted(self.ppj.options.bsarch_path)
         arguments.append('pack')
-        arguments.append_quoted(script_folder)
-        arguments.append_quoted(archive_path)
+        arguments.append_quoted(containing_folder)
+        arguments.append_quoted(output_path)
 
         if self.ppj.options.game_type == 'fo4':
             arguments.append('-fo4')
@@ -121,33 +64,82 @@ class PackageManager(Logger):
         return arguments.join()
 
     def create_archive(self) -> None:
-        # clear temporary data
-        if os.path.exists(self.ppj.options.temp_path):
-            shutil.rmtree(self.ppj.options.temp_path, ignore_errors=True)
-
-        # create temporary folder for compiled scripts
-        temp_scripts_path: str = os.path.join(self.ppj.options.temp_path, 'Scripts')
-        os.makedirs(temp_scripts_path, exist_ok=True)
-
-        self._copy_scripts_to_temp_path()
-
-        self._copy_includes_to_temp_path()
-
-        archive_path: str = self.ppj.options.archive_path
-
-        # if the archive path is a folder, use the project name as the package name
-        if not archive_path.casefold().endswith(('.ba2', '.bsa')):
-            archive_name, _ = os.path.splitext(os.path.basename(self.ppj.options.input_path))
-            archive_path = os.path.join(archive_path, '%s%s' % (archive_name, '.ba2' if self.ppj.options.game_type == 'fo4' else '.bsa'))
-
-        # create archive directory
-        archive_folder: str = os.path.dirname(archive_path)
-        os.makedirs(archive_folder, exist_ok=True)
-
-        # run bsarch
-        commands: str = self.build_commands(*map(lambda x: os.path.normpath(x), [self.ppj.options.temp_path, archive_path]))
-        ProcessManager.run(commands, use_bsarch=True)
+        package_nodes = ElementHelper.get(self.ppj.root_node, 'Packages')
+        if package_nodes is None:
+            PackageManager.log.warning('Cannot create package because no packages are defined')
+            return
 
         # clear temporary data
         if os.path.exists(self.ppj.options.temp_path):
             shutil.rmtree(self.ppj.options.temp_path, ignore_errors=True)
+
+        for i, package_node in enumerate(package_nodes):
+            package_name: str = package_node.get('Name', default=self.ppj.project_name if i == 0 else '%s (%s)' % (self.ppj.project_name, i))
+            package_name = self._fix_package_extension(package_name)
+
+            package_root: str = package_node.get('RootDir', default='')
+            if not package_root:
+                PackageManager.log.error('Cannot create package "%s" because RootDir attribute has no value' % package_name)
+                continue
+
+            PackageManager.log.info('Creating "%s"...' % package_name)
+
+            package_data: list = []
+
+            for include_node in package_node:
+                no_recurse: bool = self.ppj._get_attr_as_bool(include_node, 'NoRecurse')
+                wildcard_pattern: str = '*' if no_recurse else '**\*'
+
+                if include_node.text == os.curdir or include_node.text == os.pardir:
+                    PackageManager.log.warning('Include paths cannot be equal to "." or ".."')
+                    continue
+
+                if include_node.text.startswith('.'):
+                    PackageManager.log.warning('Include paths cannot start with "."')
+                    continue
+
+                # populate files list using simple glob patterns
+                if '*' in include_node.text:
+                    search_path: str = os.path.join(package_root, wildcard_pattern)
+                    files: list = [f for f in glob.iglob(search_path, recursive=not no_recurse) if os.path.isfile(f)]
+                    matches: list = fnmatch.filter(files, include_node.text)
+                    if not matches:
+                        PackageManager.log.warning('No files in "%s" matched glob pattern: %s' % (search_path, include_node.text))
+                    package_data.extend(matches)
+                    continue
+
+                include_path: str = os.path.normpath(include_node.text)
+
+                # populate files list using absolute paths
+                if os.path.isabs(include_path) and os.path.exists(include_path):
+                    package_data.append(include_path)
+                    continue
+
+                # populate files list using relative file path
+                test_path = os.path.join(package_root, include_path)
+                if not os.path.isdir(test_path):
+                    package_data.append(test_path)
+                    continue
+
+                # populate files list using relative folder path
+                package_data.extend([f for f in glob.iglob(os.path.join(package_root, include_path, wildcard_pattern), recursive=not no_recurse) if os.path.isfile(f)])
+
+            if package_data:
+                PackageManager.log.info('Includes found:')
+
+                for source_path in PathHelper.uniqify(package_data):
+                    PackageManager.log.info('+ "%s"' % source_path)
+                    target_path: str = os.path.join(self.ppj.options.temp_path, os.path.relpath(source_path, package_root))
+
+                    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                    shutil.copy2(source_path, target_path)
+
+                # run bsarch
+                commands: str = self.build_commands(self.ppj.options.temp_path, os.path.join(self.ppj.options.package_path, package_name))
+                ProcessManager.run(commands, use_bsarch=True)
+            else:
+                PackageManager.log.info('No includes found for package: "%s"' % package_name)
+
+            # clear temporary data
+            if os.path.exists(self.ppj.options.temp_path):
+                shutil.rmtree(self.ppj.options.temp_path, ignore_errors=True)

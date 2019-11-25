@@ -29,7 +29,7 @@ class ProjectOptions:
 
     # bsarch arguments
     bsarch_path: str = field(init=False, default_factory=str)
-    archive_path: str = field(init=False, default_factory=str)
+    package_path: str = field(init=False, default_factory=str)
     temp_path: str = field(init=False, default_factory=str)
 
     # program arguments
