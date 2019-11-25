@@ -163,7 +163,7 @@ class PapyrusProject(ProjectBase):
             import_path: str = os.path.normpath(self.parse(import_node.text))
 
             if import_path == os.pardir:
-                self.log.warning('Cannot use ".." as import path')
+                self.log.warning('Import paths cannot be equal to ".."')
                 continue
 
             if import_path == os.curdir:
@@ -290,7 +290,7 @@ class PapyrusProject(ProjectBase):
             folder_text: str = self.parse(folder_node.text)
 
             if folder_text == os.pardir:
-                self.log.warning('Cannot use ".." as folder path')
+                self.log.warning('Folder paths cannot be equal to ".."')
                 continue
 
             no_recurse: bool = self._get_attr_as_bool(folder_node, 'NoRecurse')
