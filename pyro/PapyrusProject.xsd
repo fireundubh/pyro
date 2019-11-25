@@ -10,6 +10,7 @@
         <xs:complexType>
             <xs:sequence>
                 <xs:choice maxOccurs="unbounded">
+                    <xs:element minOccurs="0" name="Variables" type="ppj:variableList"/>
                     <xs:element minOccurs="0" name="Imports" type="ppj:importList"/>
                     <xs:element minOccurs="0" name="Folders" type="ppj:folderList"/>
                     <xs:element minOccurs="0" name="Scripts" type="ppj:scriptList"/>
@@ -27,6 +28,11 @@
             <xs:attribute name="Package" type="ppj:bool"/>
         </xs:complexType>
     </xs:element>
+    <xs:complexType name="variableList">
+        <xs:sequence>
+            <xs:element maxOccurs="unbounded" name="Variable" type="ppj:variable"/>
+        </xs:sequence>
+    </xs:complexType>
     <xs:complexType name="importList">
         <xs:sequence>
             <xs:element maxOccurs="unbounded" name="Import" type="xs:string"/>
@@ -52,6 +58,10 @@
             <xs:element maxOccurs="unbounded" ref="Package"/>
         </xs:sequence>
         <xs:attribute name="Output" type="xs:string"/>
+    </xs:complexType>
+    <xs:complexType name="variable">
+        <xs:attribute name="Name" use="required" type="xs:string"/>
+        <xs:attribute name="Value" use="required" type="xs:string"/>
     </xs:complexType>
     <xs:simpleType name="asmType">
         <xs:restriction base="xs:string">

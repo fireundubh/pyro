@@ -28,7 +28,7 @@ class PackageManager(Logger):
         if packages_node is None:
             return self.ppj.options.package_path
 
-        output_path: str = packages_node.get('Output', default='')
+        output_path: str = self.ppj.parse(packages_node.get('Output', default=''))
 
         if not output_path:
             return self.ppj.options.package_path
@@ -74,10 +74,10 @@ class PackageManager(Logger):
             shutil.rmtree(self.ppj.options.temp_path, ignore_errors=True)
 
         for i, package_node in enumerate(package_nodes):
-            package_name: str = package_node.get('Name', default=self.ppj.project_name if i == 0 else '%s (%s)' % (self.ppj.project_name, i))
+            package_name: str = self.ppj.parse(package_node.get('Name', default=self.ppj.project_name if i == 0 else '%s (%s)' % (self.ppj.project_name, i)))
             package_name = self._fix_package_extension(package_name)
 
-            package_root: str = package_node.get('RootDir', default='')
+            package_root: str = self.ppj.parse(package_node.get('RootDir', default=''))
             if not package_root:
                 PackageManager.log.error('Cannot create package "%s" because RootDir attribute has no value' % package_name)
                 continue
@@ -90,25 +90,27 @@ class PackageManager(Logger):
                 no_recurse: bool = self.ppj._get_attr_as_bool(include_node, 'NoRecurse')
                 wildcard_pattern: str = '*' if no_recurse else '**\*'
 
-                if include_node.text == os.curdir or include_node.text == os.pardir:
+                include_text: str = self.ppj.parse(include_node.text)
+
+                if include_text == os.curdir or include_text == os.pardir:
                     PackageManager.log.warning('Include paths cannot be equal to "." or ".."')
                     continue
 
-                if include_node.text.startswith('.'):
+                if include_text.startswith('.'):
                     PackageManager.log.warning('Include paths cannot start with "."')
                     continue
 
                 # populate files list using simple glob patterns
-                if '*' in include_node.text:
+                if '*' in include_text:
                     search_path: str = os.path.join(package_root, wildcard_pattern)
                     files: list = [f for f in glob.iglob(search_path, recursive=not no_recurse) if os.path.isfile(f)]
-                    matches: list = fnmatch.filter(files, include_node.text)
+                    matches: list = fnmatch.filter(files, include_text)
                     if not matches:
-                        PackageManager.log.warning('No files in "%s" matched glob pattern: %s' % (search_path, include_node.text))
+                        PackageManager.log.warning('No files in "%s" matched glob pattern: %s' % (search_path, include_text))
                     package_data.extend(matches)
                     continue
 
-                include_path: str = os.path.normpath(include_node.text)
+                include_path: str = os.path.normpath(include_text)
 
                 # populate files list using absolute paths
                 if os.path.isabs(include_path) and os.path.exists(include_path):

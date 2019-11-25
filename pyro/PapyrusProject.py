@@ -37,10 +37,21 @@ class PapyrusProject(ProjectBase):
                 PapyrusProject.log.error('Failed to validate XML Schema.%s\t%s' % (os.linesep, e))
                 sys.exit(1)
 
+        variables_node = ElementHelper.get(self.root_node, 'Variables')
+        if variables_node is not None:
+            for variable_node in variables_node:
+                var_key = variable_node.get('Name', default='')
+                var_value = variable_node.get('Value', default='')
+
+                if any([not var_key, not var_value]):
+                    continue
+
+                self.variables.update({var_key: var_value})
+
         # we need to parse all PapyrusProject attributes after validating and before we do anything else
         # options can be overridden by arguments when the BuildFacade is initialized
-        self.options.output_path = self.root_node.get('Output', default='')
-        self.options.flags_path = self.root_node.get('Flags', default='')
+        self.options.output_path = self.parse(self.root_node.get('Output', default=''))
+        self.options.flags_path = self.parse(self.root_node.get('Flags', default=''))
 
         self.optimize: bool = PapyrusProject._get_attr_as_bool(self.root_node, 'Optimize')
         self.release: bool = PapyrusProject._get_attr_as_bool(self.root_node, 'Release')
@@ -83,7 +94,7 @@ class PapyrusProject(ProjectBase):
         # we need to set the game type after imports are populated but before pex paths are populated
         # allow xml to set game type but defer to passed argument
         if not self.options.game_type:
-            game_type: str = self.root_node.get('Game', default='').casefold()
+            game_type: str = self.parse(self.root_node.get('Game', default='')).casefold()
 
             if game_type and game_type in self.game_types:
                 PapyrusProject.log.warning('Using game type: %s (determined from Papyrus Project)' % self.game_types[game_type])
@@ -149,7 +160,7 @@ class PapyrusProject(ProjectBase):
             if not import_node.text:
                 continue
 
-            import_path: str = os.path.normpath(import_node.text)
+            import_path: str = os.path.normpath(self.parse(import_node.text))
 
             if import_path == os.pardir:
                 self.log.warning('Cannot use ".." as import path')
@@ -178,7 +189,7 @@ class PapyrusProject(ProjectBase):
             if not folder_node.text:
                 continue
 
-            folder_path: str = os.path.normpath(folder_node.text)
+            folder_path: str = os.path.normpath(self.parse(folder_node.text))
 
             if os.path.isabs(folder_path):
                 if os.path.exists(folder_path):
@@ -276,18 +287,20 @@ class PapyrusProject(ProjectBase):
         folder_paths: list = []
 
         for folder_node in folder_nodes:
-            if folder_node.text == os.pardir:
+            folder_text: str = self.parse(folder_node.text)
+
+            if folder_text == os.pardir:
                 self.log.warning('Cannot use ".." as folder path')
                 continue
 
             no_recurse: bool = self._get_attr_as_bool(folder_node, 'NoRecurse')
 
             # try to add project path
-            if folder_node.text == os.curdir:
+            if folder_text == os.curdir:
                 folder_paths.append((self.project_path, no_recurse))
                 continue
 
-            folder_path: str = os.path.normpath(folder_node.text)
+            folder_path: str = os.path.normpath(folder_text)
 
             # try to add absolute path
             if os.path.isabs(folder_path) and os.path.isdir(folder_path):
@@ -324,7 +337,7 @@ class PapyrusProject(ProjectBase):
             return []
 
         for script_node in script_nodes:
-            psc_path: str = script_node.text
+            psc_path: str = self.parse(script_node.text)
 
             if ':' in psc_path:
                 psc_path = psc_path.replace(':', os.sep)

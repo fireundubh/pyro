@@ -3,6 +3,7 @@ import sys
 
 from pyro.Logger import Logger
 from pyro.ProjectOptions import ProjectOptions
+from pyro.StringTemplate import StringTemplate
 
 
 class ProjectBase(Logger):
@@ -18,6 +19,8 @@ class ProjectBase(Logger):
         self.project_name: str = os.path.splitext(os.path.basename(self.options.input_path))[0]
         self.project_path: str = os.path.dirname(self.options.input_path)
 
+        self.variables: dict = {}
+
         self.import_paths: list = []
 
         self.optimize: bool = False
@@ -32,6 +35,14 @@ class ProjectBase(Logger):
         elif key.endswith('paths') and isinstance(value, list):
             value = [os.path.normpath(path) for path in value]
         super(ProjectBase, self).__setattr__(key, value)
+
+    def parse(self, value: str) -> str:
+        t = StringTemplate(value)
+        try:
+            return t.substitute(self.variables)
+        except KeyError as e:
+            ProjectBase.log.error('Failed to parse variable "%s" in "%s" - is the variable name correct?' % (e.args[0], value))
+            sys.exit(1)
 
     # compiler arguments
     def get_compiler_path(self) -> str:
