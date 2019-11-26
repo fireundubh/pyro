@@ -381,7 +381,7 @@ class PapyrusProject(ProjectBase):
 
         for folder_path, no_recurse in folder_paths:
             search_path: str = os.path.join(folder_path, '*' if no_recurse else '**\*')
-            script_paths.extend([f for f in glob.iglob(search_path, recursive=not no_recurse) if os.path.isfile(f) and f.endswith('.psc')])
+            script_paths.extend([f for f in glob.iglob(search_path, recursive=not no_recurse) if os.path.isfile(f) and f.casefold().endswith('.psc')])
 
         return PathHelper.uniqify(script_paths)
 
