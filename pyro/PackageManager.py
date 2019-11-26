@@ -19,7 +19,7 @@ class PackageManager(Logger):
     def __init__(self, ppj: PapyrusProject) -> None:
         self.ppj = ppj
         self.options = ppj.options
-        self.options.package_path = self._get_output_path()
+        self.options.package_path = self._get_output_path() if not self.options.package_path else self.ppj.project_path
 
         if not os.path.exists(self.options.package_path):
             os.makedirs(self.options.package_path, exist_ok=True)
@@ -35,10 +35,7 @@ class PackageManager(Logger):
         if packages_node is None:
             return self.options.package_path
 
-        output_path: str = self.ppj.parse(packages_node.get('Output', default=''))
-
-        if not output_path:
-            return self.options.package_path
+        output_path: str = self.ppj.parse(packages_node.get('Output', default=self.options.package_path))
 
         if output_path == os.curdir:
             output_path = self.ppj.project_path
