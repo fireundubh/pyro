@@ -20,10 +20,11 @@ class BuildFacade(Logger):
         self.ppj = ppj
 
         # WARN: if methods are renamed and their respective option names are not, this will break.
-        for key in self.ppj.options.__dict__:
-            if key in ('args', 'input_path', 'worker_limit', 'anonymize', 'bsarch') or key.startswith('no_'):
-                continue
-            setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
+        options: dict = deepcopy(self.ppj.options.__dict__)
+
+        for key in options:
+            if key not in ('args', 'input_path', 'worker_limit', 'anonymize', 'bsarch', 'zip', 'zip_compression') and not key.startswith('no_'):
+                setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
 
         if not self.ppj.options.worker_limit:
             worker_limit: int = 2
@@ -43,7 +44,7 @@ class BuildFacade(Logger):
             os.makedirs(self.ppj.options.log_path, exist_ok=True)
             log_path = os.path.join(self.ppj.options.log_path, 'pyro-%s.log' % int(time.time()))
             with open(log_path, mode='w', encoding='utf-8') as f:
-                options: dict = deepcopy(self.ppj.options.__dict__)
+                options = deepcopy(self.ppj.options.__dict__)
                 json.dump(options, f, indent=2)
 
         self.log_file = JsonLogger(ppj)
@@ -51,7 +52,6 @@ class BuildFacade(Logger):
             'program_path': ppj.program_path,
             'project_path': ppj.project_path,
             'import_paths': ppj.import_paths,
-            'folder_paths': ppj.folder_paths,
             'psc_paths': ppj.psc_paths,
             'pex_paths': ppj.pex_paths
         })
@@ -142,6 +142,15 @@ class BuildFacade(Logger):
                 Anonymizer.anonymize_script(pex_path)
 
     def try_pack(self) -> None:
-        """Generates ZIP archive for project"""
+        """Generates BSA/BA2 packages for project"""
         package_manager = PackageManager(self.ppj)
-        package_manager.create_archive()
+
+        if self.ppj.options.bsarch and os.path.isfile(self.ppj.options.bsarch_path):
+            package_manager.create_packages()
+        else:
+            BuildFacade.log.warning('Cannot create package(s) because packaging was disabled by user')
+
+        if self.ppj.options.zip:
+            package_manager.create_zip()
+        else:
+            BuildFacade.log.warning('Cannot create archive because zipping was disabled by user')

@@ -3,6 +3,7 @@ import sys
 
 from pyro.Logger import Logger
 from pyro.ProjectOptions import ProjectOptions
+from pyro.StringTemplate import StringTemplate
 
 
 class ProjectBase(Logger):
@@ -15,9 +16,11 @@ class ProjectBase(Logger):
         if sys.argv[0].endswith(('pyro', '.exe')):
             self.program_path = os.path.abspath(os.path.join(self.program_path, os.pardir))
 
+        self.project_name: str = os.path.splitext(os.path.basename(self.options.input_path))[0]
         self.project_path: str = os.path.dirname(self.options.input_path)
 
-        self.folder_paths: list = []
+        self.variables: dict = {}
+
         self.import_paths: list = []
 
         self.optimize: bool = False
@@ -32,6 +35,14 @@ class ProjectBase(Logger):
         elif key.endswith('paths') and isinstance(value, list):
             value = [os.path.normpath(path) for path in value]
         super(ProjectBase, self).__setattr__(key, value)
+
+    def parse(self, value: str) -> str:
+        t = StringTemplate(value)
+        try:
+            return t.substitute(self.variables)
+        except KeyError as e:
+            ProjectBase.log.error('Failed to parse variable "%s" in "%s" - is the variable name correct?' % (e.args[0], value))
+            sys.exit(1)
 
     # compiler arguments
     def get_compiler_path(self) -> str:
@@ -131,12 +142,12 @@ class ProjectBase(Logger):
             return os.path.join(os.getcwd(), self.options.bsarch_path)
         return os.path.abspath(os.path.join(self.program_path, 'tools', 'bsarch.exe'))
 
-    def get_archive_path(self) -> str:
-        """Returns absolute archive path from arguments"""
-        if self.options.archive_path:
-            if os.path.isabs(self.options.archive_path):
-                return self.options.archive_path
-            return os.path.join(self.project_path, self.options.archive_path)
+    def get_package_path(self) -> str:
+        """Returns absolute package path from arguments"""
+        if self.options.package_path:
+            if os.path.isabs(self.options.package_path):
+                return self.options.package_path
+            return os.path.join(self.project_path, self.options.package_path)
         return os.path.abspath(os.path.join(self.program_path, 'dist'))
 
     def get_temp_path(self) -> str:
@@ -146,6 +157,15 @@ class ProjectBase(Logger):
                 return self.options.temp_path
             return os.path.join(os.getcwd(), self.options.temp_path)
         return os.path.abspath(os.path.join(self.program_path, 'temp'))
+
+    # zip arguments
+    def get_zip_output_path(self) -> str:
+        """Returns absolute zip output path from arguments"""
+        if self.options.zip_output_path:
+            if os.path.isabs(self.options.zip_output_path):
+                return self.options.zip_output_path
+            return os.path.join(self.project_path, self.options.zip_output_path)
+        return os.path.abspath(os.path.join(self.program_path, 'dist'))
 
     # program arguments
     def get_game_type(self) -> str:

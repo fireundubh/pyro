@@ -70,13 +70,9 @@ class Application(Logger):
             Application.log.error('Cannot determine game type from arguments or Papyrus Project')
             sys.exit(print_help())
 
-        Application.log.info('Imports found:')
-        for import_path in ppj.import_paths:
-            Application.log.info('- "%s"' % import_path)
+        Application.print_list('Imports found:', ppj.import_paths)
 
-        Application.log.info('Scripts found:')
-        for psc_path in ppj.psc_paths:
-            Application.log.info('- "%s"' % psc_path)
+        Application.print_list('Scripts found:', ppj.psc_paths)
 
         time_elapsed = TimeElapsed()
 
@@ -88,10 +84,7 @@ class Application(Logger):
         else:
             Application.log.warning('Cannot anonymize scripts because anonymization was disabled by user')
 
-        if ppj.options.bsarch and ppj.options.bsarch_path:
-            build.try_pack()
-        else:
-            Application.log.warning('Cannot build package because packaging was disabled by user')
+        build.try_pack()
 
         time_elapsed.print(callback_func=Application.log.info)
 
@@ -116,12 +109,6 @@ if __name__ == '__main__':
                                           '(if relative, must be relative to current working directory)')
 
     _build_arguments = _parser.add_argument_group('build arguments')
-    _build_arguments.add_argument('--anonymize',
-                                  action='store_true', default=False,
-                                  help='anonymize metadata')
-    _build_arguments.add_argument('--bsarch',
-                                  action='store_true', default=False,
-                                  help='create package with bsarch')
     _build_arguments.add_argument('--no-incremental-build',
                                   action='store_true', default=False,
                                   help='do not build incrementally')
@@ -168,14 +155,24 @@ if __name__ == '__main__':
                                    action='store', type=str,
                                    help='relative or absolute path to bsarch.exe\n'
                                         '(if relative, must be relative to current working directory)')
-    _bsarch_arguments.add_argument('--archive-path',
+    _bsarch_arguments.add_argument('--package-path',
                                    action='store', type=str,
-                                   help='relative or absolute path to bsa/ba2 file\n'
+                                   help='relative or absolute path to bsa/ba2 output folder\n'
                                         '(if relative, must be relative to project)')
     _bsarch_arguments.add_argument('--temp-path',
                                    action='store', type=str,
                                    help='relative or absolute path to temp folder\n'
                                         '(if relative, must be relative to current working directory)')
+
+    _zip_arguments = _parser.add_argument_group('zip arguments')
+    _zip_arguments.add_argument('--zip-compression',
+                                action='store', type=str,
+                                choices={'store', 'deflate'},
+                                help='set compression method (choices: store, deflate)')
+    _zip_arguments.add_argument('--zip-output-path',
+                                action='store', type=str,
+                                help='relative or absolute path to zip output folder\n'
+                                     '(if relative, must be relative to project)')
 
     _program_arguments = _parser.add_argument_group('program arguments')
     _program_arguments.add_argument('--log-path',
