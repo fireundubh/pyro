@@ -113,15 +113,6 @@ if __name__ == '__main__':
                                           '(if relative, must be relative to current working directory)')
 
     _build_arguments = _parser.add_argument_group('build arguments')
-    _build_arguments.add_argument('--anonymize',
-                                  action='store_true', default=False,
-                                  help='anonymize metadata')
-    _build_arguments.add_argument('--bsarch',
-                                  action='store_true', default=False,
-                                  help='create package with bsarch')
-    _build_arguments.add_argument('--zip',
-                                  action='store_true', default=False,
-                                  help='create distributable zip archive')
     _build_arguments.add_argument('--no-incremental-build',
                                   action='store_true', default=False,
                                   help='do not build incrementally')
