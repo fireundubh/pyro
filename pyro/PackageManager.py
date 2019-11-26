@@ -83,6 +83,9 @@ class PackageManager(Logger):
 
             # populate files list using absolute paths
             if os.path.isabs(include_path) and os.path.exists(include_path):
+                if root_path not in include_path:
+                    PackageManager.log.warning('Cannot include path outside RootDir: "%s"' % include_path)
+                    continue
                 output_data.append(include_path)
                 continue
 
