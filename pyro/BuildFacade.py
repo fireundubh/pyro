@@ -20,10 +20,11 @@ class BuildFacade(Logger):
         self.ppj = ppj
 
         # WARN: if methods are renamed and their respective option names are not, this will break.
-        for key in self.ppj.options.__dict__:
-            if key in ('args', 'input_path', 'worker_limit', 'anonymize', 'bsarch', 'zip', 'zip_compression') or key.startswith('no_'):
-                continue
-            setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
+        options: dict = deepcopy(self.ppj.options.__dict__)
+
+        for key in options:
+            if key not in ('args', 'input_path', 'worker_limit', 'anonymize', 'bsarch', 'zip', 'zip_compression') and not key.startswith('no_'):
+                setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
 
         if not self.ppj.options.worker_limit:
             worker_limit: int = 2
