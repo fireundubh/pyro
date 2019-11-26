@@ -54,8 +54,8 @@ class PapyrusProject(ProjectBase):
 
         # we need to parse all PapyrusProject attributes after validating and before we do anything else
         # options can be overridden by arguments when the BuildFacade is initialized
-        self.options.output_path = self.parse(self.root_node.get('Output', default=''))
-        self.options.flags_path = self.parse(self.root_node.get('Flags', default=''))
+        self.options.output_path = self.parse(self.root_node.get('Output', default=self.options.output_path))
+        self.options.flags_path = self.parse(self.root_node.get('Flags', default=self.options.flags_path))
 
         self.optimize: bool = PapyrusProject._get_attr_as_bool(self.root_node, 'Optimize')
         self.release: bool = PapyrusProject._get_attr_as_bool(self.root_node, 'Release')
@@ -453,7 +453,8 @@ class PapyrusProject(ProjectBase):
 
         # add .psc scripts whose .pex counterparts do not exist
         for missing_psc_path in self.missing_scripts:
-            psc_paths.append(missing_psc_path)
+            if missing_psc_path not in psc_paths:
+                psc_paths.append(missing_psc_path)
 
         # generate list of commands
         for psc_path in psc_paths:
