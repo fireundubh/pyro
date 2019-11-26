@@ -111,17 +111,22 @@ class BuildFacade(Logger):
         """Builds and passes commands to Papyrus Compiler"""
         commands: list = self.ppj.build_commands()
 
+        script_count: int = len(self.ppj.psc_paths)
+
         time_elapsed.start_time = time.time()
 
         if self.ppj.options.no_parallel:
             for command in commands:
                 ProcessManager.run(command)
-        else:
-            multiprocessing.freeze_support()
-            p = multiprocessing.Pool(processes=min(len(self.ppj.psc_paths), self.ppj.options.worker_limit))
-            p.imap(ProcessManager.run, commands)
-            p.close()
-            p.join()
+        elif script_count > 0:
+            if script_count == 1:
+                ProcessManager.run(commands[0])
+            else:
+                multiprocessing.freeze_support()
+                p = multiprocessing.Pool(processes=min(script_count, self.ppj.options.worker_limit))
+                p.imap(ProcessManager.run, commands)
+                p.close()
+                p.join()
 
         time_elapsed.end_time = time.time()
 
