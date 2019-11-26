@@ -380,8 +380,8 @@ class PapyrusProject(ProjectBase):
             PapyrusProject.log.warning('Cannot resolve folder path: "%s"' % folder_node.text)
 
         for folder_path, no_recurse in folder_paths:
-            search_path: str = os.path.join(folder_path, '%s.psc' % '*' if no_recurse else '**\*')
-            script_paths.extend([f for f in glob.iglob(search_path, recursive=not no_recurse) if os.path.isfile(f)])
+            search_path: str = os.path.join(folder_path, '*' if no_recurse else '**\*')
+            script_paths.extend([f for f in glob.iglob(search_path, recursive=not no_recurse) if os.path.isfile(f) and f.endswith('.psc')])
 
         return PathHelper.uniqify(script_paths)
 
