@@ -70,13 +70,9 @@ class Application(Logger):
             Application.log.error('Cannot determine game type from arguments or Papyrus Project')
             sys.exit(print_help())
 
-        Application.log.info('Imports found:')
-        for import_path in ppj.import_paths:
-            Application.log.info('+ "%s"' % import_path)
+        Application.print_list('Imports found:', ppj.import_paths)
 
-        Application.log.info('Scripts found:')
-        for psc_path in ppj.psc_paths:
-            Application.log.info('+ "%s"' % psc_path)
+        Application.print_list('Scripts found:', ppj.psc_paths)
 
         time_elapsed = TimeElapsed()
 
@@ -173,7 +169,7 @@ if __name__ == '__main__':
                                 action='store', type=str,
                                 choices={'store', 'deflate'},
                                 help='set compression method (choices: store, deflate)')
-    _zip_arguments.add_argument('--zip-path',
+    _zip_arguments.add_argument('--zip-output-path',
                                 action='store', type=str,
                                 help='relative or absolute path to zip output folder\n'
                                      '(if relative, must be relative to project)')

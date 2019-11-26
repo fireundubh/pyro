@@ -35,7 +35,7 @@ class ProjectOptions:
 
     # zip arguments
     zip_compression: str = field(init=False, default_factory=str)
-    zip_path: str = field(init=False, default_factory=str)
+    zip_output_path: str = field(init=False, default_factory=str)
 
     # program arguments
     log_path: str = field(init=False, default_factory=str)

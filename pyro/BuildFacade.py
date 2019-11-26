@@ -44,7 +44,7 @@ class BuildFacade(Logger):
             os.makedirs(self.ppj.options.log_path, exist_ok=True)
             log_path = os.path.join(self.ppj.options.log_path, 'pyro-%s.log' % int(time.time()))
             with open(log_path, mode='w', encoding='utf-8') as f:
-                options: dict = deepcopy(self.ppj.options.__dict__)
+                options = deepcopy(self.ppj.options.__dict__)
                 json.dump(options, f, indent=2)
 
         self.log_file = JsonLogger(ppj)

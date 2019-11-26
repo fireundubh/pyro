@@ -159,12 +159,12 @@ class ProjectBase(Logger):
         return os.path.abspath(os.path.join(self.program_path, 'temp'))
 
     # zip arguments
-    def get_zip_path(self) -> str:
-        """Returns absolute zip path from arguments"""
-        if self.options.zip_path:
-            if os.path.isabs(self.options.zip_path):
-                return self.options.zip_path
-            return os.path.join(self.project_path, self.options.zip_path)
+    def get_zip_output_path(self) -> str:
+        """Returns absolute zip output path from arguments"""
+        if self.options.zip_output_path:
+            if os.path.isabs(self.options.zip_output_path):
+                return self.options.zip_output_path
+            return os.path.join(self.project_path, self.options.zip_output_path)
         return os.path.abspath(os.path.join(self.program_path, 'dist'))
 
     # program arguments

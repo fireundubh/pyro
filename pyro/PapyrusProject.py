@@ -3,6 +3,7 @@ import io
 import os
 import re
 import sys
+import zipfile
 
 from lxml import etree
 
@@ -64,6 +65,16 @@ class PapyrusProject(ProjectBase):
         self.options.bsarch = PapyrusProject._get_attr_as_bool(self.root_node, 'Package')
         self.options.zip = PapyrusProject._get_attr_as_bool(self.root_node, 'Zip')
 
+        self.packages_node = ElementHelper.get(self.root_node, 'Packages')
+        self.zipfile_node = ElementHelper.get(self.root_node, 'ZipFile')
+
+        if self.options.zip:
+            if self.zipfile_node is None:
+                PapyrusProject.log.error('Zip is enabled but the ZipFile node is undefined. Setting Zip to false.')
+                self.options.zip = False
+            else:
+                self._setup_zipfile_options()
+
         # we need to populate the list of import paths before we try to determine the game type
         # because the game type can be determined from import paths
         self.import_paths: list = self._get_import_paths()
@@ -117,6 +128,35 @@ class PapyrusProject(ProjectBase):
         # game type must be set before we call this
         if not self.options.game_path:
             self.options.game_path = self.get_game_path()
+
+    def _setup_zipfile_options(self) -> None:
+        self.zip_root_path = self.parse(self.zipfile_node.get('RootDir', default=self.project_path))
+
+        # zip - required attribute
+        if not os.path.isabs(self.zip_root_path):
+            test_path: str = os.path.normpath(os.path.join(self.project_path, self.zip_root_path))
+
+            if os.path.isdir(test_path):
+                self.zip_root_path = test_path
+            else:
+                PapyrusProject.log.error('Cannot resolve RootDir path to existing folder: "%s"' % self.zip_root_path)
+                sys.exit(1)
+
+        # zip - optional attributes
+        self.zip_file_name: str = self.parse(self.zipfile_node.get('Name', default=self.project_name))
+        if not self.zip_file_name.casefold().endswith('.zip'):
+            self.zip_file_name = '%s.zip' % self.zip_file_name
+
+        if not self.options.zip_output_path:
+            self.options.zip_output_path = self.parse(self.zipfile_node.get('Output', default=self.project_path))
+
+        if not self.options.zip_compression:
+            self.options.zip_compression = self.parse(self.zipfile_node.get('Compression', default='deflate').casefold())
+
+        if self.options.zip_compression not in ('store', 'deflate'):
+            self.options.zip_compression = 'deflate'
+
+        self.compress_type: int = zipfile.ZIP_STORED if self.options.zip_compression == 'store' else zipfile.ZIP_DEFLATED
 
     @staticmethod
     def _get_attr_as_bool(node: etree.ElementBase, attribute_name: str, default_value: str = 'false') -> bool:
