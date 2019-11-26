@@ -21,13 +21,13 @@
             <xs:attribute name="Game" type="ppj:gameType"/>
             <xs:attribute name="Output" type="xs:string"/>
             <xs:attribute name="Flags" type="xs:string"/>
-            <xs:attribute name="Asm" type="ppj:asmType"/>
-            <xs:attribute name="Optimize" type="ppj:bool"/>
-            <xs:attribute name="Release" type="ppj:bool"/>
-            <xs:attribute name="Final" type="ppj:bool"/>
-            <xs:attribute name="Anonymize" type="ppj:bool"/>
-            <xs:attribute name="Package" type="ppj:bool"/>
-            <xs:attribute name="Zip" type="ppj:bool"/>
+            <xs:attribute name="Asm" type="ppj:asmType" default="none"/>
+            <xs:attribute name="Optimize" type="ppj:bool" default="false"/>
+            <xs:attribute name="Release" type="ppj:bool" default="false"/>
+            <xs:attribute name="Final" type="ppj:bool" default="false"/>
+            <xs:attribute name="Anonymize" type="ppj:bool" default="false"/>
+            <xs:attribute name="Package" type="ppj:bool" default="false"/>
+            <xs:attribute name="Zip" type="ppj:bool" default="false"/>
         </xs:complexType>
     </xs:element>
     <xs:complexType name="variableList">
@@ -66,20 +66,20 @@
             <xs:element maxOccurs="unbounded" ref="Include"/>
         </xs:sequence>
         <xs:attribute name="Name" type="xs:string"/>
-        <xs:attribute name="RootDir" use="required" type="xs:string"/>
+        <xs:attribute name="RootDir" type="xs:string" use="required"/>
         <xs:attribute name="Output" type="xs:string"/>
-        <xs:attribute name="Compression" type="ppj:compressionType"/>
+        <xs:attribute name="Compression" type="ppj:compressionType" default="deflate"/>
     </xs:complexType>
     <xs:complexType name="variable">
-        <xs:attribute name="Name" use="required" type="xs:string"/>
-        <xs:attribute name="Value" use="required" type="xs:string"/>
+        <xs:attribute name="Name" type="xs:string" use="required"/>
+        <xs:attribute name="Value" type="xs:string" use="required"/>
     </xs:complexType>
     <xs:simpleType name="asmType">
         <xs:restriction base="xs:string">
-            <xs:enumeration value="None"/>
-            <xs:enumeration value="Keep"/>
-            <xs:enumeration value="Only"/>
-            <xs:enumeration value="Discard"/>
+            <xs:pattern value="[nN][oO][nN][eE]"/>
+            <xs:pattern value="[kK][eE][eE][pP]"/>
+            <xs:pattern value="[oO][nN][lL][yY]"/>
+            <xs:pattern value="[dD][iI][sS][cC][aA][rR][dD]"/>
         </xs:restriction>
     </xs:simpleType>
     <xs:simpleType name="bool">
@@ -104,12 +104,12 @@
     </xs:simpleType>
     <xs:element name="Folder">
         <xs:complexType mixed="true">
-            <xs:attribute name="NoRecurse" type="ppj:bool"/>
+            <xs:attribute name="NoRecurse" type="ppj:bool" default="false"/>
         </xs:complexType>
     </xs:element>
     <xs:element name="Include">
         <xs:complexType mixed="true">
-            <xs:attribute name="NoRecurse" type="ppj:bool"/>
+            <xs:attribute name="NoRecurse" type="ppj:bool" default="false"/>
         </xs:complexType>
     </xs:element>
     <xs:element name="Package">
@@ -118,7 +118,7 @@
                 <xs:element maxOccurs="unbounded" ref="Include"/>
             </xs:sequence>
             <xs:attribute name="Name" type="xs:string"/>
-            <xs:attribute name="RootDir" use="required" type="xs:string"/>
+            <xs:attribute name="RootDir" type="xs:string" use="required"/>
         </xs:complexType>
     </xs:element>
 </xs:schema>
