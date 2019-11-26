@@ -19,30 +19,10 @@ class PackageManager(Logger):
     def __init__(self, ppj: PapyrusProject) -> None:
         self.ppj = ppj
         self.options = ppj.options
-        self.options.package_path = self._get_output_path() if not self.options.package_path else self.ppj.project_path
-
-        if not os.path.exists(self.options.package_path):
-            os.makedirs(self.options.package_path, exist_ok=True)
 
         self.extension: str = '.ba2' if self.options.game_type == 'fo4' else '.bsa'
 
         self.package_paths: list = []
-
-    def _get_output_path(self) -> str:
-        # use package output path if set in ppj, otherwise use default path
-        packages_node = ElementHelper.get(self.ppj.root_node, 'Packages')
-
-        if packages_node is None:
-            return self.options.package_path
-
-        output_path: str = self.ppj.parse(packages_node.get('Output', default=self.options.package_path))
-
-        if output_path == os.curdir:
-            output_path = self.ppj.project_path
-        elif output_path == os.pardir or not os.path.isabs(output_path):
-            output_path = os.path.join(self.ppj.project_path, output_path)
-
-        return os.path.normpath(output_path)
 
     def _fix_package_extension(self, package_name: str) -> str:
         if not package_name.casefold().endswith(('.ba2', '.bsa')):
@@ -121,12 +101,15 @@ class PackageManager(Logger):
 
     def create_packages(self) -> None:
         if self.ppj.packages_node is None:
-            PackageManager.log.warning('Package is enabled but the Packages node is undefined. No package will be created.')
             return
 
         # clear temporary data
         if os.path.exists(self.options.temp_path):
             shutil.rmtree(self.options.temp_path, ignore_errors=True)
+
+        # ensure package path exists
+        if not os.path.exists(self.options.package_path):
+            os.makedirs(self.options.package_path, exist_ok=True)
 
         for i, package_node in enumerate(self.ppj.packages_node):
             if not package_node.tag.endswith('Package'):

@@ -66,6 +66,14 @@ class PapyrusProject(ProjectBase):
         self.options.zip = PapyrusProject._get_attr_as_bool(self.root_node, 'Zip')
 
         self.packages_node = ElementHelper.get(self.root_node, 'Packages')
+
+        if self.options.bsarch:
+            if self.packages_node is None:
+                PapyrusProject.log.error('Package is enabled but the Packages node is undefined. Setting Package to false.')
+                self.options.bsarch = False
+            else:
+                self.options.package_path = self.parse(self.packages_node.get('Output', default=self.options.package_path))
+
         self.zipfile_node = ElementHelper.get(self.root_node, 'ZipFile')
 
         if self.options.zip:
@@ -147,8 +155,7 @@ class PapyrusProject(ProjectBase):
         if not self.zip_file_name.casefold().endswith('.zip'):
             self.zip_file_name = '%s.zip' % self.zip_file_name
 
-        if not self.options.zip_output_path:
-            self.options.zip_output_path = self.parse(self.zipfile_node.get('Output', default=self.project_path))
+        self.options.zip_output_path = self.parse(self.zipfile_node.get('Output', default=self.options.zip_output_path))
 
         if not self.options.zip_compression:
             self.options.zip_compression = self.parse(self.zipfile_node.get('Compression', default='deflate').casefold())
