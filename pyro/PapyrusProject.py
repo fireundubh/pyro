@@ -40,6 +40,9 @@ class PapyrusProject(ProjectBase):
         variables_node = ElementHelper.get(self.root_node, 'Variables')
         if variables_node is not None:
             for variable_node in variables_node:
+                if not variable_node.tag.endswith('Variable'):
+                    continue
+
                 var_key = variable_node.get('Name', default='')
                 var_value = variable_node.get('Value', default='')
 
@@ -57,11 +60,9 @@ class PapyrusProject(ProjectBase):
         self.release: bool = PapyrusProject._get_attr_as_bool(self.root_node, 'Release')
         self.final: bool = PapyrusProject._get_attr_as_bool(self.root_node, 'Final')
 
-        if not self.options.bsarch:
-            self.options.bsarch = PapyrusProject._get_attr_as_bool(self.root_node, 'Package')
-
-        if not self.options.anonymize:
-            self.options.anonymize = PapyrusProject._get_attr_as_bool(self.root_node, 'Anonymize')
+        self.options.anonymize = PapyrusProject._get_attr_as_bool(self.root_node, 'Anonymize')
+        self.options.bsarch = PapyrusProject._get_attr_as_bool(self.root_node, 'Package')
+        self.options.zip = PapyrusProject._get_attr_as_bool(self.root_node, 'Zip')
 
         # we need to populate the list of import paths before we try to determine the game type
         # because the game type can be determined from import paths
@@ -120,7 +121,7 @@ class PapyrusProject(ProjectBase):
     @staticmethod
     def _get_attr_as_bool(node: etree.ElementBase, attribute_name: str, default_value: str = 'false') -> bool:
         attr: str = node.get(attribute_name, default=default_value).casefold()
-        return any([attr == value for value in ('true', '1')])
+        return any([attr == 'true', attr == '1'])
 
     @staticmethod
     def _strip_xml_comments(path: str) -> io.StringIO:
@@ -157,6 +158,9 @@ class PapyrusProject(ProjectBase):
             return []
 
         for import_node in import_nodes:
+            if not import_node.tag.endswith('Import'):
+                continue
+
             if not import_node.text:
                 continue
 
@@ -186,6 +190,9 @@ class PapyrusProject(ProjectBase):
             return []
 
         for folder_node in folder_nodes:
+            if not folder_node.tag.endswith('Folder'):
+                continue
+
             if not folder_node.text:
                 continue
 
@@ -287,6 +294,9 @@ class PapyrusProject(ProjectBase):
         folder_paths: list = []
 
         for folder_node in folder_nodes:
+            if not folder_node.tag.endswith('Folder'):
+                continue
+
             folder_text: str = self.parse(folder_node.text)
 
             if folder_text == os.pardir:
@@ -337,6 +347,9 @@ class PapyrusProject(ProjectBase):
             return []
 
         for script_node in script_nodes:
+            if not script_node.tag.endswith('Script'):
+                continue
+
             psc_path: str = self.parse(script_node.text)
 
             if ':' in psc_path:
