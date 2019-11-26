@@ -13,6 +13,7 @@ class ProjectOptions:
     # build arguments
     anonymize: bool = field(init=False, default_factory=bool)
     bsarch: bool = field(init=False, default_factory=bool)
+    zip: bool = field(init=False, default_factory=bool)
     no_incremental_build: bool = field(init=False, default_factory=bool)
     no_parallel: bool = field(init=False, default_factory=bool)
     worker_limit: int = field(init=False, default_factory=int)
@@ -31,6 +32,10 @@ class ProjectOptions:
     bsarch_path: str = field(init=False, default_factory=str)
     package_path: str = field(init=False, default_factory=str)
     temp_path: str = field(init=False, default_factory=str)
+
+    # zip arguments
+    zip_compression: str = field(init=False, default_factory=str)
+    zip_path: str = field(init=False, default_factory=str)
 
     # program arguments
     log_path: str = field(init=False, default_factory=str)

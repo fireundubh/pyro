@@ -158,6 +158,15 @@ class ProjectBase(Logger):
             return os.path.join(os.getcwd(), self.options.temp_path)
         return os.path.abspath(os.path.join(self.program_path, 'temp'))
 
+    # zip arguments
+    def get_zip_path(self) -> str:
+        """Returns absolute zip path from arguments"""
+        if self.options.zip_path:
+            if os.path.isabs(self.options.zip_path):
+                return self.options.zip_path
+            return os.path.join(self.project_path, self.options.zip_path)
+        return os.path.abspath(os.path.join(self.program_path, 'dist'))
+
     # program arguments
     def get_game_type(self) -> str:
         """Returns game type from arguments or Papyrus Project"""

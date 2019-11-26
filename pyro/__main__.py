@@ -88,10 +88,7 @@ class Application(Logger):
         else:
             Application.log.warning('Cannot anonymize scripts because anonymization was disabled by user')
 
-        if ppj.options.bsarch and ppj.options.bsarch_path:
-            build.try_pack()
-        else:
-            Application.log.warning('Cannot build package because packaging was disabled by user')
+        build.try_pack()
 
         time_elapsed.print(callback_func=Application.log.info)
 
@@ -122,6 +119,9 @@ if __name__ == '__main__':
     _build_arguments.add_argument('--bsarch',
                                   action='store_true', default=False,
                                   help='create package with bsarch')
+    _build_arguments.add_argument('--zip',
+                                  action='store_true', default=False,
+                                  help='create distributable zip archive')
     _build_arguments.add_argument('--no-incremental-build',
                                   action='store_true', default=False,
                                   help='do not build incrementally')
@@ -176,6 +176,16 @@ if __name__ == '__main__':
                                    action='store', type=str,
                                    help='relative or absolute path to temp folder\n'
                                         '(if relative, must be relative to current working directory)')
+
+    _zip_arguments = _parser.add_argument_group('zip arguments')
+    _zip_arguments.add_argument('--zip-compression',
+                                action='store', type=str,
+                                choices={'store', 'deflate'},
+                                help='set compression method (choices: store, deflate)')
+    _zip_arguments.add_argument('--zip-path',
+                                action='store', type=str,
+                                help='relative or absolute path to zip output folder\n'
+                                     '(if relative, must be relative to project)')
 
     _program_arguments = _parser.add_argument_group('program arguments')
     _program_arguments.add_argument('--log-path',

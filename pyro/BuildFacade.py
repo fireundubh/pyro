@@ -21,7 +21,7 @@ class BuildFacade(Logger):
 
         # WARN: if methods are renamed and their respective option names are not, this will break.
         for key in self.ppj.options.__dict__:
-            if key in ('args', 'input_path', 'worker_limit', 'anonymize', 'bsarch') or key.startswith('no_'):
+            if key in ('args', 'input_path', 'worker_limit', 'anonymize', 'bsarch', 'zip', 'zip_compression') or key.startswith('no_'):
                 continue
             setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
 
@@ -141,6 +141,15 @@ class BuildFacade(Logger):
                 Anonymizer.anonymize_script(pex_path)
 
     def try_pack(self) -> None:
-        """Generates ZIP archive for project"""
+        """Generates BSA/BA2 packages for project"""
         package_manager = PackageManager(self.ppj)
-        package_manager.create_archive()
+
+        if self.ppj.options.bsarch and os.path.isfile(self.ppj.options.bsarch_path):
+            package_manager.create_packages()
+        else:
+            BuildFacade.log.warning('Cannot create package(s) because packaging was disabled by user')
+
+        if self.ppj.options.zip:
+            package_manager.create_zip()
+        else:
+            BuildFacade.log.warning('Cannot create archive because zipping was disabled by user')
