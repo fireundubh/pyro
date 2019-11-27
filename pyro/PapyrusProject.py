@@ -204,7 +204,7 @@ class PapyrusProject(ProjectBase):
                 object_name = os.path.basename(psc_path)
 
             pex_path: str = os.path.join(self.options.output_path, object_name.replace('.psc', '.pex'))
-            if os.path.exists(pex_path):
+            if os.path.isfile(pex_path):
                 continue
 
             results.append(psc_path)
@@ -238,7 +238,7 @@ class PapyrusProject(ProjectBase):
                 # relative import paths should be relative to the project
                 import_path = os.path.normpath(os.path.join(self.project_path, import_path))
 
-            if os.path.exists(import_path):
+            if os.path.isdir(import_path):
                 results.append(import_path)
 
         return PathHelper.uniqify(results)
@@ -261,11 +261,11 @@ class PapyrusProject(ProjectBase):
             folder_path: str = os.path.normpath(self.parse(folder_node.text))
 
             if os.path.isabs(folder_path):
-                if os.path.exists(folder_path):
+                if os.path.isdir(folder_path):
                     implicit_paths.append(folder_path)
             else:
                 test_path = os.path.join(self.project_path, folder_path)
-                if os.path.exists(test_path):
+                if os.path.isdir(test_path):
                     implicit_paths.append(test_path)
 
         return PathHelper.uniqify(implicit_paths)
@@ -278,7 +278,7 @@ class PapyrusProject(ProjectBase):
             for import_path in self.import_paths:
                 relpath = os.path.relpath(os.path.dirname(psc_path), import_path)
                 test_path = os.path.normpath(os.path.join(import_path, relpath))
-                if os.path.exists(test_path):
+                if os.path.isdir(test_path):
                     implicit_paths.append(test_path)
 
         return PathHelper.uniqify(implicit_paths)
@@ -320,13 +320,13 @@ class PapyrusProject(ProjectBase):
         # convert user paths to absolute paths
         for path in paths:
             # try to add existing absolute paths
-            if os.path.isabs(path) and os.path.exists(path):
+            if os.path.isabs(path) and os.path.isfile(path):
                 results.append(path)
                 continue
 
             # try to add existing project-relative paths
             test_path = os.path.join(self.project_path, path)
-            if os.path.exists(test_path):
+            if os.path.isfile(test_path):
                 results.append(test_path)
                 continue
 
@@ -336,7 +336,7 @@ class PapyrusProject(ProjectBase):
                     import_path = os.path.join(self.project_path, import_path)
 
                 test_path = os.path.join(import_path, path)
-                if os.path.exists(test_path):
+                if os.path.isfile(test_path):
                     results.append(test_path)
                     break
 
@@ -432,7 +432,7 @@ class PapyrusProject(ProjectBase):
                     matching_path = pex_path
                     break
 
-            if not os.path.exists(matching_path):
+            if not os.path.isfile(matching_path):
                 continue
 
             try:

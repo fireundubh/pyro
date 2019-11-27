@@ -58,7 +58,7 @@ class Application(Logger):
 
         self.args.input_path = input_path
 
-        if not os.path.exists(self.args.input_path):
+        if not os.path.isfile(self.args.input_path):
             Application.log.error('Cannot load PPJ at given path because file does not exist: "%s"' % self.args.input_path)
             sys.exit(print_help())
 

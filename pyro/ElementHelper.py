@@ -14,7 +14,7 @@ class ElementHelper(Logger):
         if namespace:
             schema_path = os.path.join(program_path, namespace[0])
 
-            if os.path.exists(schema_path):
+            if os.path.isfile(schema_path):
                 schema = etree.parse(schema_path)
                 return etree.XMLSchema(schema)
 
