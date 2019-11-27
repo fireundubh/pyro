@@ -193,15 +193,19 @@ class PapyrusProject(ProjectBase):
             xml_document = comments_pattern.sub('', xml_document)
         return io.StringIO(xml_document)
 
+    def _calculate_object_name(self, psc_path: str) -> str:
+        if self.options.game_type == 'fo4':
+            object_name = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
+        else:
+            object_name = os.path.basename(psc_path)
+        return object_name
+
     def _find_missing_script_paths(self) -> list:
         """Returns list of script paths for compiled scripts that do not exist"""
         results: list = []
 
         for psc_path in self.psc_paths:
-            if self.options.game_type == 'fo4':
-                object_name = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
-            else:
-                object_name = os.path.basename(psc_path)
+            object_name = self._calculate_object_name(psc_path)
 
             pex_path: str = os.path.join(self.options.output_path, object_name.replace('.psc', '.pex'))
             if os.path.isfile(pex_path):
@@ -290,10 +294,7 @@ class PapyrusProject(ProjectBase):
         pex_paths: list = []
 
         for psc_path in self.psc_paths:
-            if self.options.game_type == 'fo4':
-                object_name = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
-            else:
-                object_name = os.path.basename(psc_path)
+            object_name = self._calculate_object_name(psc_path)
 
             pex_path = os.path.join(self.options.output_path, object_name.replace('.psc', '.pex'))
 
