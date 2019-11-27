@@ -38,34 +38,9 @@ class PapyrusProject(ProjectBase):
                 PapyrusProject.log.error('Failed to validate XML Schema.%s\t%s' % (os.linesep, e))
                 sys.exit(1)
 
-        reserved_characters: tuple = ('!', '#', '$', '%', '^', '&', '*')
-
         variables_node = ElementHelper.get(self.root_node, 'Variables')
         if variables_node is not None:
-            for variable_node in variables_node:
-                if not variable_node.tag.endswith('Variable'):
-                    continue
-
-                var_key = variable_node.get('Name', default='')
-                var_value = variable_node.get('Value', default='')
-
-                if any([not var_key, not var_value]):
-                    continue
-
-                if not var_key.isalnum():
-                    PapyrusProject.log.error('The name of the variable "%s" must be an alphanumeric string.' % var_key)
-                    sys.exit(1)
-
-                if any([c in reserved_characters for c in var_value]):
-                    PapyrusProject.log.error('The value of the variable "%s" contains a reserved character.' % var_key)
-                    sys.exit(1)
-
-                self.variables.update({var_key: var_value})
-
-            # allow variables to reference other variables
-            for var_key in self.variables:
-                var_value = self.variables[var_key]
-                self.variables.update({var_key: self.parse(var_value)})
+            self._parse_variables(variables_node)
 
         # we need to parse all PapyrusProject attributes after validating and before we do anything else
         # options can be overridden by arguments when the BuildFacade is initialized
@@ -151,6 +126,39 @@ class PapyrusProject(ProjectBase):
         # game type must be set before we call this
         if not self.options.game_path:
             self.options.game_path = self.get_game_path()
+
+    def _parse_variables(self, variables_node: etree.ElementBase) -> None:
+        reserved_characters: tuple = ('!', '#', '$', '%', '^', '&', '*')
+
+        for variable_node in variables_node:
+            if not variable_node.tag.endswith('Variable'):
+                continue
+
+            var_key = variable_node.get('Name', default='')
+            var_value = variable_node.get('Value', default='')
+
+            if any([not var_key, not var_value]):
+                continue
+
+            if not var_key.isalnum():
+                PapyrusProject.log.error('The name of the variable "%s" must be an alphanumeric string.' % var_key)
+                sys.exit(1)
+
+            if any([c in reserved_characters for c in var_value]):
+                PapyrusProject.log.error('The value of the variable "%s" contains a reserved character.' % var_key)
+                sys.exit(1)
+
+            self.variables.update({var_key: var_value})
+
+        # allow variables to reference other variables
+        for var_key in self.variables:
+            var_value = self.variables[var_key]
+            self.variables.update({var_key: self.parse(var_value)})
+
+        # complete round trip so that order does not matter
+        for var_key in reversed([var_key for var_key in self.variables]):
+            var_value = self.variables[var_key]
+            self.variables.update({var_key: self.parse(var_value)})
 
     def _setup_zipfile_options(self) -> None:
         self.zip_root_path = self.parse(self.zipfile_node.get('RootDir', default=self.project_path))
