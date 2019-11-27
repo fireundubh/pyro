@@ -38,6 +38,8 @@ class PapyrusProject(ProjectBase):
                 PapyrusProject.log.error('Failed to validate XML Schema.%s\t%s' % (os.linesep, e))
                 sys.exit(1)
 
+        reserved_characters: tuple = ('!', '#', '$', '%', '^', '&', '*')
+
         variables_node = ElementHelper.get(self.root_node, 'Variables')
         if variables_node is not None:
             for variable_node in variables_node:
@@ -50,7 +52,20 @@ class PapyrusProject(ProjectBase):
                 if any([not var_key, not var_value]):
                     continue
 
+                if any([c.isspace() or c == '@' or c in reserved_characters for c in var_key]):
+                    PapyrusProject.log.error('Variable "%s" contains a reserved character.' % var_key)
+                    sys.exit(1)
+
+                if any([c in reserved_characters for c in var_value]):
+                    PapyrusProject.log.error('Variable "%s" value contains a reserved character.' % var_key)
+                    sys.exit(1)
+
                 self.variables.update({var_key: var_value})
+
+            # allow variables to reference other variables
+            for var_key in self.variables:
+                var_value = self.variables[var_key]
+                self.variables.update({var_key: self.parse(var_value)})
 
         # we need to parse all PapyrusProject attributes after validating and before we do anything else
         # options can be overridden by arguments when the BuildFacade is initialized
@@ -376,8 +391,6 @@ class PapyrusProject(ProjectBase):
                 if os.path.isdir(test_path):
                     folder_paths.append((test_path, no_recurse))
                     continue
-
-            PapyrusProject.log.warning('Cannot resolve folder path: "%s"' % folder_node.text)
 
         for folder_path, no_recurse in folder_paths:
             search_path: str = os.path.join(folder_path, '*' if no_recurse else '**\*')
