@@ -52,12 +52,12 @@ class PapyrusProject(ProjectBase):
                 if any([not var_key, not var_value]):
                     continue
 
-                if any([c.isspace() or c == '@' or c in reserved_characters for c in var_key]):
-                    PapyrusProject.log.error('Variable "%s" contains a reserved character.' % var_key)
+                if not var_key.isalnum():
+                    PapyrusProject.log.error('The name of the variable "%s" must be an alphanumeric string.' % var_key)
                     sys.exit(1)
 
                 if any([c in reserved_characters for c in var_value]):
-                    PapyrusProject.log.error('Variable "%s" value contains a reserved character.' % var_key)
+                    PapyrusProject.log.error('The value of the variable "%s" contains a reserved character.' % var_key)
                     sys.exit(1)
 
                 self.variables.update({var_key: var_value})
