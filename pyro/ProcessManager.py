@@ -36,13 +36,7 @@ class ProcessManager(Logger):
                         archive_time = line.split('in')[1].strip()[:-1]
                         hours, minutes, seconds = [round(float(n), 2) for n in archive_time.split(':')]
 
-                        timecode = ''
-                        if hours > 0.0 and minutes > 0.0 and seconds > 0.0:
-                            timecode = '%sh %sm %ss' % (hours, minutes, seconds)
-                        elif hours == 0.0 and minutes > 0.0 and seconds > 0.0:
-                            timecode = '%sm %ss' % (minutes, seconds)
-                        elif hours == 0.0 and minutes == 0.0 and seconds > 0.0:
-                            timecode = '%ss' % seconds
+                        timecode = ProcessManager._format_time(hours, minutes, seconds)
 
                         ProcessManager.log.info('Packaging time: %s' % timecode)
                         continue
@@ -67,3 +61,13 @@ class ProcessManager(Logger):
             return -1
 
         return 0
+
+    @staticmethod
+    def _format_time(hours: float, minutes: float, seconds: float) -> str:
+        if hours > 0.0 and minutes > 0.0 and seconds > 0.0:
+            return '%sh %sm %ss' % (hours, minutes, seconds)
+        if hours == 0.0 and minutes > 0.0 and seconds > 0.0:
+            return '%sm %ss' % (minutes, seconds)
+        if hours == 0.0 and minutes == 0.0 and seconds > 0.0:
+            return '%ss' % seconds
+        return '%sh %sm %ss' % (hours, minutes, seconds)

@@ -62,7 +62,7 @@ class PackageManager(Logger):
             include_path: str = os.path.normpath(include_text)
 
             # populate files list using absolute paths
-            if os.path.isabs(include_path) and os.path.exists(include_path):
+            if os.path.isabs(include_path) and os.path.isfile(include_path):
                 if root_path not in include_path:
                     PackageManager.log.warning('Cannot include path outside RootDir: "%s"' % include_path)
                     continue
@@ -104,11 +104,11 @@ class PackageManager(Logger):
             return
 
         # clear temporary data
-        if os.path.exists(self.options.temp_path):
+        if os.path.isdir(self.options.temp_path):
             shutil.rmtree(self.options.temp_path, ignore_errors=True)
 
         # ensure package path exists
-        if not os.path.exists(self.options.package_path):
+        if not os.path.isdir(self.options.package_path):
             os.makedirs(self.options.package_path, exist_ok=True)
 
         for i, package_node in enumerate(self.ppj.packages_node):
@@ -145,7 +145,7 @@ class PackageManager(Logger):
             ProcessManager.run(commands, use_bsarch=True)
 
             # clear temporary data
-            if os.path.exists(self.options.temp_path):
+            if os.path.isdir(self.options.temp_path):
                 shutil.rmtree(self.options.temp_path, ignore_errors=True)
 
     def create_zip(self) -> None:

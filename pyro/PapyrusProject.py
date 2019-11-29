@@ -38,34 +38,9 @@ class PapyrusProject(ProjectBase):
                 PapyrusProject.log.error('Failed to validate XML Schema.%s\t%s' % (os.linesep, e))
                 sys.exit(1)
 
-        reserved_characters: tuple = ('!', '#', '$', '%', '^', '&', '*')
-
         variables_node = ElementHelper.get(self.root_node, 'Variables')
         if variables_node is not None:
-            for variable_node in variables_node:
-                if not variable_node.tag.endswith('Variable'):
-                    continue
-
-                var_key = variable_node.get('Name', default='')
-                var_value = variable_node.get('Value', default='')
-
-                if any([not var_key, not var_value]):
-                    continue
-
-                if not var_key.isalnum():
-                    PapyrusProject.log.error('The name of the variable "%s" must be an alphanumeric string.' % var_key)
-                    sys.exit(1)
-
-                if any([c in reserved_characters for c in var_value]):
-                    PapyrusProject.log.error('The value of the variable "%s" contains a reserved character.' % var_key)
-                    sys.exit(1)
-
-                self.variables.update({var_key: var_value})
-
-            # allow variables to reference other variables
-            for var_key in self.variables:
-                var_value = self.variables[var_key]
-                self.variables.update({var_key: self.parse(var_value)})
+            self._parse_variables(variables_node)
 
         # we need to parse all PapyrusProject attributes after validating and before we do anything else
         # options can be overridden by arguments when the BuildFacade is initialized
@@ -152,6 +127,39 @@ class PapyrusProject(ProjectBase):
         if not self.options.game_path:
             self.options.game_path = self.get_game_path()
 
+    def _parse_variables(self, variables_node: etree.ElementBase) -> None:
+        reserved_characters: tuple = ('!', '#', '$', '%', '^', '&', '*')
+
+        for variable_node in variables_node:
+            if not variable_node.tag.endswith('Variable'):
+                continue
+
+            var_key = variable_node.get('Name', default='')
+            var_value = variable_node.get('Value', default='')
+
+            if any([not var_key, not var_value]):
+                continue
+
+            if not var_key.isalnum():
+                PapyrusProject.log.error('The name of the variable "%s" must be an alphanumeric string.' % var_key)
+                sys.exit(1)
+
+            if any([c in reserved_characters for c in var_value]):
+                PapyrusProject.log.error('The value of the variable "%s" contains a reserved character.' % var_key)
+                sys.exit(1)
+
+            self.variables.update({var_key: var_value})
+
+        # allow variables to reference other variables
+        for var_key in self.variables:
+            var_value = self.variables[var_key]
+            self.variables.update({var_key: self.parse(var_value)})
+
+        # complete round trip so that order does not matter
+        for var_key in reversed([var_key for var_key in self.variables]):
+            var_value = self.variables[var_key]
+            self.variables.update({var_key: self.parse(var_value)})
+
     def _setup_zipfile_options(self) -> None:
         self.zip_root_path = self.parse(self.zipfile_node.get('RootDir', default=self.project_path))
 
@@ -193,18 +201,22 @@ class PapyrusProject(ProjectBase):
             xml_document = comments_pattern.sub('', xml_document)
         return io.StringIO(xml_document)
 
+    def _calculate_object_name(self, psc_path: str) -> str:
+        if self.options.game_type == 'fo4':
+            object_name = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
+        else:
+            object_name = os.path.basename(psc_path)
+        return object_name
+
     def _find_missing_script_paths(self) -> list:
         """Returns list of script paths for compiled scripts that do not exist"""
         results: list = []
 
         for psc_path in self.psc_paths:
-            if self.options.game_type == 'fo4':
-                object_name = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
-            else:
-                object_name = os.path.basename(psc_path)
+            object_name = self._calculate_object_name(psc_path)
 
             pex_path: str = os.path.join(self.options.output_path, object_name.replace('.psc', '.pex'))
-            if os.path.exists(pex_path):
+            if os.path.isfile(pex_path):
                 continue
 
             results.append(psc_path)
@@ -238,7 +250,7 @@ class PapyrusProject(ProjectBase):
                 # relative import paths should be relative to the project
                 import_path = os.path.normpath(os.path.join(self.project_path, import_path))
 
-            if os.path.exists(import_path):
+            if os.path.isdir(import_path):
                 results.append(import_path)
 
         return PathHelper.uniqify(results)
@@ -261,11 +273,11 @@ class PapyrusProject(ProjectBase):
             folder_path: str = os.path.normpath(self.parse(folder_node.text))
 
             if os.path.isabs(folder_path):
-                if os.path.exists(folder_path):
+                if os.path.isdir(folder_path):
                     implicit_paths.append(folder_path)
             else:
                 test_path = os.path.join(self.project_path, folder_path)
-                if os.path.exists(test_path):
+                if os.path.isdir(test_path):
                     implicit_paths.append(test_path)
 
         return PathHelper.uniqify(implicit_paths)
@@ -278,7 +290,7 @@ class PapyrusProject(ProjectBase):
             for import_path in self.import_paths:
                 relpath = os.path.relpath(os.path.dirname(psc_path), import_path)
                 test_path = os.path.normpath(os.path.join(import_path, relpath))
-                if os.path.exists(test_path):
+                if os.path.isdir(test_path):
                     implicit_paths.append(test_path)
 
         return PathHelper.uniqify(implicit_paths)
@@ -290,10 +302,7 @@ class PapyrusProject(ProjectBase):
         pex_paths: list = []
 
         for psc_path in self.psc_paths:
-            if self.options.game_type == 'fo4':
-                object_name = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
-            else:
-                object_name = os.path.basename(psc_path)
+            object_name = self._calculate_object_name(psc_path)
 
             pex_path = os.path.join(self.options.output_path, object_name.replace('.psc', '.pex'))
 
@@ -320,13 +329,13 @@ class PapyrusProject(ProjectBase):
         # convert user paths to absolute paths
         for path in paths:
             # try to add existing absolute paths
-            if os.path.isabs(path) and os.path.exists(path):
+            if os.path.isabs(path) and os.path.isfile(path):
                 results.append(path)
                 continue
 
             # try to add existing project-relative paths
             test_path = os.path.join(self.project_path, path)
-            if os.path.exists(test_path):
+            if os.path.isfile(test_path):
                 results.append(test_path)
                 continue
 
@@ -336,7 +345,7 @@ class PapyrusProject(ProjectBase):
                     import_path = os.path.join(self.project_path, import_path)
 
                 test_path = os.path.join(import_path, path)
-                if os.path.exists(test_path):
+                if os.path.isfile(test_path):
                     results.append(test_path)
                     break
 
@@ -432,7 +441,7 @@ class PapyrusProject(ProjectBase):
                     matching_path = pex_path
                     break
 
-            if not os.path.exists(matching_path):
+            if not os.path.isfile(matching_path):
                 continue
 
             try:

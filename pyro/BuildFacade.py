@@ -57,7 +57,7 @@ class BuildFacade(Logger):
         })
 
     def _rotate_logs(self, keep_count: int) -> None:
-        if not os.path.exists(self.ppj.options.log_path):
+        if not os.path.isdir(self.ppj.options.log_path):
             return
 
         # because we're rotating at start, account for new log file
@@ -90,7 +90,7 @@ class BuildFacade(Logger):
                 continue
 
             pex_path: str = pex_match[0]
-            if not os.path.exists(pex_path):
+            if not os.path.isfile(pex_path):
                 continue
 
             try:
@@ -139,7 +139,7 @@ class BuildFacade(Logger):
         else:
             # these are absolute paths. there's no reason to manipulate them.
             for pex_path in self.ppj.pex_paths:
-                if not os.path.exists(pex_path):
+                if not os.path.isfile(pex_path):
                     BuildFacade.log.warning('Cannot locate file to anonymize: "%s"' % pex_path)
                     continue
 

@@ -7,8 +7,8 @@ verify_ssl = true
 mypy = "==0.740"
 
 [packages]
-lxml = "==4.4.1"
+lxml = "==4.4.2"
 nuitka = "==0.6.5"
 
 [requires]
-python_version = "3.7"
+python_version = "3.7.5"
