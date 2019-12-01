@@ -85,6 +85,7 @@ class Application:
 
         Application.log.warning('Cleaning: "%s"' % self.dist_path)
         shutil.rmtree(self.dist_path, ignore_errors=True)
+        os.makedirs(self.dist_path, exist_ok=True)
 
         fail_state: int = 0
 
@@ -117,9 +118,7 @@ class Application:
                     environ[key] = value
 
         args: list = [
-            'pipenv',
-            'run',
-            'nuitka',
+            sys.executable, '-m', 'nuitka',
             '--standalone', 'pyro',
             '--include-package=pyro',
             '--experimental=use_pefile',
@@ -131,11 +130,10 @@ class Application:
             '--file-reference-choice=runtime'
         ]
 
-        command: str = ' '.join(args)
-
         try:
-            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True, env=environ)
+            process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True, env=environ)
         except FileNotFoundError:
+            Application.log.error('Cannot run command: %s' % ' '.join(args))
             fail_state = 1
 
         if fail_state == 0:
@@ -173,7 +171,8 @@ class Application:
 
                 Application.log.info(line)
 
-        if not os.path.exists(self.dist_path) or '%s.exe' % self.package_name not in os.listdir(self.dist_path):
+        if fail_state == 0 and not os.path.exists(self.dist_path) or '%s.exe' % self.package_name not in os.listdir(self.dist_path):
+            Application.log.error('Cannot find %s.exe in folder or folder does not exist: %s' % (self.package_name, self.dist_path))
             fail_state = 1
 
         if fail_state == 0:
@@ -202,7 +201,7 @@ class Application:
 
             return fail_state
 
-        Application.log.error('Failed to execute command: %s' % command)
+        Application.log.error('Failed to execute command: %s' % ' '.join(args))
 
         Application.log.warning('Resetting: %s' % self.dist_path)
         shutil.rmtree(self.dist_path, ignore_errors=True)
