@@ -4,7 +4,7 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
-mypy = "==0.740"
+mypy = "==0.750"
 
 [packages]
 lxml = "==4.4.2"
