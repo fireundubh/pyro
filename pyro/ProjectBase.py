@@ -39,7 +39,7 @@ class ProjectBase(Logger):
     def parse(self, value: str) -> str:
         t = StringTemplate(value)
         try:
-            return t.substitute(self.variables)
+            return os.path.expanduser(os.path.expandvars(t.substitute(self.variables)))
         except KeyError as e:
             ProjectBase.log.error('Failed to parse variable "%s" in "%s" - is the variable name correct?' % (e.args[0], value))
             sys.exit(1)
