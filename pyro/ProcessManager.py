@@ -7,7 +7,15 @@ from pyro.Logger import Logger
 class ProcessManager(Logger):
     @staticmethod
     def run(command: str, use_bsarch: bool = False) -> int:
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True)
+        if len(command) > 32768:
+            ProcessManager.log.error('Cannot create process because command exceeds max length: %s' % len(command))
+            return 1
+
+        try:
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True)
+        except WindowsError as e:
+            ProcessManager.log.error('Cannot create process because: %s.' % e.strerror)
+            return 1
 
         papyrus_exclusions = ('Starting', 'Assembly', 'Compilation', 'Batch', 'Copyright', 'Papyrus', 'Failed', 'No output')
         bsarch_exclusions = ('BSArch', 'Packer', 'Version', 'Files', 'Archive Flags', '[', '*', 'Compressed', 'Retain', 'XBox', 'Startup', 'Embed', 'XMem', 'Bit', 'Format')
