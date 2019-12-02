@@ -41,13 +41,12 @@ class PackageManager(Logger):
 
             include_text: str = self.ppj.parse(include_node.text)
 
-            if include_text == os.curdir or include_text == os.pardir:
-                PackageManager.log.warning('Include paths cannot be equal to "." or ".."')
+            if include_text.startswith(os.pardir):
+                PackageManager.log.warning('Include paths cannot start with ".."')
                 continue
 
-            if include_text.startswith('.'):
-                PackageManager.log.warning('Include paths cannot start with "."')
-                continue
+            if include_text == os.curdir or include_text.startswith(os.curdir):
+                include_text = include_text.replace(os.curdir, root_path, 1)
 
             # normalize path
             include_path: str = os.path.normpath(include_text)
@@ -75,12 +74,19 @@ class PackageManager(Logger):
                 continue
 
             # populate files list using absolute paths
-            if os.path.isabs(include_path) and os.path.isfile(include_path):
+            if os.path.isabs(include_path):
                 if root_path not in include_path:
                     PackageManager.log.warning('Cannot include path outside RootDir: "%s"' % include_path)
                     continue
-                include_paths.append(include_path)
-                continue
+                if os.path.isfile(include_path):
+                    include_paths.append(include_path)
+                    continue
+                else:
+                    search_path = os.path.join(include_path, wildcard_pattern)
+                    for f in glob.iglob(search_path, recursive=not no_recurse):
+                        if os.path.isfile(f):
+                            include_paths.append(f)
+                    continue
 
             # populate files list using relative file path
             test_path = os.path.join(root_path, include_path)
@@ -145,7 +151,12 @@ class PackageManager(Logger):
             PackageManager.print_list('Includes found:', package_data)
 
             for source_path in package_data:
-                target_path: str = os.path.join(self.options.temp_path, os.path.relpath(source_path, package_root))
+                relpath = os.path.relpath(source_path, package_root)
+                target_path = os.path.join(self.options.temp_path, relpath)
+
+                # fix target path if user passes a deeper package root (RootDir)
+                if source_path.casefold().endswith('.pex') and not relpath.casefold().startswith('scripts'):
+                    target_path = os.path.join(self.options.temp_path, 'Scripts', relpath)
 
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
                 shutil.copy2(source_path, target_path)
@@ -181,6 +192,9 @@ class PackageManager(Logger):
         try:
             with zipfile.ZipFile(zip_output_path, mode='w', compression=self.ppj.compress_type) as z:
                 for include_path in zip_data:
+                    if self.ppj.zip_root_path not in include_path:
+                        PackageManager.log.warning('Cannot zip file outside RootDir: "%s"' % include_path)
+                        continue
                     arcname: str = os.path.relpath(include_path, self.ppj.zip_root_path)
                     z.write(include_path, arcname, compress_type=self.ppj.compress_type)
 
