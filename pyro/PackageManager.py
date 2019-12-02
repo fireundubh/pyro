@@ -49,17 +49,30 @@ class PackageManager(Logger):
                 PackageManager.log.warning('Include paths cannot start with "."')
                 continue
 
+            # normalize path
+            include_path: str = os.path.normpath(include_text)
+
             # populate files list using simple glob patterns
-            if '*' in include_text:
-                search_path: str = os.path.join(root_path, wildcard_pattern)
+            if '*' in include_path:
+                if not os.path.isabs(include_path):
+                    search_path: str = os.path.join(root_path, wildcard_pattern)
+                elif root_path in include_path:
+                    # pass include path as pattern
+                    search_path = include_path
+                else:
+                    PackageManager.log.warning('Cannot include path outside RootDir: "%s"' % include_path)
+                    continue
+
+                search_path = os.path.normpath(search_path)
                 files: list = [f for f in glob.iglob(search_path, recursive=not no_recurse) if os.path.isfile(f)]
-                matches: list = fnmatch.filter(files, include_text)
+
+                matches: list = fnmatch.filter(files, include_path)
                 if not matches:
                     PackageManager.log.warning('No files in "%s" matched glob pattern: %s' % (search_path, include_text))
+                    continue
+
                 include_paths.extend(matches)
                 continue
-
-            include_path: str = os.path.normpath(include_text)
 
             # populate files list using absolute paths
             if os.path.isabs(include_path) and os.path.isfile(include_path):
