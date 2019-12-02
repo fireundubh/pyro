@@ -195,7 +195,7 @@ class PapyrusProject(ProjectBase):
 
     @staticmethod
     def _strip_xml_comments(path: str) -> io.StringIO:
-        with open(path, mode='r', encoding='utf-8') as f:
+        with open(path, encoding='utf-8') as f:
             xml_document: str = f.read()
             comments_pattern = re.compile('(<!--.*?-->)', flags=re.DOTALL)
             xml_document = comments_pattern.sub('', xml_document)
@@ -241,7 +241,7 @@ class PapyrusProject(ProjectBase):
             import_path: str = os.path.normpath(self.parse(import_node.text))
 
             if import_path == os.pardir:
-                self.log.warning('Import paths cannot be equal to ".."')
+                self.log.warning('Import paths cannot be equal to "%s"' % os.pardir)
                 continue
 
             if import_path == os.curdir:
@@ -372,7 +372,7 @@ class PapyrusProject(ProjectBase):
             folder_text: str = self.parse(folder_node.text)
 
             if folder_text == os.pardir:
-                self.log.warning('Folder paths cannot be equal to ".."')
+                self.log.warning('Folder paths cannot be equal to "%s"' % os.pardir)
                 continue
 
             no_recurse: bool = self._get_attr_as_bool(folder_node, 'NoRecurse')
@@ -403,7 +403,7 @@ class PapyrusProject(ProjectBase):
                     continue
 
         for folder_path, no_recurse in folder_paths:
-            search_path: str = os.path.join(folder_path, '*' if no_recurse else '**\*')
+            search_path: str = os.path.join(folder_path, '*' if no_recurse else r'**\*')
             script_paths.extend([f for f in glob.iglob(search_path, recursive=not no_recurse) if os.path.isfile(f) and f.casefold().endswith('.psc')])
 
         return PathHelper.uniqify(script_paths)
