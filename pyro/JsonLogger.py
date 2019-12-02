@@ -17,7 +17,7 @@ class JsonLogger:
 
         path = os.path.join(self.ppj.options.log_path, self.log_file)
 
-        with open(path, mode='r', encoding='utf-8') as r:
+        with open(path, encoding='utf-8') as r:
             data = json.load(r)
 
         data[key] = value

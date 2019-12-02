@@ -90,11 +90,11 @@ class ProjectBase(Logger):
         if not self.options.registry_path:
             game_type = self.options.game_type if not game_type else game_type
             if game_type == 'fo4':
-                return 'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\Fallout4\Installed Path'
+                return r'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\Fallout4\Installed Path'
             if game_type == 'tesv':
-                return 'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\Skyrim\Installed Path'
+                return r'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\Skyrim\Installed Path'
             if game_type == 'sse':
-                return 'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\Skyrim Special Edition\Installed Path'
+                return r'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\Skyrim Special Edition\Installed Path'
             raise ValueError('Cannot determine registry path from game type')
         return self.options.registry_path.replace('/', '\\')
 

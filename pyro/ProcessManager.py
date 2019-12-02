@@ -1,5 +1,6 @@
 import re
 import subprocess
+from decimal import Decimal
 
 from pyro.Logger import Logger
 
@@ -12,7 +13,7 @@ class ProcessManager(Logger):
             return 1
 
         try:
-            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True)
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
         except WindowsError as e:
             ProcessManager.log.error('Cannot create process because: %s.' % e.strerror)
             return 1
@@ -20,7 +21,7 @@ class ProcessManager(Logger):
         papyrus_exclusions = ('Starting', 'Assembly', 'Compilation', 'Batch', 'Copyright', 'Papyrus', 'Failed', 'No output')
         bsarch_exclusions = ('BSArch', 'Packer', 'Version', 'Files', 'Archive Flags', '[', '*', 'Compressed', 'Retain', 'XBox', 'Startup', 'Embed', 'XMem', 'Bit', 'Format')
 
-        line_error = re.compile('\(\d+,\d+\)')
+        line_error = re.compile(r'\(\d+,\d+\)')
 
         try:
             while process.poll() is None:
@@ -42,7 +43,7 @@ class ProcessManager(Logger):
 
                     if line.startswith('Done'):
                         archive_time = line.split('in')[1].strip()[:-1]
-                        hours, minutes, seconds = [round(float(n), 2) for n in archive_time.split(':')]
+                        hours, minutes, seconds = [round(Decimal(n), 3) for n in archive_time.split(':')]
 
                         timecode = ProcessManager._format_time(hours, minutes, seconds)
 
@@ -71,11 +72,11 @@ class ProcessManager(Logger):
         return 0
 
     @staticmethod
-    def _format_time(hours: float, minutes: float, seconds: float) -> str:
-        if hours > 0.0 and minutes > 0.0 and seconds > 0.0:
+    def _format_time(hours: Decimal, minutes: Decimal, seconds: Decimal) -> str:
+        if hours.compare(0) == 1 and minutes.compare(0) == 1 and seconds.compare(0) == 1:
             return '%sh %sm %ss' % (hours, minutes, seconds)
-        if hours == 0.0 and minutes > 0.0 and seconds > 0.0:
+        if hours.compare(0) == 0 and minutes.compare(0) == 1 and seconds.compare(0) == 1:
             return '%sm %ss' % (minutes, seconds)
-        if hours == 0.0 and minutes == 0.0 and seconds > 0.0:
+        if hours.compare(0) == 0 and minutes.compare(0) == 0 and seconds.compare(0) == 1:
             return '%ss' % seconds
         return '%sh %sm %ss' % (hours, minutes, seconds)

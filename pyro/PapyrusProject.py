@@ -47,13 +47,13 @@ class PapyrusProject(ProjectBase):
         self.options.output_path = self.parse(self.root_node.get('Output', default=self.options.output_path))
         self.options.flags_path = self.parse(self.root_node.get('Flags', default=self.options.flags_path))
 
-        self.optimize: bool = PapyrusProject._get_attr_as_bool(self.root_node, 'Optimize')
-        self.release: bool = PapyrusProject._get_attr_as_bool(self.root_node, 'Release')
-        self.final: bool = PapyrusProject._get_attr_as_bool(self.root_node, 'Final')
+        self.optimize: bool = PapyrusProject.get_attr_as_bool(self.root_node, 'Optimize')
+        self.release: bool = PapyrusProject.get_attr_as_bool(self.root_node, 'Release')
+        self.final: bool = PapyrusProject.get_attr_as_bool(self.root_node, 'Final')
 
-        self.options.anonymize = PapyrusProject._get_attr_as_bool(self.root_node, 'Anonymize')
-        self.options.bsarch = PapyrusProject._get_attr_as_bool(self.root_node, 'Package')
-        self.options.zip = PapyrusProject._get_attr_as_bool(self.root_node, 'Zip')
+        self.options.anonymize = PapyrusProject.get_attr_as_bool(self.root_node, 'Anonymize')
+        self.options.bsarch = PapyrusProject.get_attr_as_bool(self.root_node, 'Package')
+        self.options.zip = PapyrusProject.get_attr_as_bool(self.root_node, 'Zip')
 
         self.packages_node = ElementHelper.get(self.root_node, 'Packages')
 
@@ -189,7 +189,7 @@ class PapyrusProject(ProjectBase):
         self.compress_type: int = zipfile.ZIP_STORED if self.options.zip_compression == 'store' else zipfile.ZIP_DEFLATED
 
     @staticmethod
-    def _get_attr_as_bool(node: etree.ElementBase, attribute_name: str, default_value: str = 'false') -> bool:
+    def get_attr_as_bool(node: etree.ElementBase, attribute_name: str, default_value: str = 'false') -> bool:
         attr: str = node.get(attribute_name, default=default_value).casefold()
         return any([attr == 'true', attr == '1'])
 
@@ -375,7 +375,7 @@ class PapyrusProject(ProjectBase):
                 self.log.warning('Folder paths cannot be equal to "%s"' % os.pardir)
                 continue
 
-            no_recurse: bool = self._get_attr_as_bool(folder_node, 'NoRecurse')
+            no_recurse: bool = self.get_attr_as_bool(folder_node, 'NoRecurse')
 
             # try to add project path
             if folder_text == os.curdir:

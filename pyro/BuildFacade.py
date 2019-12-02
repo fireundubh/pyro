@@ -61,7 +61,7 @@ class BuildFacade(Logger):
             return
 
         # because we're rotating at start, account for new log file
-        keep_count = keep_count - 1
+        keep_count -= 1
 
         log_files = [f for f in os.listdir(self.ppj.options.log_path) if f.endswith('.log')]
         if not (len(log_files) > keep_count):

@@ -36,8 +36,8 @@ class PackageManager(Logger):
             if not include_node.tag.endswith('Include'):
                 continue
 
-            no_recurse: bool = self.ppj._get_attr_as_bool(include_node, 'NoRecurse')
-            wildcard_pattern: str = '*' if no_recurse else '**\*'
+            no_recurse: bool = self.ppj.get_attr_as_bool(include_node, 'NoRecurse')
+            wildcard_pattern: str = '*' if no_recurse else r'**\*'
 
             include_text: str = self.ppj.parse(include_node.text)
 
