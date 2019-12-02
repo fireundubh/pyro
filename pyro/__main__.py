@@ -76,7 +76,7 @@ class Application(Logger):
         time_elapsed = TimeElapsed()
 
         build = BuildFacade(ppj)
-        build.try_compile(time_elapsed)
+        script_count, success_count, failed_count = build.try_compile(time_elapsed)
 
         if ppj.options.anonymize:
             build.try_anonymize()
@@ -85,7 +85,12 @@ class Application(Logger):
 
         build.try_pack()
 
-        time_elapsed.print(callback_func=Application.log.info)
+        raw_time = time_elapsed.value()
+        avg_time = time_elapsed.average(success_count)
+        s_raw_time, s_avg_time = ('{0:.3f}s'.format(t) for t in (raw_time, avg_time))
+
+        Application.log.info('Compilation time: %s (%s/script) - %s succeeded, %s failed (%s scripts)'
+                             % (s_raw_time, s_avg_time, success_count, failed_count, script_count))
 
         Application.log.info('DONE!')
 

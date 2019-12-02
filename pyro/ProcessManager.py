@@ -1,27 +1,31 @@
+import os
 import re
 import subprocess
 from decimal import Decimal
 
 from pyro.Logger import Logger
+from pyro.ProcessState import ProcessState
 
 
 class ProcessManager(Logger):
     @staticmethod
-    def run(command: str, use_bsarch: bool = False) -> int:
-        if len(command) > 32768:
-            ProcessManager.log.error('Cannot create process because command exceeds max length: %s' % len(command))
-            return 1
+    def run(command: str, use_bsarch: bool = False) -> ProcessState:
+        command_size = len(command)
+
+        if command_size > 32768:
+            ProcessManager.log.error('Cannot create process because command exceeds max length: %s' % command_size)
+            return ProcessState.FAILURE
 
         try:
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
         except WindowsError as e:
             ProcessManager.log.error('Cannot create process because: %s.' % e.strerror)
-            return 1
+            return ProcessState.FAILURE
 
         papyrus_exclusions = ('Starting', 'Assembly', 'Compilation', 'Batch', 'Copyright', 'Papyrus', 'Failed', 'No output')
         bsarch_exclusions = ('BSArch', 'Packer', 'Version', 'Files', 'Archive Flags', '[', '*', 'Compressed', 'Retain', 'XBox', 'Startup', 'Embed', 'XMem', 'Bit', 'Format')
 
-        line_error = re.compile(r'\(\d+,\d+\)')
+        line_error = re.compile(r'(.*)(\(\d+,\d+\)):\s+(.*)')
 
         try:
             while process.poll() is None:
@@ -55,21 +59,26 @@ class ProcessManager(Logger):
                 else:
                     exclude_lines = not line.startswith(papyrus_exclusions)
 
-                    if line and exclude_lines and 'error(s)' not in line:
+                    match = line_error.search(line)
+
+                    if line and exclude_lines and match is None and 'error(s)' not in line:
                         ProcessManager.log.info(line)
 
-                    if line_error.match(line) is not None:
+                    if match is not None:
+                        path, location, message = match.groups()
+                        head, tail = os.path.split(path)
+                        ProcessManager.log.error(r'COMPILATION FAILED: %s\%s%s: %s' % (os.path.basename(head), tail, location, message))
                         process.terminate()
-                        return -1
+                        return ProcessState.ERRORS
 
         except KeyboardInterrupt:
             try:
                 process.terminate()
             except OSError:
                 ProcessManager.log.error('Process interrupted by user.')
-            return -1
+            return ProcessState.INTERRUPTED
 
-        return 0
+        return ProcessState.SUCCESS
 
     @staticmethod
     def _format_time(hours: Decimal, minutes: Decimal, seconds: Decimal) -> str:

@@ -12,6 +12,7 @@ from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProcessManager import ProcessManager
+from pyro.ProcessState import ProcessState
 from pyro.TimeElapsed import TimeElapsed
 
 
@@ -107,28 +108,37 @@ class BuildFacade(Logger):
 
         return PathHelper.uniqify(pex_paths)
 
-    def try_compile(self, time_elapsed: TimeElapsed) -> None:
+    def try_compile(self, time_elapsed: TimeElapsed) -> tuple:
         """Builds and passes commands to Papyrus Compiler"""
         commands: list = self.ppj.build_commands()
 
         script_count: int = len(self.ppj.psc_paths)
+        success_count: int = 0
 
         time_elapsed.start_time = time.time()
 
         if self.ppj.options.no_parallel:
             for command in commands:
-                ProcessManager.run(command)
+                state = ProcessManager.run(command)
+                if state == ProcessState.SUCCESS:
+                    success_count += 1
         elif script_count > 0:
             if script_count == 1:
-                ProcessManager.run(commands[0])
+                state = ProcessManager.run(commands[0])
+                if state == ProcessState.SUCCESS:
+                    success_count += 1
             else:
                 multiprocessing.freeze_support()
                 p = multiprocessing.Pool(processes=min(script_count, self.ppj.options.worker_limit))
-                p.imap(ProcessManager.run, commands)
+                for state in p.imap(ProcessManager.run, commands):
+                    if state == ProcessState.SUCCESS:
+                        success_count += 1
                 p.close()
                 p.join()
 
         time_elapsed.end_time = time.time()
+
+        return script_count, success_count, script_count - success_count
 
     def try_anonymize(self) -> None:
         """Obfuscates identifying metadata in compiled scripts"""
