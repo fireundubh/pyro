@@ -47,7 +47,7 @@ class Application:
             'etree.pyd'
         )
 
-        files: list = [f for f in glob.glob(os.path.join(self.dist_path, '**\*'), recursive=True)
+        files: list = [f for f in glob.glob(os.path.join(self.dist_path, r'**\*'), recursive=True)
                        if os.path.isfile(f) and not f.endswith(files_to_keep)]
 
         for f in files:
@@ -62,9 +62,9 @@ class Application:
         zip_path: str = os.path.join(self.root_path, 'bin', '%s.zip' % self.package_name)
         os.makedirs(os.path.dirname(zip_path), exist_ok=True)
 
-        files: list = [f for f in glob.glob(os.path.join(self.dist_path, '**\*'), recursive=True) if os.path.isfile(f)]
+        files: list = [f for f in glob.glob(os.path.join(self.dist_path, r'**\*'), recursive=True) if os.path.isfile(f)]
 
-        with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_STORED) as z:
+        with zipfile.ZipFile(zip_path, 'w') as z:
             for f in files:
                 z.write(f, os.path.join(self.package_name, os.path.relpath(f, self.dist_path)), compress_type=zipfile.ZIP_STORED)
                 Application.log.info('Added file to archive: %s' % f)
@@ -94,8 +94,7 @@ class Application:
 
         if self.vcvars64_path:
             try:
-                process = subprocess.Popen(f'%comspec% /C "{self.vcvars64_path}"',
-                                           stdout=subprocess.PIPE, stderr=None, shell=True, universal_newlines=True)
+                process = subprocess.Popen(f'%comspec% /C "{self.vcvars64_path}"', stdout=subprocess.PIPE, shell=True, universal_newlines=True)
             except FileNotFoundError:
                 fail_state = 1
 
@@ -110,7 +109,7 @@ class Application:
 
             Application.log.info('Loading environment: "%s"' % env_log_path)
 
-            with open(env_log_path, mode='r', encoding='utf-8') as f:
+            with open(env_log_path, encoding='utf-8') as f:
                 lines: list = f.read().splitlines()
 
                 for line in lines:
@@ -131,7 +130,7 @@ class Application:
         ]
 
         try:
-            process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True, env=environ)
+            process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, env=environ)
         except FileNotFoundError:
             Application.log.error('Cannot run command: %s' % ' '.join(args))
             fail_state = 1

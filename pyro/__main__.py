@@ -17,7 +17,6 @@ class Application(Logger):
         self.args = args
         self._validate_args()
 
-    # noinspection PyUnresolvedReferences
     @staticmethod
     def _url2pathname(url_path: str) -> str:
         url = urlparse(url_path)
