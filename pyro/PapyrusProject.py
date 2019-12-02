@@ -287,8 +287,9 @@ class PapyrusProject(ProjectBase):
         implicit_paths: list = []
 
         for psc_path in self.psc_paths:
+            script_folder_path = os.path.dirname(psc_path)
             for import_path in self.import_paths:
-                relpath = os.path.relpath(os.path.dirname(psc_path), import_path)
+                relpath = os.path.relpath(script_folder_path, import_path)
                 test_path = os.path.normpath(os.path.join(import_path, relpath))
                 if os.path.isdir(test_path):
                     implicit_paths.append(test_path)
