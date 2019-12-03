@@ -8,7 +8,12 @@ class TimeElapsed:
         self.end_time: float = 0.0
 
     def average(self, dividend: int) -> Decimal:
-        return round(Decimal(dividend, self._context) / self.value(), 3)
+        if dividend == 0:
+            return round(Decimal(0), 3)
+        value = self.value()
+        if value.compare(0) == 0:
+            return round(Decimal(0), 3)
+        return round(Decimal(dividend, self._context) / value, 3)
 
     def value(self) -> Decimal:
         return Decimal(self.end_time) - Decimal(self.start_time)
