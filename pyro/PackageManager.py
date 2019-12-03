@@ -22,8 +22,6 @@ class PackageManager(Logger):
 
         self.extension: str = '.ba2' if self.options.game_type == 'fo4' else '.bsa'
 
-        self.package_paths: list = []
-
     def _fix_package_extension(self, package_name: str) -> str:
         if not package_name.casefold().endswith(('.ba2', '.bsa')):
             return '%s%s' % (package_name, self.extension)
@@ -138,6 +136,15 @@ class PackageManager(Logger):
             package_name: str = self.ppj.parse(package_node.get('Name', default=default_name))
             package_name = self._fix_package_extension(package_name)
 
+            package_path: str = os.path.join(self.options.package_path, package_name)
+
+            if os.path.isfile(package_path):
+                try:
+                    open(package_path, 'a').close()
+                except PermissionError:
+                    PackageManager.log.error('Cannot create package without write permission to file: "%s"' % package_path)
+                    sys.exit(1)
+
             package_root: str = self.ppj.parse(package_node.get('RootDir', default=self.ppj.project_path))
 
             PackageManager.log.info('Creating "%s"...' % package_name)
@@ -160,9 +167,6 @@ class PackageManager(Logger):
 
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
                 shutil.copy2(source_path, target_path)
-
-            package_path: str = os.path.join(self.options.package_path, package_name)
-            self.package_paths.append(package_path)
 
             # run bsarch
             commands: str = self.build_commands(self.options.temp_path, package_path)

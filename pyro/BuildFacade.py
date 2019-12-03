@@ -1,6 +1,8 @@
 import json
 import multiprocessing
 import os
+import psutil
+import sys
 import time
 from copy import deepcopy
 
@@ -24,19 +26,8 @@ class BuildFacade(Logger):
         options: dict = deepcopy(self.ppj.options.__dict__)
 
         for key in options:
-            if key not in ('args', 'input_path', 'worker_limit', 'anonymize', 'bsarch', 'zip', 'zip_compression') and not key.startswith('no_'):
+            if key not in ('args', 'input_path', 'anonymize', 'bsarch', 'zip', 'zip_compression') and not key.startswith(('ignore_', 'no_')):
                 setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
-
-        if not self.ppj.options.worker_limit:
-            worker_limit: int = 2
-
-            try:
-                # noinspection Mypy
-                worker_limit = os.cpu_count()  # can be None if indeterminate
-            except NotImplementedError:
-                pass
-
-            self.ppj.options.worker_limit = worker_limit
 
         # record project options in log
         if self.ppj.options.log_path:
@@ -108,37 +99,38 @@ class BuildFacade(Logger):
 
         return PathHelper.uniqify(pex_paths)
 
+    @staticmethod
+    def _limit_priority() -> None:
+        process = psutil.Process(os.getpid())
+        process.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS if sys.platform == 'win32' else 19)
+
     def try_compile(self, time_elapsed: TimeElapsed) -> tuple:
         """Builds and passes commands to Papyrus Compiler"""
         commands: list = self.ppj.build_commands()
 
-        script_count: int = len(self.ppj.psc_paths)
+        command_count: int = len(commands)
         success_count: int = 0
 
         time_elapsed.start_time = time.time()
 
-        if self.ppj.options.no_parallel:
+        if self.ppj.options.no_parallel or command_count == 1:
             for command in commands:
-                state = ProcessManager.run(command)
+                if ProcessManager.run(command) == ProcessState.SUCCESS:
+                    success_count += 1
+        elif command_count > 0:
+            multiprocessing.freeze_support()
+            worker_limit = min(command_count, self.ppj.options.worker_limit)
+            pool = multiprocessing.Pool(processes=worker_limit,
+                                        initializer=BuildFacade._limit_priority)
+            for state in pool.imap(ProcessManager.run, commands):
                 if state == ProcessState.SUCCESS:
                     success_count += 1
-        elif script_count > 0:
-            if script_count == 1:
-                state = ProcessManager.run(commands[0])
-                if state == ProcessState.SUCCESS:
-                    success_count += 1
-            else:
-                multiprocessing.freeze_support()
-                p = multiprocessing.Pool(processes=min(script_count, self.ppj.options.worker_limit))
-                for state in p.imap(ProcessManager.run, commands):
-                    if state == ProcessState.SUCCESS:
-                        success_count += 1
-                p.close()
-                p.join()
+            pool.close()
+            pool.join()
 
         time_elapsed.end_time = time.time()
 
-        return script_count, success_count, script_count - success_count
+        return success_count, command_count - success_count
 
     def try_anonymize(self) -> None:
         """Obfuscates identifying metadata in compiled scripts"""
@@ -159,13 +151,9 @@ class BuildFacade(Logger):
     def try_pack(self) -> None:
         """Generates BSA/BA2 packages for project"""
         package_manager = PackageManager(self.ppj)
+        package_manager.create_packages()
 
-        if self.ppj.options.bsarch and os.path.isfile(self.ppj.options.bsarch_path):
-            package_manager.create_packages()
-        else:
-            BuildFacade.log.warning('Cannot create package(s) because packaging was disabled by user')
-
-        if self.ppj.options.zip:
-            package_manager.create_zip()
-        else:
-            BuildFacade.log.warning('Cannot create archive because zipping was disabled by user')
+    def try_zip(self) -> None:
+        """Generates ZIP file for project"""
+        package_manager = PackageManager(self.ppj)
+        package_manager.create_zip()

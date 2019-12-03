@@ -6,14 +6,15 @@ from dataclasses import dataclass, field
 @dataclass
 class ProjectOptions:
     args: dict = field(repr=False, default_factory=dict)
+    anonymize: bool = field(init=False, default_factory=bool)
+    bsarch: bool = field(init=False, default_factory=bool)
+    zip: bool = field(init=False, default_factory=bool)
 
     # required arguments
     input_path: str = field(init=False, default_factory=str)
 
     # build arguments
-    anonymize: bool = field(init=False, default_factory=bool)
-    bsarch: bool = field(init=False, default_factory=bool)
-    zip: bool = field(init=False, default_factory=bool)
+    ignore_errors: bool = field(init=False, default_factory=bool)
     no_incremental_build: bool = field(init=False, default_factory=bool)
     no_parallel: bool = field(init=False, default_factory=bool)
     worker_limit: int = field(init=False, default_factory=int)

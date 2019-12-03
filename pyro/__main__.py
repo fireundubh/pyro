@@ -76,21 +76,43 @@ class Application(Logger):
         time_elapsed = TimeElapsed()
 
         build = BuildFacade(ppj)
-        script_count, success_count, failed_count = build.try_compile(time_elapsed)
+
+        psc_count = len(ppj.psc_paths)
+        success_count, failed_count = build.try_compile(time_elapsed)
 
         if ppj.options.anonymize:
-            build.try_anonymize()
+            if failed_count == 0 or ppj.options.ignore_errors:
+                build.try_anonymize()
+            else:
+                Application.log.warning('Cannot anonymize scripts because %s scripts failed to compile' % failed_count)
         else:
-            Application.log.warning('Cannot anonymize scripts because anonymization was disabled by user')
+            Application.log.warning('Cannot anonymize scripts (Anonymize=false)')
 
-        build.try_pack()
+        if ppj.options.bsarch and os.path.isfile(ppj.options.bsarch_path):
+            if failed_count == 0 or ppj.options.ignore_errors:
+                build.try_pack()
+            else:
+                Application.log.warning('Cannot create packages because %s scripts failed to compile' % failed_count)
+        else:
+            Application.log.warning('Cannot create packages (Package=false)')
 
-        raw_time = time_elapsed.value()
-        avg_time = time_elapsed.average(success_count)
-        s_raw_time, s_avg_time = ('{0:.3f}s'.format(t) for t in (raw_time, avg_time))
+        if ppj.options.zip:
+            if failed_count == 0 or ppj.options.ignore_errors:
+                build.try_zip()
+            else:
+                Application.log.warning('Cannot create ZIP archive because %s scripts failed to compile' % failed_count)
+        else:
+            Application.log.warning('Cannot create ZIP archive (Zip=false)')
 
-        Application.log.info('Compilation time: %s (%s/script) - %s succeeded, %s failed (%s scripts)'
-                             % (s_raw_time, s_avg_time, success_count, failed_count, script_count))
+        if success_count > 0:
+            raw_time = time_elapsed.value()
+            avg_time = time_elapsed.average(success_count)
+            s_raw_time, s_avg_time = ('{0:.3f}s'.format(t) for t in (raw_time, avg_time))
+
+            Application.log.info('Compilation time: %s (%s/script) - %s succeeded, %s failed (%s scripts)'
+                                 % (s_raw_time, s_avg_time, success_count, failed_count, psc_count))
+        else:
+            Application.log.info('No scripts were compiled.')
 
         Application.log.info('DONE!')
 
@@ -113,6 +135,9 @@ if __name__ == '__main__':
                                           '(if relative, must be relative to current working directory)')
 
     _build_arguments = _parser.add_argument_group('build arguments')
+    _build_arguments.add_argument('--ignore-errors',
+                                  action='store_true', default=False,
+                                  help='ignore compiler errors during build')
     _build_arguments.add_argument('--no-incremental-build',
                                   action='store_true', default=False,
                                   help='do not build incrementally')

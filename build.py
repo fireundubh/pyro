@@ -44,7 +44,8 @@ class Application:
             '_socket.pyd',
             'select.pyd',
             '_elementpath.pyd',
-            'etree.pyd'
+            'etree.pyd',
+            '_psutil_windows.pyd'
         )
 
         files: list = [f for f in glob.glob(os.path.join(self.dist_path, r'**\*'), recursive=True)

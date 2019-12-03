@@ -44,6 +44,18 @@ class ProjectBase(Logger):
             ProjectBase.log.error('Failed to parse variable "%s" in "%s" - is the variable name correct?' % (e.args[0], value))
             sys.exit(1)
 
+    # build arguments
+    def get_worker_limit(self) -> int:
+        """Returns worker limit from arguments"""
+        if self.options.worker_limit > 0:
+            return self.options.worker_limit
+        cpu_count = None
+        try:
+            cpu_count = os.cpu_count()  # can be None if indeterminate
+        except NotImplementedError:
+            pass
+        return 2 if cpu_count is None else cpu_count
+
     # compiler arguments
     def get_compiler_path(self) -> str:
         """Returns absolute compiler path from arguments"""
