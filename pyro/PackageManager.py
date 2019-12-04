@@ -76,7 +76,7 @@ class PackageManager(Logger):
                     search_path = os.path.join(path_or_pattern, wildcard_pattern)
                     yield from self._find_include_paths(search_path, no_recurse)
 
-            elif not os.path.abspath(path_or_pattern):
+            else:
                 # populate files list using relative file path
                 test_path = os.path.join(root_path, path_or_pattern)
                 if not os.path.isdir(test_path):
