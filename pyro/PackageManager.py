@@ -3,15 +3,14 @@ import glob
 import os
 import shutil
 import sys
+import typing
 import zipfile
 
 from lxml import etree
 
 from pyro.CommandArguments import CommandArguments
-from pyro.ElementHelper import ElementHelper
 from pyro.Logger import Logger
 from pyro.PapyrusProject import PapyrusProject
-from pyro.PathHelper import PathHelper
 from pyro.ProcessManager import ProcessManager
 
 
@@ -22,19 +21,23 @@ class PackageManager(Logger):
 
         self.extension: str = '.ba2' if self.options.game_type == 'fo4' else '.bsa'
 
+    @staticmethod
+    def _find_include_paths(search_path: str, no_recurse: bool) -> typing.Generator:
+        for include_path in glob.iglob(search_path, recursive=not no_recurse):
+            if os.path.isfile(include_path):
+                yield include_path
+
     def _fix_package_extension(self, package_name: str) -> str:
         if not package_name.casefold().endswith(('.ba2', '.bsa')):
             return '%s%s' % (package_name, self.extension)
         return '%s%s' % (os.path.splitext(package_name)[0], self.extension)
 
-    def _populate_include_paths(self, parent_node: etree.ElementBase, root_path: str) -> list:
-        include_paths: list = []
-
+    def _generate_include_paths(self, parent_node: etree.ElementBase, root_path: str) -> typing.Generator:
         for include_node in parent_node:
             if not include_node.tag.endswith('Include'):
                 continue
 
-            no_recurse: bool = self.ppj.get_attr_as_bool(include_node, 'NoRecurse')
+            no_recurse: bool = include_node.get('NoRecurse') == 'True'
             wildcard_pattern: str = '*' if no_recurse else r'**\*'
 
             include_text: str = self.ppj.parse(include_node.text)
@@ -47,56 +50,44 @@ class PackageManager(Logger):
                 include_text = include_text.replace(os.curdir, root_path, 1)
 
             # normalize path
-            include_path: str = os.path.normpath(include_text)
+            path_or_pattern = os.path.normpath(include_text)
 
             # populate files list using simple glob patterns
-            if '*' in include_path:
-                if not os.path.isabs(include_path):
-                    search_path: str = os.path.join(root_path, wildcard_pattern)
-                elif root_path in include_path:
-                    # pass include path as pattern
-                    search_path = include_path
+            if '*' in path_or_pattern:
+                if not os.path.isabs(path_or_pattern):
+                    search_path = os.path.join(root_path, wildcard_pattern)
+                elif root_path in path_or_pattern:
+                    search_path = path_or_pattern
                 else:
-                    PackageManager.log.warning('Cannot include path outside RootDir: "%s"' % include_path)
+                    PackageManager.log.warning('Cannot include path outside RootDir: "%s"' % path_or_pattern)
                     continue
 
-                search_path = os.path.normpath(search_path)
-                files: list = [f for f in glob.iglob(search_path, recursive=not no_recurse) if os.path.isfile(f)]
-
-                matches: list = fnmatch.filter(files, include_path)
-                if not matches:
-                    PackageManager.log.warning('No files in "%s" matched glob pattern: %s' % (search_path, include_text))
-                    continue
-
-                include_paths.extend(matches)
-                continue
+                for include_path in glob.iglob(search_path, recursive=not no_recurse):
+                    if os.path.isfile(include_path) and fnmatch.fnmatch(include_path, path_or_pattern):
+                        yield include_path
 
             # populate files list using absolute paths
-            if os.path.isabs(include_path):
-                if root_path not in include_path:
-                    PackageManager.log.warning('Cannot include path outside RootDir: "%s"' % include_path)
+            elif os.path.isabs(path_or_pattern):
+                if root_path not in path_or_pattern:
+                    PackageManager.log.warning('Cannot include path outside RootDir: "%s"' % path_or_pattern)
                     continue
-                if os.path.isfile(include_path):
-                    include_paths.append(include_path)
-                    continue
+
+                if os.path.isfile(path_or_pattern):
+                    yield path_or_pattern
                 else:
-                    search_path = os.path.join(include_path, wildcard_pattern)
-                    for f in glob.iglob(search_path, recursive=not no_recurse):
-                        if os.path.isfile(f):
-                            include_paths.append(f)
-                    continue
+                    search_path = os.path.join(path_or_pattern, wildcard_pattern)
+                    yield from self._find_include_paths(search_path, no_recurse)
 
-            # populate files list using relative file path
-            test_path = os.path.join(root_path, include_path)
-            if not os.path.isdir(test_path):
-                include_paths.append(test_path)
-                continue
+            elif not os.path.abspath(path_or_pattern):
+                # populate files list using relative file path
+                test_path = os.path.join(root_path, path_or_pattern)
+                if not os.path.isdir(test_path):
+                    yield test_path
 
-            # populate files list using relative folder path
-            search_path = os.path.join(root_path, include_path, wildcard_pattern)
-            include_paths.extend([f for f in glob.iglob(search_path, recursive=not no_recurse) if os.path.isfile(f)])
-
-        return PathHelper.uniqify(include_paths)
+                # populate files list using relative folder path
+                else:
+                    search_path = os.path.join(root_path, path_or_pattern, wildcard_pattern)
+                    yield from self._find_include_paths(search_path, no_recurse)
 
     def build_commands(self, containing_folder: str, output_path: str) -> str:
         """Returns arguments for BSArch as a string"""
@@ -117,9 +108,6 @@ class PackageManager(Logger):
         return arguments.join()
 
     def create_packages(self) -> None:
-        if self.ppj.packages_node is None:
-            return
-
         # clear temporary data
         if os.path.isdir(self.options.temp_path):
             shutil.rmtree(self.options.temp_path, ignore_errors=True)
@@ -128,12 +116,21 @@ class PackageManager(Logger):
         if not os.path.isdir(self.options.package_path):
             os.makedirs(self.options.package_path, exist_ok=True)
 
+        package_names: list = []
+
         for i, package_node in enumerate(self.ppj.packages_node):
             if not package_node.tag.endswith('Package'):
                 continue
 
-            default_name: str = self.ppj.project_name if i == 0 else '%s (%s)' % (self.ppj.project_name, i)
-            package_name: str = self.ppj.parse(package_node.get('Name', default=default_name))
+            package_name: str = package_node.get('Name')
+
+            # ensure successive package names do not conflict if project name is used
+            if i > 0 and (package_name == self.ppj.project_name or package_name in package_names):
+                package_name = '%s (%s)' % (self.ppj.project_name, i)
+
+            if package_name.casefold() not in package_names:
+                package_names.append(package_name.casefold())
+
             package_name = self._fix_package_extension(package_name)
 
             package_path: str = os.path.join(self.options.package_path, package_name)
@@ -145,20 +142,12 @@ class PackageManager(Logger):
                     PackageManager.log.error('Cannot create package without write permission to file: "%s"' % package_path)
                     sys.exit(1)
 
-            package_root: str = self.ppj.parse(package_node.get('RootDir', default=self.ppj.project_path))
-
             PackageManager.log.info('Creating "%s"...' % package_name)
 
-            package_data: list = self._populate_include_paths(package_node, package_root)
+            for source_path in self._generate_include_paths(package_node, package_node.get('RootDir')):
+                PackageManager.log.info('+ "%s"' % source_path)
 
-            if not package_data:
-                PackageManager.log.info('No includes found for package: "%s"' % package_name)
-                continue
-
-            PackageManager.print_list('Includes found:', package_data)
-
-            for source_path in package_data:
-                relpath = os.path.relpath(source_path, package_root)
+                relpath = os.path.relpath(source_path, package_node.get('RootDir'))
                 target_path = os.path.join(self.options.temp_path, relpath)
 
                 # fix target path if user passes a deeper package root (RootDir)
@@ -177,17 +166,7 @@ class PackageManager(Logger):
                 shutil.rmtree(self.options.temp_path, ignore_errors=True)
 
     def create_zip(self) -> None:
-        if self.ppj.zipfile_node is None:
-            return
-
-        zip_data: list = self._populate_include_paths(self.ppj.zipfile_node, self.ppj.zip_root_path)
-        if not zip_data:
-            PackageManager.log.error('No includes found for ZIP file: "%s"' % self.ppj.zip_file_name)
-            return
-
         PackageManager.log.info('Creating "%s"...' % self.ppj.zip_file_name)
-
-        PackageManager.print_list('Includes found:', zip_data)
 
         # ensure that zip output folder exists
         zip_output_path: str = os.path.join(self.options.zip_output_path, self.ppj.zip_file_name)
@@ -195,14 +174,17 @@ class PackageManager(Logger):
 
         try:
             with zipfile.ZipFile(zip_output_path, mode='w', compression=self.ppj.compress_type) as z:
-                for include_path in zip_data:
+                for include_path in self._generate_include_paths(self.ppj.zip_file_node, self.ppj.zip_root_path):
+                    PackageManager.log.info('+ "%s"' % include_path)
+
                     if self.ppj.zip_root_path not in include_path:
-                        PackageManager.log.warning('Cannot zip file outside RootDir: "%s"' % include_path)
+                        PackageManager.log.warning('Cannot add file to ZIP outside RootDir: "%s"' % include_path)
                         continue
+
                     arcname: str = os.path.relpath(include_path, self.ppj.zip_root_path)
                     z.write(include_path, arcname, compress_type=self.ppj.compress_type)
 
-            PackageManager.log.info('Wrote ZIP file to: "%s"' % zip_output_path)
+            PackageManager.log.info('Wrote ZIP file: "%s"' % zip_output_path)
         except PermissionError:
             PackageManager.log.error('Cannot open ZIP file for writing: "%s"' % zip_output_path)
             sys.exit(1)

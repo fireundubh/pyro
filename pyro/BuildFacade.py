@@ -1,10 +1,11 @@
 import json
 import multiprocessing
 import os
-import psutil
 import sys
 import time
 from copy import deepcopy
+
+import psutil
 
 from pyro.Anonymizer import Anonymizer
 from pyro.JsonLogger import JsonLogger
@@ -26,7 +27,7 @@ class BuildFacade(Logger):
         options: dict = deepcopy(self.ppj.options.__dict__)
 
         for key in options:
-            if key not in ('args', 'input_path', 'anonymize', 'bsarch', 'zip', 'zip_compression') and not key.startswith(('ignore_', 'no_')):
+            if key not in ('args', 'input_path', 'anonymize', 'package', 'zip', 'zip_compression') and not key.startswith(('ignore_', 'no_')):
                 setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
 
         # record project options in log

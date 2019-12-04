@@ -61,13 +61,33 @@ class Application(Logger):
             Application.log.error('Cannot load PPJ at given path because file does not exist: "%s"' % self.args.input_path)
             sys.exit(print_help())
 
+    @staticmethod
+    def _validate_project(ppj: PapyrusProject) -> None:
+        if not ppj.options.game_path:
+            Application.log.error('Cannot determine game type from arguments or Papyrus Project')
+            sys.exit(print_help())
+
+        if not ppj.has_imports_node:
+            Application.log.error('Cannot proceed without imports defined in project')
+            sys.exit(print_help())
+
+        if not ppj.has_scripts_node:
+            Application.log.error('Cannot proceed without Scripts defined in project')
+            sys.exit(print_help())
+
+        if ppj.options.package and not ppj.has_packages_node:
+            Application.log.error('Cannot proceed with Package enabled without Packages defined in project')
+            sys.exit(print_help())
+
+        if ppj.options.zip and not ppj.has_zip_file_node:
+            Application.log.error('Cannot proceed with Zip enabled without ZipFile defined in project')
+            sys.exit(print_help())
+
     def run(self) -> int:
         options = ProjectOptions(self.args.__dict__)
         ppj = PapyrusProject(options)
 
-        if not ppj.options.game_path:
-            Application.log.error('Cannot determine game type from arguments or Papyrus Project')
-            sys.exit(print_help())
+        self._validate_project(ppj)
 
         Application.print_list('Imports found:', ppj.import_paths)
 
@@ -77,7 +97,11 @@ class Application(Logger):
 
         build = BuildFacade(ppj)
 
-        psc_count = len(ppj.psc_paths)
+        # bsarch path is not set until BuildFacade initializes
+        if ppj.options.package and not os.path.isfile(ppj.options.bsarch_path):
+            Application.log.error('Cannot proceed with Package enabled without valid BSArch path')
+            sys.exit(print_help())
+
         success_count, failed_count = build.try_compile(time_elapsed)
 
         if ppj.options.anonymize:
@@ -86,28 +110,30 @@ class Application(Logger):
             else:
                 Application.log.warning('Cannot anonymize scripts because %s scripts failed to compile' % failed_count)
         else:
-            Application.log.warning('Cannot anonymize scripts (Anonymize=false)')
+            Application.log.warning('Cannot anonymize scripts because Anonymize is disabled in project')
 
-        if ppj.options.bsarch and os.path.isfile(ppj.options.bsarch_path):
+        if ppj.options.package:
             if failed_count == 0 or ppj.options.ignore_errors:
                 build.try_pack()
             else:
-                Application.log.warning('Cannot create packages because %s scripts failed to compile' % failed_count)
+                Application.log.warning('Cannot create Packages because %s scripts failed to compile' % failed_count)
         else:
-            Application.log.warning('Cannot create packages (Package=false)')
+            Application.log.warning('Cannot create Packages because Package is disabled in project')
 
         if ppj.options.zip:
             if failed_count == 0 or ppj.options.ignore_errors:
                 build.try_zip()
             else:
-                Application.log.warning('Cannot create ZIP archive because %s scripts failed to compile' % failed_count)
+                Application.log.warning('Cannot create ZipFile because %s scripts failed to compile' % failed_count)
         else:
-            Application.log.warning('Cannot create ZIP archive (Zip=false)')
+            Application.log.warning('Cannot create ZipFile because Zip is disabled in project')
 
         if success_count > 0:
             raw_time = time_elapsed.value()
             avg_time = time_elapsed.average(success_count)
             s_raw_time, s_avg_time = ('{0:.3f}s'.format(t) for t in (raw_time, avg_time))
+
+            psc_count = len(ppj.psc_paths)
 
             Application.log.info('Compilation time: %s (%s/script) - %s succeeded, %s failed (%s scripts)'
                                  % (s_raw_time, s_avg_time, success_count, failed_count, psc_count))

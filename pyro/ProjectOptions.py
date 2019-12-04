@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 class ProjectOptions:
     args: dict = field(repr=False, default_factory=dict)
     anonymize: bool = field(init=False, default_factory=bool)
-    bsarch: bool = field(init=False, default_factory=bool)
+    package: bool = field(init=False, default_factory=bool)
     zip: bool = field(init=False, default_factory=bool)
 
     # required arguments

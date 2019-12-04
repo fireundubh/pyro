@@ -3,6 +3,7 @@ import io
 import os
 import re
 import sys
+import typing
 import zipfile
 
 from lxml import etree
@@ -38,40 +39,50 @@ class PapyrusProject(ProjectBase):
                 PapyrusProject.log.error('Failed to validate XML Schema.%s\t%s' % (os.linesep, e))
                 sys.exit(1)
 
+        # variables need to be parsed before nodes are updated
         variables_node = ElementHelper.get(self.root_node, 'Variables')
         if variables_node is not None:
             self._parse_variables(variables_node)
 
-        # we need to parse all PapyrusProject attributes after validating and before we do anything else
+        # we need to parse all attributes after validating and before we do anything else
         # options can be overridden by arguments when the BuildFacade is initialized
-        self.options.output_path = self.parse(self.root_node.get('Output', default=self.options.output_path))
-        self.options.flags_path = self.parse(self.root_node.get('Flags', default=self.options.flags_path))
+        self._update_attributes(self.root_node)
 
-        self.optimize: bool = PapyrusProject.get_attr_as_bool(self.root_node, 'Optimize')
-        self.release: bool = PapyrusProject.get_attr_as_bool(self.root_node, 'Release')
-        self.final: bool = PapyrusProject.get_attr_as_bool(self.root_node, 'Final')
+        self.options.flags_path = self.root_node.get('Flags')
+        self.options.output_path = self.root_node.get('Output')
 
-        self.options.anonymize = PapyrusProject.get_attr_as_bool(self.root_node, 'Anonymize')
-        self.options.bsarch = PapyrusProject.get_attr_as_bool(self.root_node, 'Package')
-        self.options.zip = PapyrusProject.get_attr_as_bool(self.root_node, 'Zip')
+        self.optimize: bool = self.root_node.get('Optimize') == 'True'
+        self.release: bool = self.root_node.get('Release') == 'True'
+        self.final: bool = self.root_node.get('Final') == 'True'
+
+        self.options.anonymize = self.root_node.get('Anonymize') == 'True'
+        self.options.package = self.root_node.get('Package') == 'True'
+        self.options.zip = self.root_node.get('Zip') == 'True'
+
+        self.imports_node = ElementHelper.get(self.root_node, 'Imports')
+        self.has_imports_node: bool = self.imports_node is not None
+
+        self.scripts_node = ElementHelper.get(self.root_node, 'Scripts')
+        self.has_scripts_node: bool = self.scripts_node is not None
+
+        self.folders_node = ElementHelper.get(self.root_node, 'Folders')
+        self.has_folders_node: bool = self.folders_node is not None
 
         self.packages_node = ElementHelper.get(self.root_node, 'Packages')
+        self.has_packages_node: bool = self.packages_node is not None
 
-        if self.options.bsarch:
-            if self.packages_node is None:
-                PapyrusProject.log.error('Package is enabled but the Packages node is undefined. Setting Package to false.')
-                self.options.bsarch = False
-            else:
-                self.options.package_path = self.parse(self.packages_node.get('Output', default=self.options.package_path))
+        self.zip_file_node = ElementHelper.get(self.root_node, 'ZipFile')
+        self.has_zip_file_node: bool = self.zip_file_node is not None
 
-        self.zipfile_node = ElementHelper.get(self.root_node, 'ZipFile')
+        if self.options.package and self.has_packages_node:
+            self.options.package_path = self.packages_node.get('Output')
 
-        if self.options.zip:
-            if self.zipfile_node is None:
-                PapyrusProject.log.error('Zip is enabled but the ZipFile node is undefined. Setting Zip to false.')
-                self.options.zip = False
-            else:
-                self._setup_zipfile_options()
+        if self.options.zip and self.has_zip_file_node:
+            self.zip_file_name = self.zip_file_node.get('Name')
+            self.zip_root_path = self.zip_file_node.get('RootDir')
+            self.options.zip_output_path = self.zip_file_node.get('Output')
+            self.options.zip_compression = self.zip_file_node.get('Compression').casefold()
+            self._setup_zipfile_options()
 
         # we need to populate the list of import paths before we try to determine the game type
         # because the game type can be determined from import paths
@@ -104,7 +115,7 @@ class PapyrusProject(ProjectBase):
         # we need to set the game type after imports are populated but before pex paths are populated
         # allow xml to set game type but defer to passed argument
         if not self.options.game_type:
-            game_type: str = self.parse(self.root_node.get('Game', default='')).casefold()
+            game_type: str = self.root_node.get('Game', default='').casefold()
 
             if game_type and game_type in self.game_types:
                 PapyrusProject.log.warning('Using game type: %s (determined from Papyrus Project)' % self.game_types[game_type])
@@ -160,9 +171,61 @@ class PapyrusProject(ProjectBase):
             var_value = self.variables[var_key]
             self.variables.update({var_key: self.parse(var_value)})
 
-    def _setup_zipfile_options(self) -> None:
-        self.zip_root_path = self.parse(self.zipfile_node.get('RootDir', default=self.project_path))
+    def _update_attributes(self, parent_node: etree.ElementBase) -> None:
+        """Updates attributes of element tree with missing attributes and default values"""
+        bool_keys = ['Optimize', 'Release', 'Final', 'Anonymize', 'Package', 'Zip']
+        namespace = parent_node.nsmap[parent_node.prefix]
 
+        for node in parent_node.getiterator():
+            if node.text:
+                node.text = self.parse(node.text)
+
+            if not node.attrib:
+                continue
+
+            tag = node.tag.replace('{%s}' % namespace, '')
+
+            if tag == 'PapyrusProject':
+                if 'Game' not in node.attrib:
+                    node.set('Game', '')
+                if 'Flags' not in node.attrib:
+                    node.set('Flags', self.options.flags_path)
+                if 'Output' not in node.attrib:
+                    node.set('Output', self.options.output_path)
+                for key in bool_keys:
+                    if key not in node.attrib:
+                        node.set(key, 'False')
+
+            elif tag == 'Packages':
+                if 'Output' not in node.attrib:
+                    node.set('Output', self.options.package_path)
+
+            elif tag == 'Package':
+                if 'Name' not in node.attrib:
+                    node.set('Name', self.project_name)
+                if 'RootDir' not in node.attrib:
+                    node.set('RootDir', self.project_path)
+
+            elif tag in ('Folder', 'Include'):
+                if 'NoRecurse' not in node.attrib:
+                    node.set('NoRecurse', 'False')
+
+            elif tag == 'ZipFile':
+                if 'Name' not in node.attrib:
+                    node.set('Name', self.project_name)
+                if 'RootDir' not in node.attrib:
+                    node.set('RootDir', self.project_path)
+                if 'Output' not in node.attrib:
+                    node.set('Output', self.options.zip_output_path)
+                if 'Compression' not in node.attrib:
+                    node.set('Compression', 'deflate')
+
+            # parse values
+            for key, value in node.attrib.items():
+                value = value.casefold() in ('true', '1') if key in bool_keys + ['NoRecurse'] else self.parse(value)
+                node.set(key, str(value))
+
+    def _setup_zipfile_options(self) -> None:
         # zip - required attribute
         if not os.path.isabs(self.zip_root_path):
             test_path: str = os.path.normpath(os.path.join(self.project_path, self.zip_root_path))
@@ -174,24 +237,13 @@ class PapyrusProject(ProjectBase):
                 sys.exit(1)
 
         # zip - optional attributes
-        self.zip_file_name: str = self.parse(self.zipfile_node.get('Name', default=self.project_name))
         if not self.zip_file_name.casefold().endswith('.zip'):
             self.zip_file_name = '%s.zip' % self.zip_file_name
-
-        self.options.zip_output_path = self.parse(self.zipfile_node.get('Output', default=self.options.zip_output_path))
-
-        if not self.options.zip_compression:
-            self.options.zip_compression = self.parse(self.zipfile_node.get('Compression', default='deflate').casefold())
 
         if self.options.zip_compression not in ('store', 'deflate'):
             self.options.zip_compression = 'deflate'
 
         self.compress_type: int = zipfile.ZIP_STORED if self.options.zip_compression == 'store' else zipfile.ZIP_DEFLATED
-
-    @staticmethod
-    def get_attr_as_bool(node: etree.ElementBase, attribute_name: str, default_value: str = 'false') -> bool:
-        attr: str = node.get(attribute_name, default=default_value).casefold()
-        return any([attr == 'true', attr == '1'])
 
     @staticmethod
     def _strip_xml_comments(path: str) -> io.StringIO:
@@ -219,19 +271,19 @@ class PapyrusProject(ProjectBase):
             if os.path.isfile(pex_path):
                 continue
 
-            results.append(psc_path)
+            if psc_path not in results:
+                results.append(psc_path)
 
-        return PathHelper.uniqify(results)
+        return results
 
     def _get_import_paths(self) -> list:
         """Returns absolute import paths from Papyrus Project"""
         results: list = []
 
-        import_nodes: etree.ElementBase = ElementHelper.get(self.root_node, 'Imports')
-        if import_nodes is None:
+        if not self.has_imports_node:
             return []
 
-        for import_node in import_nodes:
+        for import_node in self.imports_node:
             if not import_node.tag.endswith('Import'):
                 continue
 
@@ -259,11 +311,10 @@ class PapyrusProject(ProjectBase):
         """Returns absolute implicit import paths from Folder node paths"""
         implicit_paths: list = []
 
-        folder_nodes = ElementHelper.get(self.root_node, 'Folders')
-        if folder_nodes is None:
+        if not self.has_folders_node:
             return []
 
-        for folder_node in folder_nodes:
+        for folder_node in self.folders_node:
             if not folder_node.tag.endswith('Folder'):
                 continue
 
@@ -316,14 +367,15 @@ class PapyrusProject(ProjectBase):
         paths: list = []
 
         # try to populate paths with scripts from Folders and Scripts nodes
-        for tag in ('Folders', 'Scripts'):
-            node = ElementHelper.get(self.root_node, tag)
-            if node is None:
-                continue
-            node_paths = getattr(self, '_get_script_paths_from_%s_node' % tag.casefold())()
-            PapyrusProject.log.info('%s script paths discovered from %s nodes.' % (len(node_paths), tag[:-1]))
-            if node_paths:
-                paths.extend(node_paths)
+        if self.has_folders_node:
+            for script_path in self._get_script_paths_from_folders_node():
+                if script_path not in paths:
+                    paths.append(script_path)
+
+        if self.has_scripts_node:
+            for script_path in self._get_script_paths_from_scripts_node():
+                if script_path not in paths:
+                    paths.append(script_path)
 
         results: list = []
 
@@ -356,16 +408,11 @@ class PapyrusProject(ProjectBase):
 
         return results
 
-    def _get_script_paths_from_folders_node(self) -> list:
+    def _get_script_paths_from_folders_node(self) -> typing.Generator:
         """Returns script paths from the Folders element array"""
-        folder_nodes = ElementHelper.get(self.root_node, 'Folders')
-        if folder_nodes is None:
-            return []
-
-        script_paths: list = []
         folder_paths: list = []
 
-        for folder_node in folder_nodes:
+        for folder_node in self.folders_node:
             if not folder_node.tag.endswith('Folder'):
                 continue
 
@@ -375,7 +422,7 @@ class PapyrusProject(ProjectBase):
                 self.log.warning('Folder paths cannot be equal to "%s"' % os.pardir)
                 continue
 
-            no_recurse: bool = self.get_attr_as_bool(folder_node, 'NoRecurse')
+            no_recurse: bool = folder_node.get('NoRecurse') == 'True'
 
             # try to add project path
             if folder_text == os.curdir:
@@ -404,30 +451,23 @@ class PapyrusProject(ProjectBase):
 
         for folder_path, no_recurse in folder_paths:
             search_path: str = os.path.join(folder_path, '*' if no_recurse else r'**\*')
-            script_paths.extend([f for f in glob.iglob(search_path, recursive=not no_recurse) if os.path.isfile(f) and f.casefold().endswith('.psc')])
+            for script_path in glob.iglob(search_path, recursive=not no_recurse):
+                if os.path.isfile(script_path) and script_path.casefold().endswith('.psc'):
+                    yield script_path
 
-        return PathHelper.uniqify(script_paths)
-
-    def _get_script_paths_from_scripts_node(self) -> list:
+    def _get_script_paths_from_scripts_node(self) -> typing.Generator:
         """Returns script paths from the Scripts node"""
-        paths: list = []
-
-        script_nodes = ElementHelper.get(self.root_node, 'Scripts')
-        if script_nodes is None:
-            return []
-
-        for script_node in script_nodes:
+        for script_node in self.scripts_node:
             if not script_node.tag.endswith('Script'):
                 continue
 
-            psc_path: str = self.parse(script_node.text)
+            if not script_node.text:
+                continue
 
-            if ':' in psc_path:
-                psc_path = psc_path.replace(':', os.sep)
+            if ':' in script_node.text:
+                script_node.text = script_node.text.replace(':', os.sep)
 
-            paths.append(os.path.normpath(psc_path))
-
-        return PathHelper.uniqify(paths)
+            yield os.path.normpath(script_node.text)
 
     def _try_exclude_unmodified_scripts(self) -> list:
         psc_paths: list = []
@@ -455,9 +495,10 @@ class PapyrusProject(ProjectBase):
             if os.path.getmtime(psc_path) < compiled_time:
                 continue
 
-            psc_paths.append(psc_path)
+            if psc_path not in psc_paths:
+                psc_paths.append(psc_path)
 
-        return PathHelper.uniqify(psc_paths)
+        return psc_paths
 
     def build_commands(self) -> list:
         commands: list = []
