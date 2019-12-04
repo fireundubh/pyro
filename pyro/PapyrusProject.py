@@ -290,7 +290,7 @@ class PapyrusProject(ProjectBase):
             if not import_node.text:
                 continue
 
-            import_path: str = os.path.normpath(self.parse(import_node.text))
+            import_path: str = os.path.normpath(import_node.text)
 
             if import_path == os.pardir:
                 self.log.warning('Import paths cannot be equal to "%s"' % os.pardir)
@@ -321,7 +321,7 @@ class PapyrusProject(ProjectBase):
             if not folder_node.text:
                 continue
 
-            folder_path: str = os.path.normpath(self.parse(folder_node.text))
+            folder_path: str = os.path.normpath(folder_node.text)
 
             if os.path.isabs(folder_path):
                 if os.path.isdir(folder_path):
@@ -416,20 +416,18 @@ class PapyrusProject(ProjectBase):
             if not folder_node.tag.endswith('Folder'):
                 continue
 
-            folder_text: str = self.parse(folder_node.text)
-
-            if folder_text == os.pardir:
+            if folder_node.text == os.pardir:
                 self.log.warning('Folder paths cannot be equal to "%s"' % os.pardir)
                 continue
 
             no_recurse: bool = folder_node.get('NoRecurse') == 'True'
 
             # try to add project path
-            if folder_text == os.curdir:
+            if folder_node.text == os.curdir:
                 folder_paths.append((self.project_path, no_recurse))
                 continue
 
-            folder_path: str = os.path.normpath(folder_text)
+            folder_path: str = os.path.normpath(folder_node.text)
 
             # try to add absolute path
             if os.path.isabs(folder_path) and os.path.isdir(folder_path):

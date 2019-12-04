@@ -40,17 +40,15 @@ class PackageManager(Logger):
             no_recurse: bool = include_node.get('NoRecurse') == 'True'
             wildcard_pattern: str = '*' if no_recurse else r'**\*'
 
-            include_text: str = self.ppj.parse(include_node.text)
-
-            if include_text.startswith(os.pardir):
+            if include_node.text.startswith(os.pardir):
                 PackageManager.log.warning('Include paths cannot start with ".."')
                 continue
 
-            if include_text == os.curdir or include_text.startswith(os.curdir):
-                include_text = include_text.replace(os.curdir, root_path, 1)
+            if include_node.text == os.curdir or include_node.text.startswith(os.curdir):
+                include_node.text = include_node.text.replace(os.curdir, root_path, 1)
 
             # normalize path
-            path_or_pattern = os.path.normpath(include_text)
+            path_or_pattern = os.path.normpath(include_node.text)
 
             # populate files list using simple glob patterns
             if '*' in path_or_pattern:
