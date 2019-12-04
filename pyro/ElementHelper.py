@@ -1,4 +1,5 @@
 import os
+import typing
 
 from lxml import etree
 
@@ -7,11 +8,11 @@ from pyro.Logger import Logger
 
 class ElementHelper(Logger):
     @staticmethod
-    def validate_schema(parent_element: etree.ElementBase, program_path: str) -> object:
-        namespace = [ns for ns in parent_element.nsmap.values()]
+    def validate_schema(parent_element: etree.ElementBase, program_path: str) -> typing.Optional[etree.XMLSchema]:
+        namespace = parent_element.nsmap[parent_element.prefix]
 
         if namespace:
-            schema_path = os.path.join(program_path, namespace[0])
+            schema_path = os.path.join(program_path, namespace)
 
             if os.path.isfile(schema_path):
                 schema = etree.parse(schema_path)
