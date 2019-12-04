@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "51e560e6e0e4b1d355e52e3d53dbf96f88a08f6ca688e9d84fec6f054a306c73"
+            "sha256": "cb73d8b339876d720dccdc533bf96acb8250d170c9375eb685ede5a5c1f5bfff"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -48,13 +48,6 @@
             "index": "pypi",
             "version": "==4.4.2"
         },
-        "nuitka": {
-            "hashes": [
-                "sha256:bb9e883deb92b79d6263b33d94a106808f0cf07acdcc7854fa84096a02cd97ca"
-            ],
-            "index": "pypi",
-            "version": "==0.6.5"
-        },
         "psutil": {
             "hashes": [
                 "sha256:094f899ac3ef72422b7e00411b4ed174e3c5a2e04c267db6643937ddba67a05b",
@@ -100,6 +93,13 @@
                 "sha256:2d82818f5bb3e369420cb3c4060a7970edba416647068eb4c5343488a6c604a8"
             ],
             "version": "==0.4.3"
+        },
+        "nuitka": {
+            "hashes": [
+                "sha256:bb9e883deb92b79d6263b33d94a106808f0cf07acdcc7854fa84096a02cd97ca"
+            ],
+            "index": "pypi",
+            "version": "==0.6.5"
         },
         "typed-ast": {
             "hashes": [

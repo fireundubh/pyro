@@ -5,10 +5,10 @@ verify_ssl = true
 
 [dev-packages]
 mypy = "==0.750"
+nuitka = "==0.6.5"
 
 [packages]
 lxml = "==4.4.2"
-nuitka = "==0.6.5"
 psutil = "==5.6.7"
 
 [requires]
