@@ -146,7 +146,6 @@ class BuildFacade(Logger):
                     BuildFacade.log.warning('Cannot locate file to anonymize: "%s"' % pex_path)
                     continue
 
-                BuildFacade.log.info('Anonymizing "%s"...' % pex_path)
                 Anonymizer.anonymize_script(pex_path)
 
     def try_pack(self) -> None:
