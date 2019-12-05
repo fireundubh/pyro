@@ -1,7 +1,5 @@
-import glob
 import io
 import os
-import re
 import sys
 import typing
 import zipfile
@@ -14,6 +12,7 @@ from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProjectBase import ProjectBase
 from pyro.ProjectOptions import ProjectOptions
+from pyro.XmlHelper import XmlHelper
 
 
 class PapyrusProject(ProjectBase):
@@ -24,13 +23,13 @@ class PapyrusProject(ProjectBase):
 
         # strip comments from raw text because lxml.etree.XMLParser does not remove XML-unsupported comments
         # e.g., '<PapyrusProject <!-- xmlns="PapyrusProject.xsd" -->>'
-        xml_document: io.StringIO = PapyrusProject._strip_xml_comments(self.options.input_path)
+        xml_document: io.StringIO = XmlHelper.strip_xml_comments(self.options.input_path)
 
         project_xml: etree.ElementTree = etree.parse(xml_document, xml_parser)
         self.root_node: etree.ElementBase = project_xml.getroot()
+        self.namespace = ElementHelper.get_namespace(self.root_node)
 
-        # TODO: validate earlier
-        schema: etree.XMLSchema = ElementHelper.validate_schema(self.root_node, self.program_path)
+        schema: etree.XMLSchema = XmlHelper.validate_schema(self.namespace, self.program_path)
         if schema:
             try:
                 if schema.assertValid(project_xml) is None:
@@ -40,7 +39,7 @@ class PapyrusProject(ProjectBase):
                 sys.exit(1)
 
         # variables need to be parsed before nodes are updated
-        variables_node = ElementHelper.get(self.root_node, 'Variables')
+        variables_node = ElementHelper.get_node('Variables', self.root_node, self.namespace)
         if variables_node is not None:
             self._parse_variables(variables_node)
 
@@ -59,19 +58,19 @@ class PapyrusProject(ProjectBase):
         self.options.package = self.root_node.get('Package') == 'True'
         self.options.zip = self.root_node.get('Zip') == 'True'
 
-        self.imports_node = ElementHelper.get(self.root_node, 'Imports')
+        self.imports_node = ElementHelper.get_node('Imports', self.root_node, self.namespace)
         self.has_imports_node: bool = self.imports_node is not None
 
-        self.scripts_node = ElementHelper.get(self.root_node, 'Scripts')
+        self.scripts_node = ElementHelper.get_node('Scripts', self.root_node, self.namespace)
         self.has_scripts_node: bool = self.scripts_node is not None
 
-        self.folders_node = ElementHelper.get(self.root_node, 'Folders')
+        self.folders_node = ElementHelper.get_node('Folders', self.root_node, self.namespace)
         self.has_folders_node: bool = self.folders_node is not None
 
-        self.packages_node = ElementHelper.get(self.root_node, 'Packages')
+        self.packages_node = ElementHelper.get_node('Packages', self.root_node, self.namespace)
         self.has_packages_node: bool = self.packages_node is not None
 
-        self.zip_file_node = ElementHelper.get(self.root_node, 'ZipFile')
+        self.zip_file_node = ElementHelper.get_node('ZipFile', self.root_node, self.namespace)
         self.has_zip_file_node: bool = self.zip_file_node is not None
 
         if self.options.package and self.has_packages_node:
@@ -174,7 +173,6 @@ class PapyrusProject(ProjectBase):
     def _update_attributes(self, parent_node: etree.ElementBase) -> None:
         """Updates attributes of element tree with missing attributes and default values"""
         bool_keys = ['Optimize', 'Release', 'Final', 'Anonymize', 'Package', 'Zip']
-        namespace = parent_node.nsmap[parent_node.prefix]
 
         for node in parent_node.getiterator():
             if node.text:
@@ -183,7 +181,7 @@ class PapyrusProject(ProjectBase):
             if not node.attrib:
                 continue
 
-            tag = node.tag.replace('{%s}' % namespace, '')
+            tag = node.tag.replace('{%s}' % self.namespace, '')
 
             if tag == 'PapyrusProject':
                 if 'Game' not in node.attrib:
@@ -243,15 +241,8 @@ class PapyrusProject(ProjectBase):
         if self.options.zip_compression not in ('store', 'deflate'):
             self.options.zip_compression = 'deflate'
 
-        self.compress_type: int = zipfile.ZIP_STORED if self.options.zip_compression == 'store' else zipfile.ZIP_DEFLATED
-
-    @staticmethod
-    def _strip_xml_comments(path: str) -> io.StringIO:
-        with open(path, encoding='utf-8') as f:
-            xml_document: str = f.read()
-            comments_pattern = re.compile('(<!--.*?-->)', flags=re.DOTALL)
-            xml_document = comments_pattern.sub('', xml_document)
-        return io.StringIO(xml_document)
+        use_store = self.options.zip_compression == 'store'
+        self.compress_type: int = zipfile.ZIP_STORED if use_store else zipfile.ZIP_DEFLATED
 
     def _calculate_object_name(self, psc_path: str) -> str:
         if self.options.game_type == 'fo4':
@@ -410,8 +401,6 @@ class PapyrusProject(ProjectBase):
 
     def _get_script_paths_from_folders_node(self) -> typing.Generator:
         """Returns script paths from the Folders element array"""
-        folder_paths: list = []
-
         for folder_node in self.folders_node:
             if not folder_node.tag.endswith('Folder'):
                 continue
@@ -424,34 +413,27 @@ class PapyrusProject(ProjectBase):
 
             # try to add project path
             if folder_node.text == os.curdir:
-                folder_paths.append((self.project_path, no_recurse))
+                yield from PathHelper.find_script_paths_from_folder(self.project_path, no_recurse)
                 continue
 
             folder_path: str = os.path.normpath(folder_node.text)
 
             # try to add absolute path
             if os.path.isabs(folder_path) and os.path.isdir(folder_path):
-                folder_paths.append((folder_path, no_recurse))
+                yield from PathHelper.find_script_paths_from_folder(folder_path, no_recurse)
                 continue
 
             # try to add project-relative folder path
             test_path = os.path.join(self.project_path, folder_path)
             if os.path.isdir(test_path):
-                folder_paths.append((test_path, no_recurse))
+                yield from PathHelper.find_script_paths_from_folder(test_path, no_recurse)
                 continue
 
             # try to add import-relative folder path
             for import_path in self.import_paths:
                 test_path = os.path.join(import_path, folder_path)
                 if os.path.isdir(test_path):
-                    folder_paths.append((test_path, no_recurse))
-                    continue
-
-        for folder_path, no_recurse in folder_paths:
-            search_path: str = os.path.join(folder_path, '*' if no_recurse else r'**\*')
-            for script_path in glob.iglob(search_path, recursive=not no_recurse):
-                if os.path.isfile(script_path) and script_path.casefold().endswith('.psc'):
-                    yield script_path
+                    yield from PathHelper.find_script_paths_from_folder(test_path, no_recurse)
 
     def _get_script_paths_from_scripts_node(self) -> typing.Generator:
         """Returns script paths from the Scripts node"""

@@ -11,6 +11,7 @@ from lxml import etree
 from pyro.CommandArguments import CommandArguments
 from pyro.Logger import Logger
 from pyro.PapyrusProject import PapyrusProject
+from pyro.PathHelper import PathHelper
 from pyro.ProcessManager import ProcessManager
 
 
@@ -22,18 +23,8 @@ class PackageManager(Logger):
         self.extension: str = '.ba2' if self.options.game_type == 'fo4' else '.bsa'
 
     @staticmethod
-    def _find_include_paths(search_path: str, no_recurse: bool) -> typing.Generator:
-        for include_path in glob.iglob(search_path, recursive=not no_recurse):
-            if os.path.isfile(include_path):
-                yield include_path
-
-    def _fix_package_extension(self, package_name: str) -> str:
-        if not package_name.casefold().endswith(('.ba2', '.bsa')):
-            return '%s%s' % (package_name, self.extension)
-        return '%s%s' % (os.path.splitext(package_name)[0], self.extension)
-
-    def _generate_include_paths(self, parent_node: etree.ElementBase, root_path: str) -> typing.Generator:
-        for include_node in parent_node:
+    def _generate_include_paths(includes_node: etree.ElementBase, root_path: str) -> typing.Generator:
+        for include_node in includes_node:
             if not include_node.tag.endswith('Include'):
                 continue
 
@@ -41,7 +32,7 @@ class PackageManager(Logger):
             wildcard_pattern: str = '*' if no_recurse else r'**\*'
 
             if include_node.text.startswith(os.pardir):
-                PackageManager.log.warning('Include paths cannot start with ".."')
+                PackageManager.log.warning('Include paths cannot start with "%s"' % os.pardir)
                 continue
 
             if include_node.text == os.curdir or include_node.text.startswith(os.curdir):
@@ -74,7 +65,7 @@ class PackageManager(Logger):
                     yield path_or_pattern
                 else:
                     search_path = os.path.join(path_or_pattern, wildcard_pattern)
-                    yield from self._find_include_paths(search_path, no_recurse)
+                    yield from PathHelper.find_include_paths(search_path, no_recurse)
 
             else:
                 # populate files list using relative file path
@@ -85,7 +76,12 @@ class PackageManager(Logger):
                 # populate files list using relative folder path
                 else:
                     search_path = os.path.join(root_path, path_or_pattern, wildcard_pattern)
-                    yield from self._find_include_paths(search_path, no_recurse)
+                    yield from PathHelper.find_include_paths(search_path, no_recurse)
+
+    def _fix_package_extension(self, package_name: str) -> str:
+        if not package_name.casefold().endswith(('.ba2', '.bsa')):
+            return '%s%s' % (package_name, self.extension)
+        return '%s%s' % (os.path.splitext(package_name)[0], self.extension)
 
     def build_commands(self, containing_folder: str, output_path: str) -> str:
         """Returns arguments for BSArch as a string"""
@@ -156,8 +152,8 @@ class PackageManager(Logger):
                 shutil.copy2(source_path, target_path)
 
             # run bsarch
-            commands: str = self.build_commands(self.options.temp_path, package_path)
-            ProcessManager.run(commands, use_bsarch=True)
+            command: str = self.build_commands(self.options.temp_path, package_path)
+            ProcessManager.run_bsarch(command)
 
             # clear temporary data
             if os.path.isdir(self.options.temp_path):

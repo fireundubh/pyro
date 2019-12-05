@@ -9,7 +9,8 @@ from pyro.PexReader import PexReader
 class Anonymizer(Logger):
     @staticmethod
     def _randomize_str(size: int, uppercase: bool = False) -> str:
-        return ''.join([random.choice(string.ascii_lowercase if not uppercase else string.ascii_uppercase) for _ in range(size)])
+        charset = string.ascii_uppercase if uppercase else string.ascii_lowercase
+        return ''.join([random.choice(charset) for _ in range(size)])
 
     @staticmethod
     def anonymize_script(path: str) -> None:

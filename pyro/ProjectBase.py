@@ -126,9 +126,8 @@ class ProjectBase(Logger):
         key_head, key_tail = os.path.split(key_path)
 
         # fix absolute registry paths, if needed
-        if any([hkey == value for value in ('HKCU', 'HKEY_CURRENT_USER', 'HKLM', 'HKEY_LOCAL_MACHINE')]):
-            if any([hkey == value for value in ('HKCU', 'HKEY_CURRENT_USER')]):
-                registry_type = winreg.HKEY_CURRENT_USER
+        if any([hkey == value for value in ('HKCU', 'HKEY_CURRENT_USER')]):
+            registry_type = winreg.HKEY_CURRENT_USER
 
         try:
             registry_key = winreg.OpenKey(registry_type, key_head, 0, winreg.KEY_READ)

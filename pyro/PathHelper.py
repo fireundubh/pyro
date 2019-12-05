@@ -1,4 +1,6 @@
+import glob
 import os
+import typing
 from collections import OrderedDict
 
 
@@ -13,6 +15,19 @@ class PathHelper:
                 relative_path = os.path.relpath(path, import_path)
                 return relative_path
         raise ValueError('Cannot build import-relative path from absolute path: "%s"' % path)
+
+    @staticmethod
+    def find_include_paths(search_path: str, no_recurse: bool) -> typing.Generator:
+        for include_path in glob.iglob(search_path, recursive=not no_recurse):
+            if os.path.isfile(include_path):
+                yield include_path
+
+    @staticmethod
+    def find_script_paths_from_folder(folder_path: str, no_recurse: bool) -> typing.Generator:
+        search_path: str = os.path.join(folder_path, '*' if no_recurse else r'**\*')
+        for script_path in glob.iglob(search_path, recursive=not no_recurse):
+            if os.path.isfile(script_path) and script_path.casefold().endswith('.psc'):
+                yield script_path
 
     @staticmethod
     def uniqify(items: list) -> list:

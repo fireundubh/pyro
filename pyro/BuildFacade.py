@@ -27,8 +27,11 @@ class BuildFacade(Logger):
         options: dict = deepcopy(self.ppj.options.__dict__)
 
         for key in options:
-            if key not in ('args', 'input_path', 'anonymize', 'package', 'zip', 'zip_compression') and not key.startswith(('ignore_', 'no_')):
-                setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
+            if key in ('args', 'input_path', 'anonymize', 'package', 'zip', 'zip_compression'):
+                continue
+            if key.startswith(('ignore_', 'no_')):
+                continue
+            setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
 
         # record project options in log
         if self.ppj.options.log_path:
@@ -57,7 +60,7 @@ class BuildFacade(Logger):
         keep_count -= 1
 
         log_files = [f for f in os.listdir(self.ppj.options.log_path) if f.endswith('.log')]
-        if not (len(log_files) > keep_count):
+        if not len(log_files) > keep_count:
             return
 
         log_paths = [os.path.join(self.ppj.options.log_path, f) for f in log_files]
@@ -116,14 +119,14 @@ class BuildFacade(Logger):
 
         if self.ppj.options.no_parallel or command_count == 1:
             for command in commands:
-                if ProcessManager.run(command) == ProcessState.SUCCESS:
+                if ProcessManager.run_compiler(command) == ProcessState.SUCCESS:
                     success_count += 1
         elif command_count > 0:
             multiprocessing.freeze_support()
             worker_limit = min(command_count, self.ppj.options.worker_limit)
             pool = multiprocessing.Pool(processes=worker_limit,
                                         initializer=BuildFacade._limit_priority)
-            for state in pool.imap(ProcessManager.run, commands):
+            for state in pool.imap(ProcessManager.run_compiler, commands):
                 if state == ProcessState.SUCCESS:
                     success_count += 1
             pool.close()
