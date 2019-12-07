@@ -1,9 +1,7 @@
 from lxml import etree
 
-from pyro.Logger import Logger
 
-
-class ElementHelper(Logger):
+class ElementHelper:
     @staticmethod
     def get_namespace(parent_element: etree.ElementBase) -> str:
         nsmap = parent_element.nsmap
