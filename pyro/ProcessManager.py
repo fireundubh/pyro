@@ -20,12 +20,6 @@ class ProcessManager(Logger):
 
     @staticmethod
     def run_bsarch(command: str) -> ProcessState:
-        command_size = len(command)
-
-        if command_size > 32768:
-            ProcessManager.log.error('Cannot create process because command exceeds max length: %s' % command_size)
-            return ProcessState.FAILURE
-
         try:
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
         except WindowsError as e:
