@@ -1,5 +1,6 @@
 import fnmatch
 import glob
+import logging
 import os
 import shutil
 import sys
@@ -9,13 +10,14 @@ import zipfile
 from lxml import etree
 
 from pyro.CommandArguments import CommandArguments
-from pyro.Logger import Logger
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
 from pyro.ProcessManager import ProcessManager
 
 
-class PackageManager(Logger):
+class PackageManager:
+    log = logging.getLogger('pyro')
+
     def __init__(self, ppj: PapyrusProject) -> None:
         self.ppj = ppj
         self.options = ppj.options

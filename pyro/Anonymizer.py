@@ -1,12 +1,14 @@
+import logging
 import os
 import random
 import string
 
-from pyro.Logger import Logger
 from pyro.PexReader import PexReader
 
 
-class Anonymizer(Logger):
+class Anonymizer:
+    log = logging.getLogger('pyro')
+
     @staticmethod
     def _randomize_str(size: int, uppercase: bool = False) -> str:
         charset = string.ascii_uppercase if uppercase else string.ascii_lowercase

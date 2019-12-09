@@ -1,13 +1,15 @@
+import logging
 import os
 import re
 import subprocess
 from decimal import Decimal
 
-from pyro.Logger import Logger
 from pyro.ProcessState import ProcessState
 
 
-class ProcessManager(Logger):
+class ProcessManager:
+    log = logging.getLogger('pyro')
+
     @staticmethod
     def _format_time(hours: Decimal, minutes: Decimal, seconds: Decimal) -> str:
         if hours.compare(0) == 1 and minutes.compare(0) == 1 and seconds.compare(0) == 1:
@@ -88,12 +90,10 @@ class ProcessManager(Logger):
             while process.poll() is None:
                 line = process.stdout.readline().strip()
 
-                exclude_lines = not line.startswith(exclusions)
+                if not line or line.startswith(exclusions):
+                    continue
 
                 match = line_error.search(line)
-
-                if line and exclude_lines and match is None and 'error(s)' not in line:
-                    ProcessManager.log.info(line)
 
                 if match is not None:
                     path, location, message = match.groups()
@@ -101,6 +101,9 @@ class ProcessManager(Logger):
                     ProcessManager.log.error(r'COMPILATION FAILED: %s\%s%s: %s' % (os.path.basename(head), tail, location, message))
                     process.terminate()
                     return ProcessState.ERRORS
+
+                if 'error(s)' not in line:
+                    ProcessManager.log.info(line)
 
         except KeyboardInterrupt:
             try:

@@ -10,7 +10,7 @@ import zipfile
 
 class Application:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname).4s] %(message)s')
-    log: logging.Logger = logging.getLogger()
+    log: logging.Logger = logging.getLogger('pyro')
 
     def __init__(self, args: argparse.Namespace) -> None:
         self.root_path: str = os.path.dirname(__file__)

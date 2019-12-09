@@ -1,4 +1,5 @@
 import json
+import logging
 import multiprocessing
 import os
 import sys
@@ -9,7 +10,6 @@ import psutil
 
 from pyro.Anonymizer import Anonymizer
 from pyro.JsonLogger import JsonLogger
-from pyro.Logger import Logger
 from pyro.PackageManager import PackageManager
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
@@ -19,7 +19,9 @@ from pyro.ProcessState import ProcessState
 from pyro.TimeElapsed import TimeElapsed
 
 
-class BuildFacade(Logger):
+class BuildFacade:
+    log = logging.getLogger('pyro')
+
     def __init__(self, ppj: PapyrusProject):
         self.ppj = ppj
 

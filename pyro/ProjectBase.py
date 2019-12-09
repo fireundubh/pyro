@@ -1,12 +1,14 @@
+import logging
 import os
 import sys
 
-from pyro.Logger import Logger
 from pyro.ProjectOptions import ProjectOptions
 from pyro.StringTemplate import StringTemplate
 
 
-class ProjectBase(Logger):
+class ProjectBase:
+    log = logging.getLogger('pyro')
+
     def __init__(self, options: ProjectOptions) -> None:
         self.options: ProjectOptions = options
 

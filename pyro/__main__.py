@@ -1,10 +1,10 @@
 import argparse
+import logging
 import os
 import sys
 from urllib.parse import unquote_plus, urlparse
 
 from pyro.BuildFacade import BuildFacade
-from pyro.Logger import Logger
 from pyro.PapyrusProject import PapyrusProject
 from pyro.ProjectOptions import ProjectOptions
 from pyro.PyroArgumentParser import PyroArgumentParser
@@ -12,7 +12,10 @@ from pyro.PyroRawDescriptionHelpFormatter import PyroRawTextHelpFormatter
 from pyro.TimeElapsed import TimeElapsed
 
 
-class Application(Logger):
+class Application:
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname).4s] %(message)s')
+    log = logging.getLogger('pyro')
+
     def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
         self._validate_args()
@@ -89,9 +92,13 @@ class Application(Logger):
 
         self._validate_project(ppj)
 
-        Application.print_list('Imports found:', ppj.import_paths)
+        Application.log.info('Imports found:')
+        for path in ppj.import_paths:
+            Application.log.info('+ "%s"' % path)
 
-        Application.print_list('Scripts found:', ppj.psc_paths)
+        Application.log.info('Scripts found:')
+        for path in ppj.psc_paths:
+            Application.log.info('+ "%s"' % path)
 
         time_elapsed = TimeElapsed()
 
