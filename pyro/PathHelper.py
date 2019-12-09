@@ -2,6 +2,7 @@ import glob
 import os
 import typing
 from collections import OrderedDict
+from urllib.parse import unquote_plus, urlparse
 
 
 class PathHelper:
@@ -64,3 +65,18 @@ class PathHelper:
 
             # insert orphan implicit path at the first position
             import_paths.insert(0, implicit_path)
+
+    @staticmethod
+    def url2pathname(url_path: str) -> str:
+        url = urlparse(url_path)
+
+        netloc: str = url.netloc
+        path: str = url.path
+
+        if netloc and netloc.startswith('/'):
+            netloc = netloc[1:]
+
+        if path and path.startswith('/'):
+            path = path[1:]
+
+        return os.path.normpath(unquote_plus(os.path.join(netloc, path)))

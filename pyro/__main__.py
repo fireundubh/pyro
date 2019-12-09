@@ -2,10 +2,10 @@ import argparse
 import logging
 import os
 import sys
-from urllib.parse import unquote_plus, urlparse
 
 from pyro.BuildFacade import BuildFacade
 from pyro.PapyrusProject import PapyrusProject
+from pyro.PathHelper import PathHelper
 from pyro.ProjectOptions import ProjectOptions
 from pyro.PyroArgumentParser import PyroArgumentParser
 from pyro.PyroRawDescriptionHelpFormatter import PyroRawTextHelpFormatter
@@ -19,21 +19,6 @@ class Application:
     def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
         self._validate_args()
-
-    @staticmethod
-    def _url2pathname(url_path: str) -> str:
-        url = urlparse(url_path)
-
-        netloc: str = url.netloc
-        path: str = url.path
-
-        if netloc and netloc.startswith('/'):
-            netloc = netloc[1:]
-
-        if path and path.startswith('/'):
-            path = path[1:]
-
-        return os.path.normpath(unquote_plus(os.path.join(netloc, path)))
 
     def _validate_args(self) -> None:
         if self.args.show_help:
@@ -50,7 +35,7 @@ class Application:
             sys.exit(print_help())
 
         if input_path.casefold().startswith('file:'):
-            full_path: str = Application._url2pathname(input_path)
+            full_path: str = PathHelper.url2pathname(input_path)
             input_path = os.path.normpath(full_path)
 
         if not os.path.isabs(input_path):
