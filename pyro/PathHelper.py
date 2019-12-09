@@ -1,7 +1,7 @@
 import glob
 import os
-import typing
 from collections import OrderedDict
+from typing import Generator
 from urllib.parse import unquote_plus, urlparse
 
 
@@ -18,13 +18,15 @@ class PathHelper:
         raise ValueError('Cannot build import-relative path from absolute path: "%s"' % path)
 
     @staticmethod
-    def find_include_paths(search_path: str, no_recurse: bool) -> typing.Generator:
+    def find_include_paths(search_path: str, no_recurse: bool) -> Generator:
+        """Yields existing file paths from absolute search path"""
         for include_path in glob.iglob(search_path, recursive=not no_recurse):
             if os.path.isfile(include_path):
                 yield include_path
 
     @staticmethod
-    def find_script_paths_from_folder(folder_path: str, no_recurse: bool) -> typing.Generator:
+    def find_script_paths_from_folder(folder_path: str, no_recurse: bool) -> Generator:
+        """Yields existing script paths starting from absolute folder path"""
         search_path: str = os.path.join(folder_path, '*' if no_recurse else r'**\*')
         for script_path in glob.iglob(search_path, recursive=not no_recurse):
             if os.path.isfile(script_path) and script_path.casefold().endswith('.psc'):
@@ -37,6 +39,7 @@ class PathHelper:
 
     @staticmethod
     def find_index_of_ancestor_import_path(implicit_path: str, import_paths: list) -> int:
+        """Returns index of ancestor of implicit path in import paths"""
         for i, import_path in enumerate(import_paths):
             if import_path.casefold() in implicit_path.casefold():
                 return i
@@ -68,6 +71,7 @@ class PathHelper:
 
     @staticmethod
     def url2pathname(url_path: str) -> str:
+        """Returns normalized unquoted path from URL"""
         url = urlparse(url_path)
 
         netloc: str = url.netloc
