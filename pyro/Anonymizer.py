@@ -3,7 +3,7 @@ import os
 import random
 import string
 
-from pyro.PexReader import PexHeader
+from pyro.PexHeader import PexHeader
 from pyro.PexReader import PexReader
 
 
