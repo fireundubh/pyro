@@ -16,6 +16,8 @@ class Application:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname).4s] %(message)s')
     log = logging.getLogger('pyro')
 
+    args: argparse.Namespace = None
+
     def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
         self._validate_args()

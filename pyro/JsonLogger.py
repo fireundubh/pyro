@@ -5,7 +5,10 @@ from pyro.PapyrusProject import PapyrusProject
 
 
 class JsonLogger:
-    def __init__(self, ppj: PapyrusProject):
+    ppj: PapyrusProject = None
+    log_file: str = ''
+
+    def __init__(self, ppj: PapyrusProject) -> None:
         self.ppj = ppj
 
         files = os.listdir(self.ppj.options.log_path) if self.ppj.options.log_path else []

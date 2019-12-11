@@ -18,19 +18,25 @@ class PexStr(PexData):
 
 class PexHeader:
     size: int = 0
+
     magic: PexInt = PexInt()
     major_version: PexInt = PexInt()
     minor_version: PexInt = PexInt()
     game_id: PexInt = PexInt()
     compilation_time: PexInt = PexInt()
+
     script_path_size: PexInt = PexInt()
     script_path: PexStr = PexStr()
+
     user_name_size: PexInt = PexInt()
     user_name: PexStr = PexStr()
+
     computer_name_size: PexInt = PexInt()
     computer_name: PexStr = PexStr()
 
-    def __init__(self, endianness: str = 'little'):
+    endianness: str = ''
+
+    def __init__(self, endianness: str = 'little') -> None:
         self.endianness = endianness
 
     def read(self, f: IO, name: str, length: int) -> None:

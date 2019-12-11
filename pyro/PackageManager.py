@@ -13,16 +13,21 @@ from pyro.CommandArguments import CommandArguments
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
 from pyro.ProcessManager import ProcessManager
+from pyro.ProjectOptions import ProjectOptions
 
 
 class PackageManager:
-    log = logging.getLogger('pyro')
+    log: logging.Logger = logging.getLogger('pyro')
+
+    ppj: PapyrusProject = None
+    options: ProjectOptions = None
+    extension: str = ''
 
     def __init__(self, ppj: PapyrusProject) -> None:
         self.ppj = ppj
         self.options = ppj.options
 
-        self.extension: str = '.ba2' if self.options.game_type == 'fo4' else '.bsa'
+        self.extension = '.ba2' if self.options.game_type == 'fo4' else '.bsa'
 
     @staticmethod
     def _generate_include_paths(includes_node: etree.ElementBase, root_path: str) -> typing.Generator:

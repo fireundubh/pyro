@@ -7,27 +7,32 @@ from pyro.StringTemplate import StringTemplate
 
 
 class ProjectBase:
-    log = logging.getLogger('pyro')
+    log: logging.Logger = logging.getLogger('pyro')
+
+    options: ProjectOptions = None
+
+    game_types: dict = {'sse': 'Skyrim Special Edition', 'tesv': 'Skyrim', 'fo4': 'Fallout 4'}
+    variables: dict = {}
+
+    program_path: str = ''
+    project_name: str = ''
+    project_path: str = ''
+
+    import_paths: list = []
+
+    final: bool = False
+    optimize: bool = False
+    release: bool = False
 
     def __init__(self, options: ProjectOptions) -> None:
-        self.options: ProjectOptions = options
+        self.options = options
 
-        self.game_types: dict = {'sse': 'Skyrim Special Edition', 'tesv': 'Skyrim', 'fo4': 'Fallout 4'}
-
-        self.program_path: str = os.path.dirname(__file__)
+        self.program_path = os.path.dirname(__file__)
         if sys.argv[0].endswith(('pyro', '.exe')):
             self.program_path = os.path.abspath(os.path.join(self.program_path, os.pardir))
 
-        self.project_name: str = os.path.splitext(os.path.basename(self.options.input_path))[0]
-        self.project_path: str = os.path.dirname(self.options.input_path)
-
-        self.variables: dict = {}
-
-        self.import_paths: list = []
-
-        self.optimize: bool = False
-        self.release: bool = False
-        self.final: bool = False
+        self.project_name = os.path.splitext(os.path.basename(self.options.input_path))[0]
+        self.project_path = os.path.dirname(self.options.input_path)
 
     def __setattr__(self, key: str, value: object) -> None:
         if key.endswith('path') and isinstance(value, str):

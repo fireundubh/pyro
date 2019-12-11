@@ -8,7 +8,7 @@ from pyro.ProcessState import ProcessState
 
 
 class ProcessManager:
-    log = logging.getLogger('pyro')
+    log: logging.Logger = logging.getLogger('pyro')
 
     @staticmethod
     def _format_time(hours: Decimal, minutes: Decimal, seconds: Decimal) -> str:

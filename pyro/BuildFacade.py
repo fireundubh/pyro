@@ -20,9 +20,12 @@ from pyro.TimeElapsed import TimeElapsed
 
 
 class BuildFacade:
-    log = logging.getLogger('pyro')
+    log: logging.Logger = logging.getLogger('pyro')
 
-    def __init__(self, ppj: PapyrusProject):
+    ppj: PapyrusProject = None
+    log_file: JsonLogger = None
+
+    def __init__(self, ppj: PapyrusProject) -> None:
         self.ppj = ppj
 
         # WARN: if methods are renamed and their respective option names are not, this will break.

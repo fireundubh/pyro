@@ -16,6 +16,27 @@ from pyro.XmlHelper import XmlHelper
 
 
 class PapyrusProject(ProjectBase):
+    root_node: etree.ElementBase = None
+    folders_node: etree.ElementBase = None
+    imports_node: etree.ElementBase = None
+    packages_node: etree.ElementBase = None
+    scripts_node: etree.ElementBase = None
+    zip_file_node: etree.ElementBase = None
+
+    has_folders_node: bool = False
+    has_imports_node: bool = False
+    has_packages_node: bool = False
+    has_scripts_node: bool = False
+    has_zip_file_node: bool = False
+
+    namespace: str = ''
+    zip_file_name: str = ''
+    zip_root_path: str = ''
+
+    missing_scripts: list = []
+    pex_paths: list = []
+    psc_paths: list = []
+
     def __init__(self, options: ProjectOptions) -> None:
         super().__init__(options)
 
@@ -26,7 +47,7 @@ class PapyrusProject(ProjectBase):
         xml_document: io.StringIO = XmlHelper.strip_xml_comments(self.options.input_path)
 
         project_xml: etree.ElementTree = etree.parse(xml_document, xml_parser)
-        self.root_node: etree.ElementBase = project_xml.getroot()
+        self.root_node = project_xml.getroot()
         self.namespace = ElementHelper.get_namespace(self.root_node)
 
         schema: etree.XMLSchema = XmlHelper.validate_schema(self.namespace, self.program_path)
@@ -50,28 +71,28 @@ class PapyrusProject(ProjectBase):
         self.options.flags_path = self.root_node.get('Flags')
         self.options.output_path = self.root_node.get('Output')
 
-        self.optimize: bool = self.root_node.get('Optimize') == 'True'
-        self.release: bool = self.root_node.get('Release') == 'True'
-        self.final: bool = self.root_node.get('Final') == 'True'
+        self.optimize = self.root_node.get('Optimize') == 'True'
+        self.release = self.root_node.get('Release') == 'True'
+        self.final = self.root_node.get('Final') == 'True'
 
         self.options.anonymize = self.root_node.get('Anonymize') == 'True'
         self.options.package = self.root_node.get('Package') == 'True'
         self.options.zip = self.root_node.get('Zip') == 'True'
 
         self.imports_node = ElementHelper.get_node('Imports', self.root_node, self.namespace)
-        self.has_imports_node: bool = self.imports_node is not None
+        self.has_imports_node = self.imports_node is not None
 
         self.scripts_node = ElementHelper.get_node('Scripts', self.root_node, self.namespace)
-        self.has_scripts_node: bool = self.scripts_node is not None
+        self.has_scripts_node = self.scripts_node is not None
 
         self.folders_node = ElementHelper.get_node('Folders', self.root_node, self.namespace)
-        self.has_folders_node: bool = self.folders_node is not None
+        self.has_folders_node = self.folders_node is not None
 
         self.packages_node = ElementHelper.get_node('Packages', self.root_node, self.namespace)
-        self.has_packages_node: bool = self.packages_node is not None
+        self.has_packages_node = self.packages_node is not None
 
         self.zip_file_node = ElementHelper.get_node('ZipFile', self.root_node, self.namespace)
-        self.has_zip_file_node: bool = self.zip_file_node is not None
+        self.has_zip_file_node = self.zip_file_node is not None
 
         if self.options.package and self.has_packages_node:
             self.options.package_path = self.packages_node.get('Output')
@@ -85,7 +106,7 @@ class PapyrusProject(ProjectBase):
 
         # we need to populate the list of import paths before we try to determine the game type
         # because the game type can be determined from import paths
-        self.import_paths: list = self._get_import_paths()
+        self.import_paths = self._get_import_paths()
         if not self.import_paths:
             PapyrusProject.log.error('Failed to build list of import paths')
             sys.exit(1)
@@ -98,7 +119,7 @@ class PapyrusProject(ProjectBase):
             if path in self.import_paths:
                 PapyrusProject.log.warning('Using import path implicitly: "%s"' % path)
 
-        self.psc_paths: list = self._get_psc_paths()
+        self.psc_paths = self._get_psc_paths()
         if not self.psc_paths:
             PapyrusProject.log.error('Failed to build list of script paths')
             sys.exit(1)
@@ -128,10 +149,10 @@ class PapyrusProject(ProjectBase):
             sys.exit(1)
 
         # get expected pex paths - these paths may not exist and that is okay!
-        self.pex_paths: list = self._get_pex_paths()
+        self.pex_paths = self._get_pex_paths()
 
         # these are relative paths to psc scripts whose pex counterparts are missing
-        self.missing_scripts: list = self._find_missing_script_paths()
+        self.missing_scripts = self._find_missing_script_paths()
 
         # game type must be set before we call this
         if not self.options.game_path:
