@@ -38,7 +38,7 @@ class PapyrusProject(ProjectBase):
     psc_paths: list = []
 
     def __init__(self, options: ProjectOptions) -> None:
-        super().__init__(options)
+        super(PapyrusProject, self).__init__(options)
 
         xml_parser: etree.XMLParser = etree.XMLParser(remove_blank_text=True, remove_comments=True)
 
@@ -47,22 +47,24 @@ class PapyrusProject(ProjectBase):
         xml_document: io.StringIO = XmlHelper.strip_xml_comments(self.options.input_path)
 
         project_xml: etree.ElementTree = etree.parse(xml_document, xml_parser)
+
         self.root_node = project_xml.getroot()
         self.namespace = ElementHelper.get_namespace(self.root_node)
 
         schema: etree.XMLSchema = XmlHelper.validate_schema(self.namespace, self.program_path)
+
         if schema:
             try:
-                if schema.assertValid(project_xml) is None:
-                    PapyrusProject.log.info('Successfully validated XML Schema.')
+                schema.assertValid(project_xml)
             except etree.DocumentInvalid as e:
                 PapyrusProject.log.error('Failed to validate XML Schema.%s\t%s' % (os.linesep, e))
                 sys.exit(1)
+            else:
+                PapyrusProject.log.info('Successfully validated XML Schema.')
 
         # variables need to be parsed before nodes are updated
         variables_node = ElementHelper.get_node('Variables', self.root_node, self.namespace)
-        if variables_node is not None:
-            self._parse_variables(variables_node)
+        self._parse_variables(variables_node)
 
         # we need to parse all attributes after validating and before we do anything else
         # options can be overridden by arguments when the BuildFacade is initialized
@@ -115,10 +117,9 @@ class PapyrusProject(ProjectBase):
         implicit_folder_paths: list = self._get_implicit_folder_imports()
         PathHelper.merge_implicit_import_paths(implicit_folder_paths, self.import_paths)
 
-        for path in implicit_folder_paths:
-            if path in self.import_paths:
-                PapyrusProject.log.warning('Using import path implicitly: "%s"' % path)
-
+        # we need to populate psc paths after explicit and implicit import paths are populated
+        # this also needs to be set before we populate implicit import paths from psc paths
+        # not sure if this must run again after populating implicit import paths from psc paths
         self.psc_paths = self._get_psc_paths()
         if not self.psc_paths:
             PapyrusProject.log.error('Failed to build list of script paths')
@@ -128,9 +129,8 @@ class PapyrusProject(ProjectBase):
         implicit_script_paths: list = self._get_implicit_script_imports()
         PathHelper.merge_implicit_import_paths(implicit_script_paths, self.import_paths)
 
-        for path in implicit_script_paths:
-            if path in self.import_paths:
-                PapyrusProject.log.warning('Using import path implicitly: "%s"' % path)
+        for path in (p for p in implicit_folder_paths + implicit_script_paths if p in self.import_paths):
+            PapyrusProject.log.warning('Using import path implicitly: "%s"' % path)
 
         # we need to set the game type after imports are populated but before pex paths are populated
         # allow xml to set game type but defer to passed argument
@@ -159,6 +159,9 @@ class PapyrusProject(ProjectBase):
             self.options.game_path = self.get_game_path()
 
     def _parse_variables(self, variables_node: etree.ElementBase) -> None:
+        if variables_node is None:
+            return
+
         reserved_characters: tuple = ('!', '#', '$', '%', '^', '&', '*')
 
         for variable_node in variables_node:
@@ -175,15 +178,14 @@ class PapyrusProject(ProjectBase):
                 PapyrusProject.log.error('The name of the variable "%s" must be an alphanumeric string.' % var_key)
                 sys.exit(1)
 
-            if any([c in reserved_characters for c in var_value]):
+            if any(c in reserved_characters for c in var_value):
                 PapyrusProject.log.error('The value of the variable "%s" contains a reserved character.' % var_key)
                 sys.exit(1)
 
             self.variables.update({var_key: var_value})
 
         # allow variables to reference other variables
-        for var_key in self.variables:
-            var_value = self.variables[var_key]
+        for var_key, var_value in self.variables.items():
             self.variables.update({var_key: self.parse(var_value)})
 
         # complete round trip so that order does not matter
@@ -267,10 +269,8 @@ class PapyrusProject(ProjectBase):
 
     def _calculate_object_name(self, psc_path: str) -> str:
         if self.options.game_type == 'fo4':
-            object_name = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
-        else:
-            object_name = os.path.basename(psc_path)
-        return object_name
+            return PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
+        return os.path.basename(psc_path)
 
     def _find_missing_script_paths(self) -> list:
         """Returns list of script paths for compiled scripts that do not exist"""
@@ -351,8 +351,10 @@ class PapyrusProject(ProjectBase):
 
         for psc_path in self.psc_paths:
             script_folder_path = os.path.dirname(psc_path)
+
             for import_path in self.import_paths:
                 relpath = os.path.relpath(script_folder_path, import_path)
+
                 test_path = os.path.normpath(os.path.join(import_path, relpath))
                 if os.path.isdir(test_path):
                     implicit_paths.append(test_path)
@@ -370,24 +372,23 @@ class PapyrusProject(ProjectBase):
 
             pex_path = os.path.join(self.options.output_path, object_name.replace('.psc', '.pex'))
 
-            pex_paths.append(pex_path)
+            if pex_path not in pex_paths:
+                pex_paths.append(pex_path)
 
-        return PathHelper.uniqify(pex_paths)
+        return pex_paths
 
     def _get_psc_paths(self) -> list:
         """Returns script paths from Folders and Scripts nodes"""
-        paths: list = []
+        paths: set = set()
 
         # try to populate paths with scripts from Folders and Scripts nodes
         if self.has_folders_node:
             for script_path in self._get_script_paths_from_folders_node():
-                if script_path not in paths:
-                    paths.append(script_path)
+                paths.add(script_path)
 
         if self.has_scripts_node:
             for script_path in self._get_script_paths_from_scripts_node():
-                if script_path not in paths:
-                    paths.append(script_path)
+                paths.add(script_path)
 
         results: list = []
 
@@ -470,8 +471,8 @@ class PapyrusProject(ProjectBase):
 
             yield os.path.normpath(script_node.text)
 
-    def _try_exclude_unmodified_scripts(self) -> list:
-        psc_paths: list = []
+    def _try_exclude_unmodified_scripts(self) -> set:
+        psc_paths: set = set()
 
         for psc_path in self.psc_paths:
             script_name, _ = os.path.splitext(os.path.basename(psc_path))
@@ -497,7 +498,7 @@ class PapyrusProject(ProjectBase):
                 continue
 
             if psc_path not in psc_paths:
-                psc_paths.append(psc_path)
+                psc_paths.add(psc_path)
 
         return psc_paths
 
@@ -514,12 +515,11 @@ class PapyrusProject(ProjectBase):
         if self.options.no_incremental_build:
             psc_paths = PathHelper.uniqify(self.psc_paths)
         else:
-            psc_paths = self._try_exclude_unmodified_scripts()
+            psc_paths = list(self._try_exclude_unmodified_scripts())
 
         # add .psc scripts whose .pex counterparts do not exist
-        for missing_psc_path in self.missing_scripts:
-            if missing_psc_path not in psc_paths:
-                psc_paths.append(missing_psc_path)
+        for missing_psc_path in [p for p in self.missing_scripts if p not in psc_paths]:
+            psc_paths.append(missing_psc_path)
 
         # generate list of commands
         for psc_path in psc_paths:

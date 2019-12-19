@@ -24,13 +24,15 @@ class PexHeader:
 
     def read(self, f: IO, name: str, length: int) -> None:
         """Reads a set of bytes and their offset to an attribute by name"""
-        if name not in self.__dict__:
+        try:
+            obj = getattr(self, name)
+        except AttributeError:
+            # this is just a guard against developer error
             raise AttributeError('Attribute "%s" does not exist in PexHeader' % name)
+        else:
+            obj.offset, obj.data = f.tell(), f.read(length)
 
-        obj = getattr(self, name)
-        obj.offset, obj.data = f.tell(), f.read(length)
-
-        if isinstance(obj, PexInt):
-            obj.value = int.from_bytes(obj.data, self.endianness, signed=False)
-        elif isinstance(obj, PexStr):
-            obj.value = obj.data.decode('ascii')
+            if isinstance(obj, PexInt):
+                obj.value = int.from_bytes(obj.data, self.endianness, signed=False)
+            elif isinstance(obj, PexStr):
+                obj.value = obj.data.decode('ascii')

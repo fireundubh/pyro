@@ -42,15 +42,16 @@ class ProjectOptions:
     log_path: str = field(init=False, default_factory=str)
 
     def __post_init__(self) -> None:
-        for key in self.__dict__:
-            if key == 'args':
+        for attr_key, attr_value in self.__dict__.items():
+            if attr_key == 'args':
                 continue
             try:
-                value = self.args.get(key)
-                if value and value != getattr(self, key):
-                    setattr(self, key, value)
+                arg_value = self.args.get(attr_key)
             except AttributeError:
                 continue
+            else:
+                if arg_value and arg_value != attr_value:
+                    setattr(self, attr_key, arg_value)
 
     def __setattr__(self, key: str, value: object) -> None:
         # sanitize paths
