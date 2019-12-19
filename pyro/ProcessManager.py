@@ -13,19 +13,19 @@ class ProcessManager:
     @staticmethod
     def _format_time(hours: Decimal, minutes: Decimal, seconds: Decimal) -> str:
         if hours.compare(0) == 1 and minutes.compare(0) == 1 and seconds.compare(0) == 1:
-            return '%sh %sm %ss' % (hours, minutes, seconds)
+            return f'{hours}h {minutes}m {seconds}s'
         if hours.compare(0) == 0 and minutes.compare(0) == 1 and seconds.compare(0) == 1:
-            return '%sm %ss' % (minutes, seconds)
+            return f'{minutes}m {seconds}s'
         if hours.compare(0) == 0 and minutes.compare(0) == 0 and seconds.compare(0) == 1:
-            return '%ss' % seconds
-        return '%sh %sm %ss' % (hours, minutes, seconds)
+            return f'{seconds}s'
+        return f'{hours}h {minutes}m {seconds}s'
 
     @staticmethod
     def run_bsarch(command: str) -> ProcessState:
         try:
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
         except WindowsError as e:
-            ProcessManager.log.error('Cannot create process because: %s.' % e.strerror)
+            ProcessManager.log.error(f'Cannot create process because: {e.strerror}')
             return ProcessState.FAILURE
 
         exclusions = ('BSArch', 'Packer', 'Version', 'Files', 'Archive Flags', '[', '*', 'Compressed', 'Retain', 'XBox', 'Startup', 'Embed', 'XMem', 'Bit', 'Format')
@@ -39,12 +39,12 @@ class ProcessManager:
 
                 if line.startswith('Packing'):
                     package_path = line.split(':', 1)[1].strip()
-                    ProcessManager.log.info('Packaging folder "%s"...' % package_path)
+                    ProcessManager.log.info(f'Packaging folder "{package_path}"...')
                     continue
 
                 if line.startswith('Archive Name'):
                     archive_path = line.split(':', 1)[1].strip()
-                    ProcessManager.log.info('Building "%s"...' % archive_path)
+                    ProcessManager.log.info(f'Building "{archive_path}"...')
                     continue
 
                 if line.startswith('Done'):
@@ -53,7 +53,7 @@ class ProcessManager:
 
                     timecode = ProcessManager._format_time(hours, minutes, seconds)
 
-                    ProcessManager.log.info('Packaging time: %s' % timecode)
+                    ProcessManager.log.info(f'Packaging time: {timecode}')
                     continue
 
                 if line:
@@ -73,13 +73,13 @@ class ProcessManager:
         command_size = len(command)
 
         if command_size > 32768:
-            ProcessManager.log.error('Cannot create process because command exceeds max length: %s' % command_size)
+            ProcessManager.log.error(f'Cannot create process because command exceeds max length: {command_size}')
             return ProcessState.FAILURE
 
         try:
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
         except WindowsError as e:
-            ProcessManager.log.error('Cannot create process because: %s.' % e.strerror)
+            ProcessManager.log.error(f'Cannot create process because: {e.strerror}')
             return ProcessState.FAILURE
 
         exclusions = ('Starting', 'Assembly', 'Compilation', 'Batch', 'Copyright', 'Papyrus', 'Failed', 'No output')
@@ -98,7 +98,7 @@ class ProcessManager:
                 if match is not None:
                     path, location, message = match.groups()
                     head, tail = os.path.split(path)
-                    ProcessManager.log.error(r'COMPILATION FAILED: %s\%s%s: %s' % (os.path.basename(head), tail, location, message))
+                    ProcessManager.log.error(f'COMPILATION FAILED: {os.path.basename(head)}\\{tail}{location}: {message}')
                     process.terminate()
                     return ProcessState.ERRORS
 

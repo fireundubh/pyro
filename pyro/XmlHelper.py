@@ -22,7 +22,7 @@ class XmlHelper:
 
         schema_path = os.path.join(program_path, namespace)
         if not os.path.isfile(schema_path):
-            raise FileExistsError('Schema file does not exist: "%s"' % schema_path)
+            raise FileExistsError(f'Schema file does not exist: "{schema_path}"')
 
         schema = etree.parse(schema_path)
         return etree.XMLSchema(schema)

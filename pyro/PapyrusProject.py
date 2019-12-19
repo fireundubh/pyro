@@ -57,7 +57,7 @@ class PapyrusProject(ProjectBase):
             try:
                 schema.assertValid(project_xml)
             except etree.DocumentInvalid as e:
-                PapyrusProject.log.error('Failed to validate XML Schema.%s\t%s' % (os.linesep, e))
+                PapyrusProject.log.error(f'Failed to validate XML Schema.{os.linesep}\t{e}')
                 sys.exit(1)
             else:
                 PapyrusProject.log.info('Successfully validated XML Schema.')
@@ -130,7 +130,7 @@ class PapyrusProject(ProjectBase):
         PathHelper.merge_implicit_import_paths(implicit_script_paths, self.import_paths)
 
         for path in (p for p in implicit_folder_paths + implicit_script_paths if p in self.import_paths):
-            PapyrusProject.log.warning('Using import path implicitly: "%s"' % path)
+            PapyrusProject.log.warning(f'Using import path implicitly: "{path}"')
 
         # we need to set the game type after imports are populated but before pex paths are populated
         # allow xml to set game type but defer to passed argument
@@ -138,7 +138,7 @@ class PapyrusProject(ProjectBase):
             game_type: str = self.root_node.get('Game', default='').casefold()
 
             if game_type and game_type in self.game_types:
-                PapyrusProject.log.warning('Using game type: %s (determined from Papyrus Project)' % self.game_types[game_type])
+                PapyrusProject.log.warning(f'Using game type: {self.game_types[game_type]} (determined from Papyrus Project)')
                 self.options.game_type = game_type
 
         if not self.options.game_type:
@@ -175,11 +175,11 @@ class PapyrusProject(ProjectBase):
                 continue
 
             if not var_key.isalnum():
-                PapyrusProject.log.error('The name of the variable "%s" must be an alphanumeric string.' % var_key)
+                PapyrusProject.log.error(f'The name of the variable "{var_key}" must be an alphanumeric string.')
                 sys.exit(1)
 
             if any(c in reserved_characters for c in var_value):
-                PapyrusProject.log.error('The value of the variable "%s" contains a reserved character.' % var_key)
+                PapyrusProject.log.error(f'The value of the variable "{var_key}" contains a reserved character.')
                 sys.exit(1)
 
             self.variables.update({var_key: var_value})
@@ -254,12 +254,12 @@ class PapyrusProject(ProjectBase):
             if os.path.isdir(test_path):
                 self.zip_root_path = test_path
             else:
-                PapyrusProject.log.error('Cannot resolve RootDir path to existing folder: "%s"' % self.zip_root_path)
+                PapyrusProject.log.error(f'Cannot resolve RootDir path to existing folder: "{self.zip_root_path}"')
                 sys.exit(1)
 
         # zip - optional attributes
         if not self.zip_file_name.casefold().endswith('.zip'):
-            self.zip_file_name = '%s.zip' % self.zip_file_name
+            self.zip_file_name = f'{self.zip_file_name}.zip'
 
         if self.options.zip_compression not in ('store', 'deflate'):
             self.options.zip_compression = 'deflate'
@@ -305,7 +305,7 @@ class PapyrusProject(ProjectBase):
             import_path: str = os.path.normpath(import_node.text)
 
             if import_path == os.pardir:
-                self.log.warning('Import paths cannot be equal to "%s"' % os.pardir)
+                self.log.warning(f'Import paths cannot be equal to "{os.pardir}"')
                 continue
 
             if import_path == os.curdir:
@@ -417,7 +417,7 @@ class PapyrusProject(ProjectBase):
 
         results = PathHelper.uniqify(results)
 
-        PapyrusProject.log.info('%s unique script paths resolved to absolute paths.' % len(results))
+        PapyrusProject.log.info(f'{len(results)} unique script paths resolved to absolute paths.')
 
         return results
 
@@ -428,7 +428,7 @@ class PapyrusProject(ProjectBase):
                 continue
 
             if folder_node.text == os.pardir:
-                self.log.warning('Folder paths cannot be equal to "%s"' % os.pardir)
+                self.log.warning(f'Folder paths cannot be equal to "{os.pardir}"')
                 continue
 
             no_recurse: bool = folder_node.get('NoRecurse') == 'True'
@@ -480,7 +480,7 @@ class PapyrusProject(ProjectBase):
             # if pex exists, compare time_t in pex header with psc's last modified timestamp
             matching_path: str = ''
             for pex_path in self.pex_paths:
-                if pex_path.endswith('%s.pex' % script_name):
+                if pex_path.endswith(f'{script_name}.pex'):
                     matching_path = pex_path
                     break
 
@@ -490,7 +490,7 @@ class PapyrusProject(ProjectBase):
             try:
                 header = PexReader.get_header(matching_path)
             except ValueError:
-                PapyrusProject.log.warning('Cannot determine compilation time from compiled script due to unknown file magic: "%s"' % matching_path)
+                PapyrusProject.log.warning(f'Cannot determine compilation time from compiled script due to unknown file magic: "{matching_path}"')
                 continue
 
             compiled_time: int = header.compilation_time.value

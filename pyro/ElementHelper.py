@@ -10,5 +10,5 @@ class ElementHelper:
 
     @staticmethod
     def get_node(tag: str, parent_element: etree.ElementBase, namespace: str) -> etree.ElementBase:
-        path = tag if not namespace else 'ns:%s' % tag, {'ns': '%s' % namespace}
+        path = tag if not namespace else f'ns:{tag}', {'ns': namespace}
         return parent_element.find(*path)

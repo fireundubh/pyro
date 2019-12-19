@@ -64,7 +64,7 @@ class ProjectBase:
         try:
             return os.path.expanduser(os.path.expandvars(t.substitute(self.variables)))
         except KeyError as e:
-            ProjectBase.log.error('Failed to parse variable "%s" in "%s" - is the variable name correct?' % (e.args[0], value))
+            ProjectBase.log.error(f'Failed to parse variable "{e.args[0]}" in "{value}" - is the variable name correct?')
             sys.exit(1)
 
     # build arguments
@@ -155,12 +155,12 @@ class ProjectBase:
             reg_value, reg_type = winreg.QueryValueEx(registry_key, key_tail)
             winreg.CloseKey(registry_key)
         except WindowsError:
-            ProjectBase.log.error('Installed Path for %s does not exist in Windows Registry. Run the game launcher once, then try again.' % self.game_types[game_type])
+            ProjectBase.log.error(f'Installed Path for {self.game_types[game_type]} does not exist in Windows Registry. Run the game launcher once, then try again.')
             sys.exit(1)
 
         # noinspection PyUnboundLocalVariable
         if not os.path.exists(reg_value):
-            ProjectBase.log.error('Installed Path for %s does not exist: %s' % (self.game_types[game_type], reg_value))
+            ProjectBase.log.error(f'Installed Path for {self.game_types[game_type]} does not exist: {reg_value}')
             sys.exit(1)
 
         return reg_value

@@ -39,7 +39,7 @@ class PackageManager:
             wildcard_pattern: str = '*' if no_recurse else r'**\*'
 
             if include_node.text.startswith(os.pardir):
-                PackageManager.log.warning('Include paths cannot start with "%s"' % os.pardir)
+                PackageManager.log.warning(f'Include paths cannot start with "{os.pardir}"')
                 continue
 
             if include_node.text == os.curdir or include_node.text.startswith(os.curdir):
@@ -55,7 +55,7 @@ class PackageManager:
                 elif root_path in path_or_pattern:
                     search_path = path_or_pattern
                 else:
-                    PackageManager.log.warning('Cannot include path outside RootDir: "%s"' % path_or_pattern)
+                    PackageManager.log.warning(f'Cannot include path outside RootDir: "{path_or_pattern}"')
                     continue
 
                 for include_path in glob.iglob(search_path, recursive=not no_recurse):
@@ -65,7 +65,7 @@ class PackageManager:
             # populate files list using absolute paths
             elif os.path.isabs(path_or_pattern):
                 if root_path not in path_or_pattern:
-                    PackageManager.log.warning('Cannot include path outside RootDir: "%s"' % path_or_pattern)
+                    PackageManager.log.warning(f'Cannot include path outside RootDir: "{path_or_pattern}"')
                     continue
 
                 if os.path.isfile(path_or_pattern):
@@ -87,8 +87,8 @@ class PackageManager:
 
     def _fix_package_extension(self, package_name: str) -> str:
         if not package_name.casefold().endswith(('.ba2', '.bsa')):
-            return '%s%s' % (package_name, self.extension)
-        return '%s%s' % (os.path.splitext(package_name)[0], self.extension)
+            return f'{package_name}{self.extension}'
+        return f'{os.path.splitext(package_name)[0]}{self.extension}'
 
     def build_commands(self, containing_folder: str, output_path: str) -> str:
         """Returns arguments for BSArch as a string"""
@@ -127,7 +127,7 @@ class PackageManager:
 
             # ensure successive package names do not conflict if project name is used
             if i > 0 and (package_name == self.ppj.project_name or package_name in package_names):
-                package_name = '%s (%s)' % (self.ppj.project_name, i)
+                package_name = f'{self.ppj.project_name} ({i})'
 
             if package_name.casefold() not in package_names:
                 package_names.append(package_name.casefold())
@@ -140,13 +140,13 @@ class PackageManager:
                 try:
                     open(package_path, 'a').close()
                 except PermissionError:
-                    PackageManager.log.error('Cannot create package without write permission to file: "%s"' % package_path)
+                    PackageManager.log.error(f'Cannot create package without write permission to file: "{package_path}"')
                     sys.exit(1)
 
-            PackageManager.log.info('Creating "%s"...' % package_name)
+            PackageManager.log.info(f'Creating "{package_name}"...')
 
             for source_path in self._generate_include_paths(package_node, package_node.get('RootDir')):
-                PackageManager.log.info('+ "%s"' % source_path)
+                PackageManager.log.info(f'+ "{source_path}"')
 
                 relpath = os.path.relpath(source_path, package_node.get('RootDir'))
                 target_path = os.path.join(self.options.temp_path, relpath)
@@ -167,7 +167,7 @@ class PackageManager:
                 shutil.rmtree(self.options.temp_path, ignore_errors=True)
 
     def create_zip(self) -> None:
-        PackageManager.log.info('Creating "%s"...' % self.ppj.zip_file_name)
+        PackageManager.log.info(f'Creating "{self.ppj.zip_file_name}"...')
 
         # ensure that zip output folder exists
         zip_output_path: str = os.path.join(self.options.zip_output_path, self.ppj.zip_file_name)
@@ -176,16 +176,16 @@ class PackageManager:
         try:
             with zipfile.ZipFile(zip_output_path, mode='w', compression=self.ppj.compress_type) as z:
                 for include_path in self._generate_include_paths(self.ppj.zip_file_node, self.ppj.zip_root_path):
-                    PackageManager.log.info('+ "%s"' % include_path)
+                    PackageManager.log.info(f'+ "{include_path}"')
 
                     if self.ppj.zip_root_path not in include_path:
-                        PackageManager.log.warning('Cannot add file to ZIP outside RootDir: "%s"' % include_path)
+                        PackageManager.log.warning(f'Cannot add file to ZIP outside RootDir: "{include_path}"')
                         continue
 
                     arcname: str = os.path.relpath(include_path, self.ppj.zip_root_path)
                     z.write(include_path, arcname, compress_type=self.ppj.compress_type)
 
-            PackageManager.log.info('Wrote ZIP file: "%s"' % zip_output_path)
+            PackageManager.log.info(f'Wrote ZIP file: "{zip_output_path}"')
         except PermissionError:
-            PackageManager.log.error('Cannot open ZIP file for writing: "%s"' % zip_output_path)
+            PackageManager.log.error(f'Cannot open ZIP file for writing: "{zip_output_path}"')
             sys.exit(1)

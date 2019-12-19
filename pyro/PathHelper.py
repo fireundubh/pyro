@@ -15,7 +15,7 @@ class PathHelper:
             if import_path in path:
                 relative_path = os.path.relpath(path, import_path)
                 return relative_path
-        raise ValueError('Cannot build import-relative path from absolute path: "%s"' % path)
+        raise ValueError(f'Cannot build import-relative path from absolute path: "{path}"')
 
     @staticmethod
     def find_include_paths(search_path: str, no_recurse: bool) -> Generator:

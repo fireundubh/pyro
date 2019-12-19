@@ -36,14 +36,14 @@ class BuildFacade:
                 continue
             if key.startswith(('ignore_', 'no_')):
                 continue
-            setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
+            setattr(self.ppj.options, key, getattr(self.ppj, f'get_{key}')())
 
         # record project options in log
         if self.ppj.options.log_path:
             self._rotate_logs(5)
 
             os.makedirs(self.ppj.options.log_path, exist_ok=True)
-            log_path = os.path.join(self.ppj.options.log_path, 'pyro-%s.log' % int(time.time()))
+            log_path = os.path.join(self.ppj.options.log_path, f'pyro-{int(time.time())}.log')
             with open(log_path, mode='w', encoding='utf-8') as f:
                 json.dump(self.ppj.options.__dict__, f, indent=2)
 
@@ -76,7 +76,7 @@ class BuildFacade:
             try:
                 os.remove(f)
             except PermissionError:
-                BuildFacade.log.error('Cannot delete log file without permission: %s' % f)
+                BuildFacade.log.error(f'Cannot delete log file without permission: {f}')
 
     def _find_modified_scripts(self) -> list:
         pex_paths: list = []
@@ -85,7 +85,7 @@ class BuildFacade:
             script_name, _ = os.path.splitext(os.path.basename(psc_path))
 
             # if pex exists, compare time_t in pex header with psc's last modified timestamp
-            pex_match: list = [pex_path for pex_path in self.ppj.pex_paths if pex_path.endswith('%s.pex' % script_name)]
+            pex_match: list = [pex_path for pex_path in self.ppj.pex_paths if pex_path.endswith(f'{script_name}.pex')]
             if not pex_match:
                 continue
 
@@ -96,7 +96,7 @@ class BuildFacade:
             try:
                 header = PexReader.get_header(pex_path)
             except ValueError:
-                BuildFacade.log.warning('Cannot determine compilation time from compiled script due to unknown file magic: "%s"' % pex_path)
+                BuildFacade.log.warning(f'Cannot determine compilation time from compiled script due to unknown file magic: "{pex_path}"')
                 continue
 
             compiled_time: int = header.compilation_time.value
@@ -150,7 +150,7 @@ class BuildFacade:
             # these are absolute paths. there's no reason to manipulate them.
             for pex_path in self.ppj.pex_paths:
                 if not os.path.isfile(pex_path):
-                    BuildFacade.log.warning('Cannot locate file to anonymize: "%s"' % pex_path)
+                    BuildFacade.log.warning(f'Cannot locate file to anonymize: "{pex_path}"')
                     continue
 
                 Anonymizer.anonymize_script(pex_path)

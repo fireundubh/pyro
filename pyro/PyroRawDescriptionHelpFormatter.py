@@ -23,7 +23,7 @@ class PyroRawDescriptionHelpFormatter(argparse.RawDescriptionHelpFormatter):
             parts.extend(action.option_strings)
         else:
             default = self._get_default_metavar_for_optional(action)
-            args_string = ' %s' % self._format_args(action, default) if _print_metavar else ''
+            args_string = f' {self._format_args(action, default)}' if _print_metavar else ''
             for option_string in action.option_strings:
                 parts.append(f'{option_string}{args_string}')
 

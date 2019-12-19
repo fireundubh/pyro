@@ -18,7 +18,7 @@ class PexReader:
             elif header.magic.value == 0xDEC057FA:  # Skyrim LE/SE
                 header.endianness = 'big'
             else:
-                raise ValueError('Cannot determine endianness from file magic in "%s"' % path)
+                raise ValueError(f'Cannot determine endianness from file magic in "{path}"')
 
             header.read(f, 'major_version', 1)
             header.read(f, 'minor_version', 1)

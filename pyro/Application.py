@@ -28,7 +28,7 @@ class Application:
         self.args.input_path = self._try_fix_input_path(self.args.input_path)
 
         if not os.path.isfile(self.args.input_path):
-            Application.log.error('Cannot load PPJ at given path because file does not exist: "%s"' % self.args.input_path)
+            Application.log.error(f'Cannot load PPJ at given path because file does not exist: "{self.args.input_path}"')
             Application._print_help_and_exit()
 
     @staticmethod
@@ -52,11 +52,11 @@ class Application:
 
         if not os.path.isabs(input_path):
             cwd = os.getcwd()
-            Application.log.warning('Using working directory: "%s"' % cwd)
+            Application.log.warning(f'Using working directory: "{cwd}"')
 
             input_path = os.path.join(cwd, input_path)
 
-        Application.log.warning('Using input path: "%s"' % input_path)
+        Application.log.warning(f'Using input path: "{input_path}"')
 
         return input_path
 
@@ -90,11 +90,11 @@ class Application:
 
         Application.log.info('Imports found:')
         for path in ppj.import_paths:
-            Application.log.info('+ "%s"' % path)
+            Application.log.info(f'+ "{path}"')
 
         Application.log.info('Scripts found:')
         for path in ppj.psc_paths:
-            Application.log.info('+ "%s"' % path)
+            Application.log.info(f'+ "{path}"')
 
         time_elapsed = TimeElapsed()
 
@@ -111,7 +111,7 @@ class Application:
             if failed_count == 0 or ppj.options.ignore_errors:
                 build.try_anonymize()
             else:
-                Application.log.warning('Cannot anonymize scripts because %s scripts failed to compile' % failed_count)
+                Application.log.warning(f'Cannot anonymize scripts because {failed_count} scripts failed to compile')
         else:
             Application.log.warning('Cannot anonymize scripts because Anonymize is disabled in project')
 
@@ -119,7 +119,7 @@ class Application:
             if failed_count == 0 or ppj.options.ignore_errors:
                 build.try_pack()
             else:
-                Application.log.warning('Cannot create Packages because %s scripts failed to compile' % failed_count)
+                Application.log.warning(f'Cannot create Packages because {failed_count} scripts failed to compile')
         else:
             Application.log.warning('Cannot create Packages because Package is disabled in project')
 
@@ -127,7 +127,7 @@ class Application:
             if failed_count == 0 or ppj.options.ignore_errors:
                 build.try_zip()
             else:
-                Application.log.warning('Cannot create ZipFile because %s scripts failed to compile' % failed_count)
+                Application.log.warning(f'Cannot create ZipFile because {failed_count} scripts failed to compile')
         else:
             Application.log.warning('Cannot create ZipFile because Zip is disabled in project')
 
@@ -138,8 +138,7 @@ class Application:
 
             psc_count = len(ppj.psc_paths)
 
-            Application.log.info('Compilation time: %s (%s/script) - %s succeeded, %s failed (%s scripts)'
-                                 % (s_raw_time, s_avg_time, success_count, failed_count, psc_count))
+            Application.log.info(f'Compilation time: {s_raw_time} ({s_avg_time}/script) - {success_count} succeeded, {failed_count} failed ({psc_count} scripts)')
         else:
             Application.log.info('No scripts were compiled.')
 

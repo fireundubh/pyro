@@ -28,7 +28,7 @@ class PexHeader:
             obj = getattr(self, name)
         except AttributeError:
             # this is just a guard against developer error
-            raise AttributeError('Attribute "%s" does not exist in PexHeader' % name)
+            raise AttributeError(f'Attribute "{name}" does not exist in PexHeader')
         else:
             obj.offset, obj.data = f.tell(), f.read(length)
 

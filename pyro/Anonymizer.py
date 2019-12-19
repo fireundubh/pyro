@@ -20,7 +20,7 @@ class Anonymizer:
         try:
             header: PexHeader = PexReader.get_header(path)
         except ValueError:
-            Anonymizer.log.error('Cannot anonymize script due to unknown file magic: "%s"' % path)
+            Anonymizer.log.error(f'Cannot anonymize script due to unknown file magic: "{path}"')
             return
 
         file_path: str = header.script_path.value
@@ -28,19 +28,19 @@ class Anonymizer:
         computer_name: str = header.computer_name.value
 
         if not file_path.casefold().endswith('.psc'):
-            Anonymizer.log.warning('Cannot anonymize script due to invalid file extension: "%s"' % path)
+            Anonymizer.log.warning(f'Cannot anonymize script due to invalid file extension: "{path}"')
             return
 
         if not len(file_path) > 0:
-            Anonymizer.log.warning('Cannot anonymize script due to zero-length file path: "%s"' % path)
+            Anonymizer.log.warning(f'Cannot anonymize script due to zero-length file path: "{path}"')
             return
 
         if not len(user_name) > 0:
-            Anonymizer.log.warning('Cannot anonymize script due to zero-length user name: "%s"' % path)
+            Anonymizer.log.warning(f'Cannot anonymize script due to zero-length user name: "{path}"')
             return
 
         if not len(computer_name) > 0:
-            Anonymizer.log.warning('Cannot anonymize script due to zero-length computer name: "%s"' % path)
+            Anonymizer.log.warning(f'Cannot anonymize script due to zero-length computer name: "{path}"')
             return
 
         with open(path, mode='r+b') as f:
@@ -53,4 +53,4 @@ class Anonymizer:
             f.seek(header.computer_name.offset, os.SEEK_SET)
             f.write(bytes(Anonymizer._randomize_str(header.computer_name_size.value, True), encoding='ascii'))
 
-            Anonymizer.log.info('Anonymized "%s"...' % path)
+            Anonymizer.log.info(f'Anonymized "{path}"...')
