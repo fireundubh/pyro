@@ -6,6 +6,7 @@ import sys
 from pyro.BuildFacade import BuildFacade
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
+from pyro.PexReader import PexReader
 from pyro.ProjectOptions import ProjectOptions
 from pyro.TimeElapsed import TimeElapsed
 
@@ -15,7 +16,6 @@ class Application:
     log = logging.getLogger('pyro')
 
     args: argparse.Namespace = None
-    parser: argparse.ArgumentParser = None
 
     def __init__(self, parser: argparse.ArgumentParser) -> None:
         self.parser = parser
@@ -23,28 +23,22 @@ class Application:
         self.args = self.parser.parse_args()
 
         if self.args.show_help:
-            Application._print_help_and_exit()
+            self._print_help_and_exit()
 
         self.args.input_path = self._try_fix_input_path(self.args.input_path)
 
         if not os.path.isfile(self.args.input_path):
             Application.log.error(f'Cannot load PPJ at given path because file does not exist: "{self.args.input_path}"')
-            Application._print_help_and_exit()
+            self._print_help_and_exit()
 
-    @staticmethod
-    def _print_help_and_exit() -> None:
-        Application.parser.print_help()
+    def _print_help_and_exit(self) -> None:
+        self.parser.print_help()
         sys.exit(1)
 
-    @staticmethod
-    def _try_fix_input_path(input_path: str) -> str:
+    def _try_fix_input_path(self, input_path: str) -> str:
         if not input_path:
             Application.log.error('required argument missing: -i INPUT.ppj')
-            Application._print_help_and_exit()
-
-        if input_path.casefold().endswith('.psc'):
-            Application.log.error('Single script compilation is no longer supported. Use a PPJ file.')
-            Application._print_help_and_exit()
+            self._print_help_and_exit()
 
         if input_path.casefold().startswith('file:'):
             full_path = PathHelper.url2pathname(input_path)
@@ -60,29 +54,38 @@ class Application:
 
         return input_path
 
-    @staticmethod
-    def _validate_project(ppj: PapyrusProject) -> None:
+    def _validate_project(self, ppj: PapyrusProject) -> None:
         if not ppj.options.game_path:
             Application.log.error('Cannot determine game type from arguments or Papyrus Project')
-            Application._print_help_and_exit()
+            self._print_help_and_exit()
 
         if not ppj.has_imports_node:
             Application.log.error('Cannot proceed without imports defined in project')
-            Application._print_help_and_exit()
+            self._print_help_and_exit()
 
         if not ppj.has_scripts_node:
             Application.log.error('Cannot proceed without Scripts defined in project')
-            Application._print_help_and_exit()
+            self._print_help_and_exit()
 
         if ppj.options.package and not ppj.has_packages_node:
             Application.log.error('Cannot proceed with Package enabled without Packages defined in project')
-            Application._print_help_and_exit()
+            self._print_help_and_exit()
 
         if ppj.options.zip and not ppj.has_zip_file_node:
             Application.log.error('Cannot proceed with Zip enabled without ZipFile defined in project')
-            Application._print_help_and_exit()
+            self._print_help_and_exit()
 
     def run(self) -> int:
+        _, extension = os.path.splitext(os.path.basename(self.args.input_path).casefold())
+
+        if extension == '.pex':
+            header = PexReader.dump(self.args.input_path)
+            Application.log.info(f'Dumping: "{self.args.input_path}"\n{header}')
+            sys.exit(0)
+        elif extension != '.ppj':
+            Application.log.error('Cannot proceed without PPJ file path')
+            self._print_help_and_exit()
+
         options = ProjectOptions(self.args.__dict__)
         ppj = PapyrusProject(options)
 
@@ -103,7 +106,7 @@ class Application:
         # bsarch path is not set until BuildFacade initializes
         if ppj.options.package and not os.path.isfile(ppj.options.bsarch_path):
             Application.log.error('Cannot proceed with Package enabled without valid BSArch path')
-            Application._print_help_and_exit()
+            self._print_help_and_exit()
 
         success_count, failed_count = build.try_compile(time_elapsed)
 

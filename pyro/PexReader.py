@@ -1,6 +1,9 @@
+import binascii
+import json
 import os
 
 from pyro.PexHeader import PexHeader
+from pyro.PexTypes import PexInt, PexStr
 
 
 class PexReader:
@@ -33,3 +36,22 @@ class PexReader:
             header.size = f.tell()
 
         return header
+
+    @staticmethod
+    def dump(file_path: str) -> str:
+        header = PexReader.get_header(file_path).__dict__
+
+        for key, value in header.items():
+            if not isinstance(value, (PexInt, PexStr)):
+                continue
+
+            header[key] = value.__dict__
+
+            for k, v in header[key].items():
+                if not isinstance(v, bytes):
+                    continue
+
+                bytes2hex = binascii.hexlify(v).decode('ascii').upper()
+                header[key][k] = ' '.join(bytes2hex[i:i + 2] for i in range(0, len(bytes2hex), 2))
+
+        return json.dumps(header, indent=4)

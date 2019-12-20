@@ -17,7 +17,7 @@ if __name__ == '__main__':
     _required_arguments = _parser.add_argument_group('required arguments')
     _required_arguments.add_argument('-i', '--input-path',
                                      action='store', type=str,
-                                     help='relative or absolute path to ppj file\n'
+                                     help='relative or absolute path to file\n'
                                           '(if relative, must be relative to current working directory)')
 
     _build_arguments = _parser.add_argument_group('build arguments')
