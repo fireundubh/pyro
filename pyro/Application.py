@@ -82,7 +82,7 @@ class Application:
             header = PexReader.dump(self.args.input_path)
             Application.log.info(f'Dumping: "{self.args.input_path}"\n{header}')
             sys.exit(0)
-        elif extension != '.ppj':
+        elif extension not in ('.ppj', '.pyroproject'):
             Application.log.error('Cannot proceed without PPJ file path')
             self._print_help_and_exit()
 
