@@ -1,3 +1,4 @@
+import hashlib
 import glob
 import io
 import os
@@ -13,7 +14,7 @@ from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProjectBase import ProjectBase
 from pyro.ProjectOptions import ProjectOptions
-from pyro.Remotes import GenericRemote
+from pyro.Remotes import GenericRemote, RemoteBase
 from pyro.XmlHelper import XmlHelper
 
 
@@ -30,6 +31,9 @@ class PapyrusProject(ProjectBase):
     has_packages_node: bool = False
     has_scripts_node: bool = False
     has_zip_file_node: bool = False
+
+    remote: RemoteBase = None
+    remote_schemas: tuple = ('http:', 'https:')
 
     namespace: str = ''
     zip_file_name: str = ''
@@ -108,6 +112,20 @@ class PapyrusProject(ProjectBase):
             self.options.zip_compression = self.zip_file_node.get('Compression').casefold()
             self._setup_zipfile_options()
 
+        # initialize remote if needed
+        if self.remote_paths:
+            if self.options.access_token:
+                self.remote = GenericRemote(self.options.access_token)
+            else:
+                PapyrusProject.log.error('Cannot proceed without personal access token')
+                sys.exit(1)
+
+            # validate remote paths
+            for path in self.remote_paths:
+                if not self.remote.validate_url(path):
+                    PapyrusProject.log.error(f'Cannot proceed while node contains invalid URL: "{path}"')
+                    sys.exit(1)
+
         # we need to populate the list of import paths before we try to determine the game type
         # because the game type can be determined from import paths
         self.import_paths = self._get_import_paths()
@@ -159,6 +177,28 @@ class PapyrusProject(ProjectBase):
         # game type must be set before we call this
         if not self.options.game_path:
             self.options.game_path = self.get_game_path()
+
+    @property
+    def remote_paths(self) -> list:
+        results = []
+
+        if self.has_imports_node:
+            for node in self.imports_node:
+                if not node.tag.endswith('Import'):
+                    continue
+
+                if node.text.casefold().startswith(self.remote_schemas):
+                    results.append(node.text)
+
+        if self.has_folders_node:
+            for node in self.folders_node:
+                if not node.tag.endswith('Folder'):
+                    continue
+
+                if node.text.casefold().startswith(self.remote_schemas):
+                    results.append(node.text)
+
+        return results
 
     def _parse_variables(self, variables_node: etree.ElementBase) -> None:
         if variables_node is None:
@@ -304,32 +344,10 @@ class PapyrusProject(ProjectBase):
             if not import_node.text:
                 continue
 
-            if import_node.text.startswith(('http:', 'https:')):
-                if not self.options.access_token:
-                    PapyrusProject.log.error('Cannot proceed without personal access token')
-                    sys.exit(1)
-
-                remote = GenericRemote(self.options.access_token)
-
-                if not remote.validate_url(import_node.text):
-                    PapyrusProject.log.error(f'Cannot proceed while Import node contains invalid URL: "{import_node.text}"')
-                    sys.exit(1)
-
-                temp_path = self.get_remote_temp_path()
-                for message in remote.get_contents(import_node.text, temp_path):
-                    if not message.startswith('Failed to load'):
-                        PapyrusProject.log.info(message)
-                    else:
-                        PapyrusProject.log.error(message)
-                        sys.exit(1)
-
-                common_paths = set([os.path.dirname(f) for f in glob.glob(os.path.join(temp_path, r'**\*'), recursive=True)
-                                    if os.path.isfile(f) and f.casefold().endswith('.psc')])
-
-                for common_path in common_paths:
+            if import_node.text.startswith(self.remote_schemas):
+                for common_path in self._get_remote_paths(import_node):
                     PapyrusProject.log.info(f'Adding import path from remote: "{common_path}"...')
                     results.append(common_path)
-
                 continue
 
             import_path = os.path.normpath(import_node.text)
@@ -451,6 +469,33 @@ class PapyrusProject(ProjectBase):
 
         return results
 
+    def _get_remote_paths(self, node: etree.ElementBase) -> set:
+        url_hash = hashlib.sha1(node.text.encode()).hexdigest()
+
+        temp_path = os.path.join(self.get_remote_temp_path(), url_hash)
+
+        if self.options.force_overwrite or not os.path.exists(temp_path):
+            for message in self.remote.get_contents(node.text, temp_path):
+                if not message.startswith('Failed to load'):
+                    PapyrusProject.log.info(message)
+                else:
+                    PapyrusProject.log.error(message)
+                    sys.exit(1)
+
+        common_paths: set = set()
+
+        search_path = os.path.join(temp_path, r'**\*')
+
+        if node.tag.endswith('Import'):
+            common_paths = set([os.path.dirname(f) for f in glob.iglob(search_path, recursive=True)
+                                if os.path.isfile(f) and f.casefold().endswith('.psc')])
+
+        elif node.tag.endswith('Folder'):
+            common_paths = set([f for f in glob.iglob(search_path, recursive=True)
+                                if os.path.isfile(f) and f.casefold().endswith('.psc')])
+
+        return common_paths
+
     def _get_script_paths_from_folders_node(self) -> typing.Generator:
         """Returns script paths from the Folders element array"""
         for folder_node in self.folders_node:
@@ -466,6 +511,12 @@ class PapyrusProject(ProjectBase):
             # try to add project path
             if folder_node.text == os.curdir:
                 yield from PathHelper.find_script_paths_from_folder(self.project_path, no_recurse)
+                continue
+
+            if folder_node.text.startswith(self.remote_schemas):
+                for common_path in self._get_remote_paths(folder_node):
+                    PapyrusProject.log.info(f'Adding folder path from remote: "{common_path}"...')
+                    yield common_path
                 continue
 
             folder_path: str = os.path.normpath(folder_node.text)

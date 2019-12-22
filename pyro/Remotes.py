@@ -21,6 +21,9 @@ class RemoteBase:
         else:
             return all([result.scheme, result.netloc, result.path])
 
+    def get_contents(self, url: str, output_path: str) -> Generator:
+        pass
+
 
 class GenericRemote(RemoteBase):
     def get_contents(self, url: str, output_path: str) -> Generator:

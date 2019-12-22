@@ -40,6 +40,7 @@ class ProjectOptions:
 
     # remote arguments
     access_token: str = field(init=False, default_factory=str)
+    force_overwrite: bool = field(init=False, default_factory=bool)
     remote_temp_path: str = field(init=False, default_factory=str)
 
     # program arguments
