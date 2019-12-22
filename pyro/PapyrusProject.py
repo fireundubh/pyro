@@ -1,3 +1,4 @@
+import glob
 import io
 import os
 import sys
@@ -12,6 +13,7 @@ from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProjectBase import ProjectBase
 from pyro.ProjectOptions import ProjectOptions
+from pyro.Remotes import GenericRemote
 from pyro.XmlHelper import XmlHelper
 
 
@@ -302,7 +304,35 @@ class PapyrusProject(ProjectBase):
             if not import_node.text:
                 continue
 
-            import_path: str = os.path.normpath(import_node.text)
+            if import_node.text.startswith(('http:', 'https:')):
+                if not self.options.access_token:
+                    PapyrusProject.log.error('Cannot proceed without personal access token')
+                    sys.exit(1)
+
+                remote = GenericRemote(self.options.access_token)
+
+                if not remote.validate_url(import_node.text):
+                    PapyrusProject.log.error(f'Cannot proceed while Import node contains invalid URL: "{import_node.text}"')
+                    sys.exit(1)
+
+                temp_path = self.get_remote_temp_path()
+                for message in remote.get_contents(import_node.text, temp_path):
+                    if not message.startswith('Failed to load'):
+                        PapyrusProject.log.info(message)
+                    else:
+                        PapyrusProject.log.error(message)
+                        sys.exit(1)
+
+                common_paths = set([os.path.dirname(f) for f in glob.glob(os.path.join(temp_path, r'**\*'), recursive=True)
+                                    if os.path.isfile(f) and f.casefold().endswith('.psc')])
+
+                for common_path in common_paths:
+                    PapyrusProject.log.info(f'Adding import path from remote: "{common_path}"...')
+                    results.append(common_path)
+
+                continue
+
+            import_path = os.path.normpath(import_node.text)
 
             if import_path == os.pardir:
                 self.log.warning(f'Import paths cannot be equal to "{os.pardir}"')

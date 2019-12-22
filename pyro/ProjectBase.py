@@ -191,6 +191,12 @@ class ProjectBase:
                               relative_root_path=self.project_path,
                               fallback_path=[self.program_path, 'dist'])
 
+    # remote arguments
+    def get_remote_temp_path(self) -> str:
+        return self._get_path(self.options.remote_temp_path,
+                              relative_root_path=self.project_path,
+                              fallback_path=[self.program_path, 'remote'])
+
     # program arguments
     def get_game_type(self) -> str:
         """Returns game type from arguments or Papyrus Project"""

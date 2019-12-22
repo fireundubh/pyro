@@ -38,6 +38,10 @@ class ProjectOptions:
     zip_compression: str = field(init=False, default_factory=str)
     zip_output_path: str = field(init=False, default_factory=str)
 
+    # remote arguments
+    access_token: str = field(init=False, default_factory=str)
+    remote_temp_path: str = field(init=False, default_factory=str)
+
     # program arguments
     log_path: str = field(init=False, default_factory=str)
 

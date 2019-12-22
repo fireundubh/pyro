@@ -89,6 +89,15 @@ if __name__ == '__main__':
                                 help='relative or absolute path to zip output folder\n'
                                      '(if relative, must be relative to project)')
 
+    _remote_arguments = _parser.add_argument_group('remote arguments')
+    _remote_arguments.add_argument('--access-token',
+                                   action='store', type=str,
+                                   help='personal access token\n(must have public_repo access scope)')
+    _remote_arguments.add_argument('--remote-temp-path',
+                                   action='store', type=str,
+                                   help='relative or absolute path to temp folder for repo files\n'
+                                        '(if relative, must be relative to project)')
+
     _program_arguments = _parser.add_argument_group('program arguments')
     _program_arguments.add_argument('--log-path',
                                     action='store', type=str,
