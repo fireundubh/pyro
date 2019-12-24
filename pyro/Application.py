@@ -12,7 +12,7 @@ from pyro.TimeElapsed import TimeElapsed
 
 
 class Application:
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname).4s] %(message)s')
+    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s [%(levelname).4s] %(message)s')
     log = logging.getLogger('pyro')
 
     args: argparse.Namespace = None
