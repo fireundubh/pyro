@@ -118,6 +118,9 @@ class PapyrusProject(ProjectBase):
 
         # initialize remote if needed
         if self.remote_paths:
+            if not self.options.remote_temp_path:
+                self.options.remote_temp_path = self.get_remote_temp_path()
+
             if self.options.access_token:
                 self.remote = GenericRemote(self.options.access_token)
             else:
@@ -476,7 +479,7 @@ class PapyrusProject(ProjectBase):
     def _get_remote_paths(self, node: etree.ElementBase) -> set:
         url_hash = hashlib.sha1(node.text.encode()).hexdigest()
 
-        temp_path = os.path.join(self.get_remote_temp_path(), url_hash)
+        temp_path = os.path.join(self.options.remote_temp_path, url_hash)
 
         if self.options.force_overwrite or not os.path.exists(temp_path):
             for message in self.remote.get_contents(node.text, temp_path):
