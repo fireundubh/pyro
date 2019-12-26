@@ -69,7 +69,8 @@ class PapyrusProject(ProjectBase):
 
         # variables need to be parsed before nodes are updated
         variables_node = self.ppj_root.find('Variables')
-        self._parse_variables(variables_node)
+        if variables_node is not None:
+            self._parse_variables(variables_node)
 
         # we need to parse all attributes after validating and before we do anything else
         # options can be overridden by arguments when the BuildFacade is initialized
@@ -208,9 +209,6 @@ class PapyrusProject(ProjectBase):
         return results
 
     def _parse_variables(self, variables_node: etree.ElementBase) -> None:
-        if variables_node is None:
-            return
-
         reserved_characters: tuple = ('!', '#', '$', '%', '^', '&', '*')
 
         for variable_node in variables_node:
