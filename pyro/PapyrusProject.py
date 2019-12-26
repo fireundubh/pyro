@@ -1,5 +1,5 @@
-import hashlib
 import glob
+import hashlib
 import io
 import os
 import sys
@@ -9,17 +9,17 @@ import zipfile
 from lxml import etree
 
 from pyro.CommandArguments import CommandArguments
-from pyro.ElementHelper import ElementHelper
 from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProjectBase import ProjectBase
 from pyro.ProjectOptions import ProjectOptions
 from pyro.Remotes import GenericRemote, RemoteBase
 from pyro.XmlHelper import XmlHelper
+from pyro.XmlRoot import XmlRoot
 
 
 class PapyrusProject(ProjectBase):
-    root_node: etree.ElementBase = None
+    ppj_root: XmlRoot = None
     folders_node: etree.ElementBase = None
     imports_node: etree.ElementBase = None
     packages_node: etree.ElementBase = None
@@ -54,10 +54,9 @@ class PapyrusProject(ProjectBase):
 
         project_xml: etree.ElementTree = etree.parse(xml_document, xml_parser)
 
-        self.root_node = project_xml.getroot()
-        self.namespace = ElementHelper.get_namespace(self.root_node)
+        self.ppj_root = XmlRoot(project_xml)
 
-        schema: etree.XMLSchema = XmlHelper.validate_schema(self.namespace, self.program_path)
+        schema: etree.XMLSchema = XmlHelper.validate_schema(self.ppj_root.ns, self.program_path)
 
         if schema:
             try:
@@ -69,37 +68,42 @@ class PapyrusProject(ProjectBase):
                 PapyrusProject.log.info('Successfully validated XML Schema.')
 
         # variables need to be parsed before nodes are updated
-        variables_node = ElementHelper.get_node('Variables', self.root_node, self.namespace)
+        variables_node = self.ppj_root.find('Variables')
         self._parse_variables(variables_node)
 
         # we need to parse all attributes after validating and before we do anything else
         # options can be overridden by arguments when the BuildFacade is initialized
-        self._update_attributes(self.root_node)
+        self._update_attributes(self.ppj_root.node)
 
-        self.options.flags_path = self.root_node.get('Flags')
-        self.options.output_path = self.root_node.get('Output')
+        if self.options.resolve_ppj:
+            xml_output = etree.tostring(self.ppj_root.node, encoding='utf-8', xml_declaration=True, pretty_print=True).decode()
+            PapyrusProject.log.debug(f'Resolved variables and paths in PPJ. Text output:{os.linesep * 2}{xml_output}')
+            sys.exit(1)
 
-        self.optimize = self.root_node.get('Optimize') == 'True'
-        self.release = self.root_node.get('Release') == 'True'
-        self.final = self.root_node.get('Final') == 'True'
+        self.options.flags_path = self.ppj_root.get('Flags')
+        self.options.output_path = self.ppj_root.get('Output')
 
-        self.options.anonymize = self.root_node.get('Anonymize') == 'True'
-        self.options.package = self.root_node.get('Package') == 'True'
-        self.options.zip = self.root_node.get('Zip') == 'True'
+        self.optimize = self.ppj_root.get('Optimize') == 'True'
+        self.release = self.ppj_root.get('Release') == 'True'
+        self.final = self.ppj_root.get('Final') == 'True'
 
-        self.imports_node = ElementHelper.get_node('Imports', self.root_node, self.namespace)
+        self.options.anonymize = self.ppj_root.get('Anonymize') == 'True'
+        self.options.package = self.ppj_root.get('Package') == 'True'
+        self.options.zip = self.ppj_root.get('Zip') == 'True'
+
+        self.imports_node = self.ppj_root.find('Imports')
         self.has_imports_node = self.imports_node is not None
 
-        self.scripts_node = ElementHelper.get_node('Scripts', self.root_node, self.namespace)
+        self.scripts_node = self.ppj_root.find('Scripts')
         self.has_scripts_node = self.scripts_node is not None
 
-        self.folders_node = ElementHelper.get_node('Folders', self.root_node, self.namespace)
+        self.folders_node = self.ppj_root.find('Folders')
         self.has_folders_node = self.folders_node is not None
 
-        self.packages_node = ElementHelper.get_node('Packages', self.root_node, self.namespace)
+        self.packages_node = self.ppj_root.find('Packages')
         self.has_packages_node = self.packages_node is not None
 
-        self.zip_file_node = ElementHelper.get_node('ZipFile', self.root_node, self.namespace)
+        self.zip_file_node = self.ppj_root.find('ZipFile')
         self.has_zip_file_node = self.zip_file_node is not None
 
         if self.options.package and self.has_packages_node:
@@ -155,7 +159,7 @@ class PapyrusProject(ProjectBase):
         # we need to set the game type after imports are populated but before pex paths are populated
         # allow xml to set game type but defer to passed argument
         if not self.options.game_type:
-            game_type: str = self.root_node.get('Game', default='').casefold()
+            game_type: str = self.ppj_root.get('Game', default='').casefold()
 
             if game_type and game_type in self.game_types:
                 PapyrusProject.log.warning(f'Using game type: {self.game_types[game_type]} (determined from Papyrus Project)')
