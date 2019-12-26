@@ -486,17 +486,15 @@ class PapyrusProject(ProjectBase):
                     PapyrusProject.log.error(message)
                     sys.exit(1)
 
-        common_paths: set = set()
-
         search_path = os.path.join(temp_path, r'**\*')
 
-        if node.tag.endswith('Import'):
-            common_paths = set([os.path.dirname(f) for f in glob.iglob(search_path, recursive=True)
-                                if os.path.isfile(f) and f.casefold().endswith('.psc')])
+        def _get_right_path_for_node(path: str) -> str:
+            if node.tag.endswith('Import'):
+                path = os.path.dirname(path)
+            return path
 
-        elif node.tag.endswith('Folder'):
-            common_paths = set([f for f in glob.iglob(search_path, recursive=True)
-                                if os.path.isfile(f) and f.casefold().endswith('.psc')])
+        common_paths = set([_get_right_path_for_node(f) for f in glob.iglob(search_path, recursive=True)
+                            if os.path.isfile(f) and f.casefold().endswith('.psc')])
 
         return common_paths
 
