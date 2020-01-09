@@ -63,8 +63,8 @@ class Application:
             Application.log.error('Cannot proceed without imports defined in project')
             self._print_help_and_exit()
 
-        if not ppj.has_scripts_node:
-            Application.log.error('Cannot proceed without Scripts defined in project')
+        if not ppj.has_scripts_node and not ppj.has_folders_node:
+            Application.log.error('Cannot proceed without Scripts or Folders defined in project')
             self._print_help_and_exit()
 
         if ppj.options.package and not ppj.has_packages_node:
