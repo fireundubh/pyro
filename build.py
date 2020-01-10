@@ -15,6 +15,7 @@ class Application:
     def __init__(self, args: argparse.Namespace) -> None:
         self.root_path: str = os.path.dirname(__file__)
 
+        self.pipenv_cmd: str = args.pipenv_cmd
         self.package_name: str = 'pyro'
         self.no_zip: bool = args.no_zip
         self.vcvars64_path: str = args.vcvars64_path
@@ -118,7 +119,7 @@ class Application:
                     environ[key] = value
 
         args: list = [
-            sys.executable, '-m', 'nuitka',
+            self.pipenv_cmd, 'run', 'python', '-m', 'nuitka',
             '--standalone', 'pyro',
             '--include-package=pyro',
             '--experimental=use_pefile',
@@ -132,7 +133,7 @@ class Application:
 
         try:
             process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, env=environ)
-        except FileNotFoundError:
+        except FileNotFoundError as e:
             Application.log.error(f'Cannot run command: {" ".join(args)}')
             fail_state = 1
 
@@ -211,6 +212,10 @@ class Application:
 
 if __name__ == '__main__':
     _parser = argparse.ArgumentParser(description='Pyro Build Script')
+
+    _parser.add_argument('--pipenv-cmd',
+                         action='store', default='pipenv',
+                         help='command to use for pipenv')
 
     _parser.add_argument('--no-zip',
                          action='store_true', default=False,
