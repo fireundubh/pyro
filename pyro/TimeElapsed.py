@@ -1,37 +1,22 @@
-from typing import Callable
+from decimal import Context, Decimal, ROUND_DOWN
 
 
 class TimeElapsed:
+    start_time: float = 0.0
+    end_time: float = 0.0
+
     def __init__(self) -> None:
-        self._start_time = 0.0
-        self._end_time = 0.0
+        self._context = Context(prec=4, rounding=ROUND_DOWN)
+        self.start_time = 0.0
+        self.end_time = 0.0
 
-    def __repr__(self) -> str:
-        return str(self._diff())
+    def average(self, dividend: int) -> Decimal:
+        if dividend == 0:
+            return round(Decimal(0), 3)
+        value = self.value()
+        if value.compare(0) == 0:
+            return round(Decimal(0), 3)
+        return round(Decimal(dividend, self._context) / value, 3)
 
-    def __str__(self) -> str:
-        return '{0:.2f}s'.format(self._diff())
-
-    def _diff(self) -> float:
-        return float(self.end_time - self.start_time)
-
-    @property
-    def start_time(self) -> float:
-        return self._start_time
-
-    @start_time.setter
-    def start_time(self, value: float) -> None:
-        self._start_time = value
-
-    @property
-    def end_time(self) -> float:
-        return self._end_time
-
-    @end_time.setter
-    def end_time(self, value: float) -> None:
-        self._end_time = value
-
-    def print(self, *, callback_func: Callable = None) -> None:
-        if not callback_func:
-            callback_func = print
-        callback_func('Compilation time: %s' % self)
+    def value(self) -> Decimal:
+        return Decimal(self.end_time) - Decimal(self.start_time)

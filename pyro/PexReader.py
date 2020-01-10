@@ -1,32 +1,9 @@
+import binascii
+import json
 import os
 
-
-class PexData:
-    offset: int
-    data: bytes
-    value: object
-
-
-class PexInt(PexData):
-    value: int
-
-
-class PexStr(PexData):
-    value: str
-
-
-class PexHeader:
-    magic: PexInt = PexInt()
-    major_version: PexInt = PexInt()
-    minor_version: PexInt = PexInt()
-    game_id: PexInt = PexInt()
-    compilation_time: PexInt = PexInt()
-    script_path_size: PexInt = PexInt()
-    script_path: PexStr = PexStr()
-    user_name_size: PexInt = PexInt()
-    user_name: PexStr = PexStr()
-    computer_name_size: PexInt = PexInt()
-    computer_name: PexStr = PexStr()
+from pyro.PexHeader import PexHeader
+from pyro.PexTypes import PexInt, PexStr
 
 
 class PexReader:
@@ -34,48 +11,47 @@ class PexReader:
     def get_header(path: str) -> PexHeader:
         header = PexHeader()
 
-        with open(path, 'rb') as f:
+        with open(path, mode='rb') as f:
             f.seek(0, os.SEEK_SET)
 
-            header.magic.offset, header.magic.data = f.tell(), f.read(4)
-            header.magic.value = int.from_bytes(header.magic.data, 'little', signed=False)
+            header.read(f, 'magic', 4)
 
-            if header.magic.value == 0xFA57C0DE:
-                # Fallout 4
-                endianness = 'little'
-            elif header.magic.value == 0xDEC057FA:
-                # Skyrim LE/SE
-                endianness = 'big'
+            if header.magic.value == 0xFA57C0DE:  # Fallout 4
+                header.endianness = 'little'
+            elif header.magic.value == 0xDEC057FA:  # Skyrim LE/SE
+                header.endianness = 'big'
             else:
-                raise ValueError('Cannot determine endianness from file magic')
+                raise ValueError(f'Cannot determine endianness from file magic in "{path}"')
 
-            header.major_version.offset, header.major_version.data = f.tell(), f.read(1)
-            header.major_version.value = int.from_bytes(header.major_version.data, endianness, signed=False)
+            header.read(f, 'major_version', 1)
+            header.read(f, 'minor_version', 1)
+            header.read(f, 'game_id', 2)
+            header.read(f, 'compilation_time', 8)
+            header.read(f, 'script_path_size', 2)
+            header.read(f, 'script_path', header.script_path_size.value)
+            header.read(f, 'user_name_size', 2)
+            header.read(f, 'user_name', header.user_name_size.value)
+            header.read(f, 'computer_name_size', 2)
+            header.read(f, 'computer_name', header.computer_name_size.value)
+            header.size = f.tell()
 
-            header.minor_version.offset, header.minor_version.data = f.tell(), f.read(1)
-            header.minor_version.value = int.from_bytes(header.minor_version.data, endianness, signed=False)
-
-            header.game_id.offset, header.game_id.data = f.tell(), f.read(2)
-            header.game_id.value = int.from_bytes(header.game_id.data, endianness, signed=False)
-
-            header.compilation_time.offset, header.compilation_time.data = f.tell(), f.read(8)
-            header.compilation_time.value = int.from_bytes(header.compilation_time.data, endianness, signed=False)
-
-            header.script_path_size.offset, header.script_path_size.data = f.tell(), f.read(2)
-            header.script_path_size.value = int.from_bytes(header.script_path_size.data, endianness, signed=False)
-
-            header.script_path.offset, header.script_path.data = f.tell(), f.read(header.script_path_size.value)
-            header.script_path.value = header.script_path.data.decode('ascii')
-
-            header.user_name_size.offset, header.user_name_size.data = f.tell(), f.read(2)
-            header.user_name_size.value = int.from_bytes(header.user_name_size.data, endianness, signed=False)
-
-            header.user_name.offset, header.user_name.data = f.tell(), f.read(header.user_name_size.value)
-            header.user_name.value = header.user_name.data.decode('ascii')
-
-            header.computer_name_size.offset, header.computer_name_size.data = f.tell(), f.read(2)
-            header.computer_name_size.value = int.from_bytes(header.computer_name_size.data, endianness, signed=False)
-
-            header.computer_name.offset, header.computer_name.data = f.tell(), f.read(header.computer_name_size.value)
-            header.computer_name.value = header.computer_name.data.decode('ascii')
         return header
+
+    @staticmethod
+    def dump(file_path: str) -> str:
+        header = PexReader.get_header(file_path).__dict__
+
+        for key, value in header.items():
+            if not isinstance(value, (PexInt, PexStr)):
+                continue
+
+            header[key] = value.__dict__
+
+            for k, v in header[key].items():
+                if not isinstance(v, bytes):
+                    continue
+
+                bytes2hex = binascii.hexlify(v).decode('ascii').upper()
+                header[key][k] = ' '.join(bytes2hex[i:i + 2] for i in range(0, len(bytes2hex), 2))
+
+        return json.dumps(header, indent=4)

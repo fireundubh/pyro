@@ -10,7 +10,7 @@ import zipfile
 
 class Application:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname).4s] %(message)s')
-    log: logging.Logger = logging.getLogger()
+    log: logging.Logger = logging.getLogger('pyro')
 
     def __init__(self, args: argparse.Namespace) -> None:
         self.root_path: str = os.path.dirname(__file__)
@@ -19,7 +19,7 @@ class Application:
         self.no_zip: bool = args.no_zip
         self.vcvars64_path: str = args.vcvars64_path
 
-        self.dist_path: str = os.path.join(self.root_path, '%s.dist' % self.package_name)
+        self.dist_path: str = os.path.join(self.root_path, f'{self.package_name}.dist')
         self.root_tools_path: str = os.path.join(self.root_path, 'tools')
         self.dist_tools_path: str = os.path.join(self.dist_path, 'tools')
 
@@ -37,21 +37,22 @@ class Application:
             return
 
         files_to_keep: tuple = (
-            '%s.exe' % self.package_name,
+            f'{self.package_name}.exe',
             'python37.dll',
             '_multiprocessing.pyd',
             '_queue.pyd',
             '_socket.pyd',
             'select.pyd',
             '_elementpath.pyd',
-            'etree.pyd'
+            'etree.pyd',
+            '_psutil_windows.pyd'
         )
 
-        files: list = [f for f in glob.glob(os.path.join(self.dist_path, '**\*'), recursive=True)
+        files: list = [f for f in glob.glob(os.path.join(self.dist_path, r'**\*'), recursive=True)
                        if os.path.isfile(f) and not f.endswith(files_to_keep)]
 
         for f in files:
-            Application.log.warning('Deleting: "%s"' % f)
+            Application.log.warning(f'Deleting: "{f}"')
             os.remove(f)
 
         site_dir: str = os.path.join(self.dist_path, 'site')
@@ -59,15 +60,15 @@ class Application:
             shutil.rmtree(site_dir, ignore_errors=True)
 
     def _build_zip_archive(self) -> str:
-        zip_path: str = os.path.join(self.root_path, 'bin', '%s.zip' % self.package_name)
+        zip_path: str = os.path.join(self.root_path, 'bin', f'{self.package_name}.zip')
         os.makedirs(os.path.dirname(zip_path), exist_ok=True)
 
-        files: list = [f for f in glob.glob(os.path.join(self.dist_path, '**\*'), recursive=True) if os.path.isfile(f)]
+        files: list = [f for f in glob.glob(os.path.join(self.dist_path, r'**\*'), recursive=True) if os.path.isfile(f)]
 
-        with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_STORED) as z:
+        with zipfile.ZipFile(zip_path, 'w') as z:
             for f in files:
                 z.write(f, os.path.join(self.package_name, os.path.relpath(f, self.dist_path)), compress_type=zipfile.ZIP_STORED)
-                Application.log.info('Added file to archive: %s' % f)
+                Application.log.info(f'Added file to archive: {f}')
 
         return zip_path
 
@@ -81,10 +82,11 @@ class Application:
                 Application.log.error('Cannot build Pyro with MSVC compiler because VsDevCmd path is invalid')
                 sys.exit(1)
 
-        Application.log.info('Using project path: "%s"' % self.root_path)
+        Application.log.info(f'Using project path: "{self.root_path}"')
 
-        Application.log.warning('Cleaning: "%s"' % self.dist_path)
+        Application.log.warning(f'Cleaning: "{self.dist_path}"')
         shutil.rmtree(self.dist_path, ignore_errors=True)
+        os.makedirs(self.dist_path, exist_ok=True)
 
         fail_state: int = 0
 
@@ -93,8 +95,7 @@ class Application:
 
         if self.vcvars64_path:
             try:
-                process = subprocess.Popen(f'%comspec% /C "{self.vcvars64_path}"',
-                                           stdout=subprocess.PIPE, stderr=None, shell=True, universal_newlines=True)
+                process = subprocess.Popen(f'%comspec% /C "{self.vcvars64_path}"', stdout=subprocess.PIPE, shell=True, universal_newlines=True)
             except FileNotFoundError:
                 fail_state = 1
 
@@ -107,9 +108,9 @@ class Application:
                     _, env_log_path = line.split(' to ')
                     process.terminate()
 
-            Application.log.info('Loading environment: "%s"' % env_log_path)
+            Application.log.info(f'Loading environment: "{env_log_path}"')
 
-            with open(env_log_path, mode='r', encoding='utf-8') as f:
+            with open(env_log_path, encoding='utf-8') as f:
                 lines: list = f.read().splitlines()
 
                 for line in lines:
@@ -117,25 +118,22 @@ class Application:
                     environ[key] = value
 
         args: list = [
-            'pipenv',
-            'run',
-            'nuitka',
+            sys.executable, '-m', 'nuitka',
             '--standalone', 'pyro',
             '--include-package=pyro',
             '--experimental=use_pefile',
             '--python-flag=nosite',
-            '--python-for-scons=%s' % sys.executable,
+            f'--python-for-scons={sys.executable}',
             '--assume-yes-for-downloads',
             '--plugin-enable=multiprocessing',
             '--show-progress',
             '--file-reference-choice=runtime'
         ]
 
-        command: str = ' '.join(args)
-
         try:
-            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True, env=environ)
+            process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, env=environ)
         except FileNotFoundError:
+            Application.log.error(f'Cannot run command: {" ".join(args)}')
             fail_state = 1
 
         if fail_state == 0:
@@ -156,7 +154,7 @@ class Application:
 
                 if line.startswith('Error, mismatch between') and 'arches' in line:
                     _, message = line.split('between')
-                    Application.log.error('Cannot proceed with mismatching architectures: %s' % message.replace(' arches', ''))
+                    Application.log.error(f'Cannot proceed with mismatching architectures: {message.replace(" arches", "")}')
                     fail_state = 1
                     break
 
@@ -173,7 +171,8 @@ class Application:
 
                 Application.log.info(line)
 
-        if not os.path.exists(self.dist_path) or '%s.exe' % self.package_name not in os.listdir(self.dist_path):
+        if fail_state == 0 and not os.path.exists(self.dist_path) or f'{self.package_name}.exe' not in os.listdir(self.dist_path):
+            Application.log.error(f'Cannot find {self.package_name}.exe in folder or folder does not exist: {self.dist_path}')
             fail_state = 1
 
         if fail_state == 0:
@@ -196,15 +195,15 @@ class Application:
                 Application.log.info('Building archive...')
                 zip_created: str = self._build_zip_archive()
 
-                Application.log.info('Wrote archive: %s' % zip_created)
+                Application.log.info(f'Wrote archive: "{zip_created}"')
 
             Application.log.info('Build complete.')
 
             return fail_state
 
-        Application.log.error('Failed to execute command: %s' % command)
+        Application.log.error(f'Failed to execute command: {" ".join(args)}')
 
-        Application.log.warning('Resetting: %s' % self.dist_path)
+        Application.log.warning(f'Resetting: "{self.dist_path}"')
         shutil.rmtree(self.dist_path, ignore_errors=True)
 
         return fail_state

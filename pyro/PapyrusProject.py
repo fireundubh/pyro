@@ -1,81 +1,142 @@
 import glob
+import hashlib
 import io
 import os
-import re
 import sys
+import typing
 import zipfile
 
 from lxml import etree
 
 from pyro.CommandArguments import CommandArguments
-from pyro.ElementHelper import ElementHelper
 from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProjectBase import ProjectBase
 from pyro.ProjectOptions import ProjectOptions
+from pyro.Remotes import GenericRemote, RemoteBase
+from pyro.XmlHelper import XmlHelper
+from pyro.XmlRoot import XmlRoot
 
 
 class PapyrusProject(ProjectBase):
+    ppj_root: XmlRoot = None
+    folders_node: etree.ElementBase = None
+    imports_node: etree.ElementBase = None
+    packages_node: etree.ElementBase = None
+    scripts_node: etree.ElementBase = None
+    zip_file_node: etree.ElementBase = None
+
+    has_folders_node: bool = False
+    has_imports_node: bool = False
+    has_packages_node: bool = False
+    has_scripts_node: bool = False
+    has_zip_file_node: bool = False
+
+    remote: RemoteBase = None
+    remote_schemas: tuple = ('http:', 'https:')
+
+    namespace: str = ''
+    zip_file_name: str = ''
+    zip_root_path: str = ''
+
+    missing_scripts: list = []
+    pex_paths: list = []
+    psc_paths: list = []
+
     def __init__(self, options: ProjectOptions) -> None:
-        super().__init__(options)
+        super(PapyrusProject, self).__init__(options)
 
         xml_parser: etree.XMLParser = etree.XMLParser(remove_blank_text=True, remove_comments=True)
 
         # strip comments from raw text because lxml.etree.XMLParser does not remove XML-unsupported comments
         # e.g., '<PapyrusProject <!-- xmlns="PapyrusProject.xsd" -->>'
-        xml_document: io.StringIO = PapyrusProject._strip_xml_comments(self.options.input_path)
+        xml_document: io.StringIO = XmlHelper.strip_xml_comments(self.options.input_path)
 
         project_xml: etree.ElementTree = etree.parse(xml_document, xml_parser)
-        self.root_node: etree.ElementBase = project_xml.getroot()
 
-        # TODO: validate earlier
-        schema: etree.XMLSchema = ElementHelper.validate_schema(self.root_node, self.program_path)
+        self.ppj_root = XmlRoot(project_xml)
+
+        schema: etree.XMLSchema = XmlHelper.validate_schema(self.ppj_root.ns, self.program_path)
+
         if schema:
             try:
-                if schema.assertValid(project_xml) is None:
-                    PapyrusProject.log.info('Successfully validated XML Schema.')
+                schema.assertValid(project_xml)
             except etree.DocumentInvalid as e:
-                PapyrusProject.log.error('Failed to validate XML Schema.%s\t%s' % (os.linesep, e))
+                PapyrusProject.log.error(f'Failed to validate XML Schema.{os.linesep}\t{e}')
                 sys.exit(1)
+            else:
+                PapyrusProject.log.info('Successfully validated XML Schema.')
 
-        variables_node = ElementHelper.get(self.root_node, 'Variables')
+        # variables need to be parsed before nodes are updated
+        variables_node = self.ppj_root.find('Variables')
         if variables_node is not None:
             self._parse_variables(variables_node)
 
-        # we need to parse all PapyrusProject attributes after validating and before we do anything else
+        # we need to parse all attributes after validating and before we do anything else
         # options can be overridden by arguments when the BuildFacade is initialized
-        self.options.output_path = self.parse(self.root_node.get('Output', default=self.options.output_path))
-        self.options.flags_path = self.parse(self.root_node.get('Flags', default=self.options.flags_path))
+        self._update_attributes(self.ppj_root.node)
 
-        self.optimize: bool = PapyrusProject._get_attr_as_bool(self.root_node, 'Optimize')
-        self.release: bool = PapyrusProject._get_attr_as_bool(self.root_node, 'Release')
-        self.final: bool = PapyrusProject._get_attr_as_bool(self.root_node, 'Final')
+        if self.options.resolve_ppj:
+            xml_output = etree.tostring(self.ppj_root.node, encoding='utf-8', xml_declaration=True, pretty_print=True).decode()
+            PapyrusProject.log.debug(f'Resolved variables and paths in PPJ. Text output:{os.linesep * 2}{xml_output}')
+            sys.exit(1)
 
-        self.options.anonymize = PapyrusProject._get_attr_as_bool(self.root_node, 'Anonymize')
-        self.options.bsarch = PapyrusProject._get_attr_as_bool(self.root_node, 'Package')
-        self.options.zip = PapyrusProject._get_attr_as_bool(self.root_node, 'Zip')
+        self.options.flags_path = self.ppj_root.get('Flags')
+        self.options.output_path = self.ppj_root.get('Output')
 
-        self.packages_node = ElementHelper.get(self.root_node, 'Packages')
+        self.optimize = self.ppj_root.get('Optimize') == 'True'
+        self.release = self.ppj_root.get('Release') == 'True'
+        self.final = self.ppj_root.get('Final') == 'True'
 
-        if self.options.bsarch:
-            if self.packages_node is None:
-                PapyrusProject.log.error('Package is enabled but the Packages node is undefined. Setting Package to false.')
-                self.options.bsarch = False
+        self.options.anonymize = self.ppj_root.get('Anonymize') == 'True'
+        self.options.package = self.ppj_root.get('Package') == 'True'
+        self.options.zip = self.ppj_root.get('Zip') == 'True'
+
+        self.imports_node = self.ppj_root.find('Imports')
+        self.has_imports_node = self.imports_node is not None
+
+        self.scripts_node = self.ppj_root.find('Scripts')
+        self.has_scripts_node = self.scripts_node is not None
+
+        self.folders_node = self.ppj_root.find('Folders')
+        self.has_folders_node = self.folders_node is not None
+
+        self.packages_node = self.ppj_root.find('Packages')
+        self.has_packages_node = self.packages_node is not None
+
+        self.zip_file_node = self.ppj_root.find('ZipFile')
+        self.has_zip_file_node = self.zip_file_node is not None
+
+        if self.options.package and self.has_packages_node:
+            self.options.package_path = self.packages_node.get('Output')
+
+        if self.options.zip and self.has_zip_file_node:
+            self.zip_file_name = self.zip_file_node.get('Name')
+            self.zip_root_path = self.zip_file_node.get('RootDir')
+            self.options.zip_output_path = self.zip_file_node.get('Output')
+            self.options.zip_compression = self.zip_file_node.get('Compression').casefold()
+            self._setup_zipfile_options()
+
+        # initialize remote if needed
+        if self.remote_paths:
+            if not self.options.remote_temp_path:
+                self.options.remote_temp_path = self.get_remote_temp_path()
+
+            if self.options.access_token:
+                self.remote = GenericRemote(self.options.access_token)
             else:
-                self.options.package_path = self.parse(self.packages_node.get('Output', default=self.options.package_path))
+                PapyrusProject.log.error('Cannot proceed without personal access token')
+                sys.exit(1)
 
-        self.zipfile_node = ElementHelper.get(self.root_node, 'ZipFile')
-
-        if self.options.zip:
-            if self.zipfile_node is None:
-                PapyrusProject.log.error('Zip is enabled but the ZipFile node is undefined. Setting Zip to false.')
-                self.options.zip = False
-            else:
-                self._setup_zipfile_options()
+            # validate remote paths
+            for path in self.remote_paths:
+                if not self.remote.validate_url(path):
+                    PapyrusProject.log.error(f'Cannot proceed while node contains invalid URL: "{path}"')
+                    sys.exit(1)
 
         # we need to populate the list of import paths before we try to determine the game type
         # because the game type can be determined from import paths
-        self.import_paths: list = self._get_import_paths()
+        self.import_paths = self._get_import_paths()
         if not self.import_paths:
             PapyrusProject.log.error('Failed to build list of import paths')
             sys.exit(1)
@@ -84,11 +145,10 @@ class PapyrusProject(ProjectBase):
         implicit_folder_paths: list = self._get_implicit_folder_imports()
         PathHelper.merge_implicit_import_paths(implicit_folder_paths, self.import_paths)
 
-        for path in implicit_folder_paths:
-            if path in self.import_paths:
-                PapyrusProject.log.warning('Using import path implicitly: "%s"' % path)
-
-        self.psc_paths: list = self._get_psc_paths()
+        # we need to populate psc paths after explicit and implicit import paths are populated
+        # this also needs to be set before we populate implicit import paths from psc paths
+        # not sure if this must run again after populating implicit import paths from psc paths
+        self.psc_paths = self._get_psc_paths()
         if not self.psc_paths:
             PapyrusProject.log.error('Failed to build list of script paths')
             sys.exit(1)
@@ -97,17 +157,16 @@ class PapyrusProject(ProjectBase):
         implicit_script_paths: list = self._get_implicit_script_imports()
         PathHelper.merge_implicit_import_paths(implicit_script_paths, self.import_paths)
 
-        for path in implicit_script_paths:
-            if path in self.import_paths:
-                PapyrusProject.log.warning('Using import path implicitly: "%s"' % path)
+        for path in (p for p in implicit_folder_paths + implicit_script_paths if p in self.import_paths):
+            PapyrusProject.log.warning(f'Using import path implicitly: "{path}"')
 
         # we need to set the game type after imports are populated but before pex paths are populated
         # allow xml to set game type but defer to passed argument
         if not self.options.game_type:
-            game_type: str = self.parse(self.root_node.get('Game', default='')).casefold()
+            game_type: str = self.ppj_root.get('Game', default='').casefold()
 
             if game_type and game_type in self.game_types:
-                PapyrusProject.log.warning('Using game type: %s (determined from Papyrus Project)' % self.game_types[game_type])
+                PapyrusProject.log.warning(f'Using game type: {self.game_types[game_type]} (determined from Papyrus Project)')
                 self.options.game_type = game_type
 
         if not self.options.game_type:
@@ -118,14 +177,36 @@ class PapyrusProject(ProjectBase):
             sys.exit(1)
 
         # get expected pex paths - these paths may not exist and that is okay!
-        self.pex_paths: list = self._get_pex_paths()
+        self.pex_paths = self._get_pex_paths()
 
         # these are relative paths to psc scripts whose pex counterparts are missing
-        self.missing_scripts: list = self._find_missing_script_paths()
+        self.missing_scripts = self._find_missing_script_paths()
 
         # game type must be set before we call this
         if not self.options.game_path:
             self.options.game_path = self.get_game_path()
+
+    @property
+    def remote_paths(self) -> list:
+        results = []
+
+        if self.has_imports_node:
+            for node in self.imports_node:
+                if not node.tag.endswith('Import'):
+                    continue
+
+                if node.text.casefold().startswith(self.remote_schemas):
+                    results.append(node.text)
+
+        if self.has_folders_node:
+            for node in self.folders_node:
+                if not node.tag.endswith('Folder'):
+                    continue
+
+                if node.text.casefold().startswith(self.remote_schemas):
+                    results.append(node.text)
+
+        return results
 
     def _parse_variables(self, variables_node: etree.ElementBase) -> None:
         reserved_characters: tuple = ('!', '#', '$', '%', '^', '&', '*')
@@ -141,18 +222,17 @@ class PapyrusProject(ProjectBase):
                 continue
 
             if not var_key.isalnum():
-                PapyrusProject.log.error('The name of the variable "%s" must be an alphanumeric string.' % var_key)
+                PapyrusProject.log.error(f'The name of the variable "{var_key}" must be an alphanumeric string.')
                 sys.exit(1)
 
-            if any([c in reserved_characters for c in var_value]):
-                PapyrusProject.log.error('The value of the variable "%s" contains a reserved character.' % var_key)
+            if any(c in reserved_characters for c in var_value):
+                PapyrusProject.log.error(f'The value of the variable "{var_key}" contains a reserved character.')
                 sys.exit(1)
 
             self.variables.update({var_key: var_value})
 
         # allow variables to reference other variables
-        for var_key in self.variables:
-            var_value = self.variables[var_key]
+        for var_key, var_value in self.variables.items():
             self.variables.update({var_key: self.parse(var_value)})
 
         # complete round trip so that order does not matter
@@ -160,9 +240,60 @@ class PapyrusProject(ProjectBase):
             var_value = self.variables[var_key]
             self.variables.update({var_key: self.parse(var_value)})
 
-    def _setup_zipfile_options(self) -> None:
-        self.zip_root_path = self.parse(self.zipfile_node.get('RootDir', default=self.project_path))
+    def _update_attributes(self, parent_node: etree.ElementBase) -> None:
+        """Updates attributes of element tree with missing attributes and default values"""
+        bool_keys = ['Optimize', 'Release', 'Final', 'Anonymize', 'Package', 'Zip']
 
+        for node in parent_node.getiterator():
+            if node.text:
+                node.text = self.parse(node.text)
+
+            if not node.attrib:
+                continue
+
+            tag = node.tag.replace('{%s}' % self.namespace, '')
+
+            if tag == 'PapyrusProject':
+                if 'Game' not in node.attrib:
+                    node.set('Game', '')
+                if 'Flags' not in node.attrib:
+                    node.set('Flags', self.options.flags_path)
+                if 'Output' not in node.attrib:
+                    node.set('Output', self.options.output_path)
+                for key in bool_keys:
+                    if key not in node.attrib:
+                        node.set(key, 'False')
+
+            elif tag == 'Packages':
+                if 'Output' not in node.attrib:
+                    node.set('Output', self.options.package_path)
+
+            elif tag == 'Package':
+                if 'Name' not in node.attrib:
+                    node.set('Name', self.project_name)
+                if 'RootDir' not in node.attrib:
+                    node.set('RootDir', self.project_path)
+
+            elif tag in ('Folder', 'Include'):
+                if 'NoRecurse' not in node.attrib:
+                    node.set('NoRecurse', 'False')
+
+            elif tag == 'ZipFile':
+                if 'Name' not in node.attrib:
+                    node.set('Name', self.project_name)
+                if 'RootDir' not in node.attrib:
+                    node.set('RootDir', self.project_path)
+                if 'Output' not in node.attrib:
+                    node.set('Output', self.options.zip_output_path)
+                if 'Compression' not in node.attrib:
+                    node.set('Compression', 'deflate')
+
+            # parse values
+            for key, value in node.attrib.items():
+                value = value.casefold() in ('true', '1') if key in bool_keys + ['NoRecurse'] else self.parse(value)
+                node.set(key, str(value))
+
+    def _setup_zipfile_options(self) -> None:
         # zip - required attribute
         if not os.path.isabs(self.zip_root_path):
             test_path: str = os.path.normpath(os.path.join(self.project_path, self.zip_root_path))
@@ -170,43 +301,30 @@ class PapyrusProject(ProjectBase):
             if os.path.isdir(test_path):
                 self.zip_root_path = test_path
             else:
-                PapyrusProject.log.error('Cannot resolve RootDir path to existing folder: "%s"' % self.zip_root_path)
+                PapyrusProject.log.error(f'Cannot resolve RootDir path to existing folder: "{self.zip_root_path}"')
                 sys.exit(1)
 
         # zip - optional attributes
-        self.zip_file_name: str = self.parse(self.zipfile_node.get('Name', default=self.project_name))
         if not self.zip_file_name.casefold().endswith('.zip'):
-            self.zip_file_name = '%s.zip' % self.zip_file_name
-
-        self.options.zip_output_path = self.parse(self.zipfile_node.get('Output', default=self.options.zip_output_path))
-
-        if not self.options.zip_compression:
-            self.options.zip_compression = self.parse(self.zipfile_node.get('Compression', default='deflate').casefold())
+            self.zip_file_name = f'{self.zip_file_name}.zip'
 
         if self.options.zip_compression not in ('store', 'deflate'):
             self.options.zip_compression = 'deflate'
 
-        self.compress_type: int = zipfile.ZIP_STORED if self.options.zip_compression == 'store' else zipfile.ZIP_DEFLATED
-
-    @staticmethod
-    def _get_attr_as_bool(node: etree.ElementBase, attribute_name: str, default_value: str = 'false') -> bool:
-        attr: str = node.get(attribute_name, default=default_value).casefold()
-        return any([attr == 'true', attr == '1'])
-
-    @staticmethod
-    def _strip_xml_comments(path: str) -> io.StringIO:
-        with open(path, mode='r', encoding='utf-8') as f:
-            xml_document: str = f.read()
-            comments_pattern = re.compile('(<!--.*?-->)', flags=re.DOTALL)
-            xml_document = comments_pattern.sub('', xml_document)
-        return io.StringIO(xml_document)
+        use_store = self.options.zip_compression == 'store'
+        self.compress_type: int = zipfile.ZIP_STORED if use_store else zipfile.ZIP_DEFLATED
 
     def _calculate_object_name(self, psc_path: str) -> str:
         if self.options.game_type == 'fo4':
-            object_name = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
-        else:
-            object_name = os.path.basename(psc_path)
-        return object_name
+            return PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
+        return os.path.basename(psc_path)
+
+    @staticmethod
+    def _can_remove_folder(import_path: str, object_name: str, script_path: str) -> bool:
+        import_path = import_path.casefold()
+        object_name = object_name.casefold()
+        script_path = script_path.casefold()
+        return script_path.startswith(import_path) and os.path.join(import_path, object_name) != script_path
 
     def _find_missing_script_paths(self) -> list:
         """Returns list of script paths for compiled scripts that do not exist"""
@@ -219,29 +337,35 @@ class PapyrusProject(ProjectBase):
             if os.path.isfile(pex_path):
                 continue
 
-            results.append(psc_path)
+            if psc_path not in results:
+                results.append(psc_path)
 
-        return PathHelper.uniqify(results)
+        return results
 
     def _get_import_paths(self) -> list:
         """Returns absolute import paths from Papyrus Project"""
         results: list = []
 
-        import_nodes: etree.ElementBase = ElementHelper.get(self.root_node, 'Imports')
-        if import_nodes is None:
+        if not self.has_imports_node:
             return []
 
-        for import_node in import_nodes:
+        for import_node in self.imports_node:
             if not import_node.tag.endswith('Import'):
                 continue
 
             if not import_node.text:
                 continue
 
-            import_path: str = os.path.normpath(self.parse(import_node.text))
+            if import_node.text.startswith(self.remote_schemas):
+                for common_path in self._get_remote_paths(import_node):
+                    PapyrusProject.log.info(f'Adding import path from remote: "{common_path}"...')
+                    results.append(common_path)
+                continue
+
+            import_path = os.path.normpath(import_node.text)
 
             if import_path == os.pardir:
-                self.log.warning('Import paths cannot be equal to ".."')
+                self.log.warning(f'Import paths cannot be equal to "{os.pardir}"')
                 continue
 
             if import_path == os.curdir:
@@ -259,18 +383,17 @@ class PapyrusProject(ProjectBase):
         """Returns absolute implicit import paths from Folder node paths"""
         implicit_paths: list = []
 
-        folder_nodes = ElementHelper.get(self.root_node, 'Folders')
-        if folder_nodes is None:
+        if not self.has_folders_node:
             return []
 
-        for folder_node in folder_nodes:
+        for folder_node in self.folders_node:
             if not folder_node.tag.endswith('Folder'):
                 continue
 
             if not folder_node.text:
                 continue
 
-            folder_path: str = os.path.normpath(self.parse(folder_node.text))
+            folder_path: str = os.path.normpath(folder_node.text)
 
             if os.path.isabs(folder_path):
                 if os.path.isdir(folder_path):
@@ -287,8 +410,11 @@ class PapyrusProject(ProjectBase):
         implicit_paths: list = []
 
         for psc_path in self.psc_paths:
+            script_folder_path = os.path.dirname(psc_path)
+
             for import_path in self.import_paths:
-                relpath = os.path.relpath(os.path.dirname(psc_path), import_path)
+                relpath = os.path.relpath(script_folder_path, import_path)
+
                 test_path = os.path.normpath(os.path.join(import_path, relpath))
                 if os.path.isdir(test_path):
                     implicit_paths.append(test_path)
@@ -306,23 +432,23 @@ class PapyrusProject(ProjectBase):
 
             pex_path = os.path.join(self.options.output_path, object_name.replace('.psc', '.pex'))
 
-            pex_paths.append(pex_path)
+            if pex_path not in pex_paths:
+                pex_paths.append(pex_path)
 
-        return PathHelper.uniqify(pex_paths)
+        return pex_paths
 
     def _get_psc_paths(self) -> list:
         """Returns script paths from Folders and Scripts nodes"""
-        paths: list = []
+        paths: set = set()
 
         # try to populate paths with scripts from Folders and Scripts nodes
-        for tag in ('Folders', 'Scripts'):
-            node = ElementHelper.get(self.root_node, tag)
-            if node is None:
-                continue
-            node_paths = getattr(self, '_get_script_paths_from_%s_node' % tag.casefold())()
-            PapyrusProject.log.info('%s script paths discovered from %s nodes.' % (len(node_paths), tag[:-1]))
-            if node_paths:
-                paths.extend(node_paths)
+        if self.has_folders_node:
+            for script_path in self._get_script_paths_from_folders_node():
+                paths.add(script_path)
+
+        if self.has_scripts_node:
+            for script_path in self._get_script_paths_from_scripts_node():
+                paths.add(script_path)
 
         results: list = []
 
@@ -351,85 +477,93 @@ class PapyrusProject(ProjectBase):
 
         results = PathHelper.uniqify(results)
 
-        PapyrusProject.log.info('%s unique script paths resolved to absolute paths.' % len(results))
+        PapyrusProject.log.info(f'{len(results)} unique script paths resolved to absolute paths.')
 
         return results
 
-    def _get_script_paths_from_folders_node(self) -> list:
+    def _get_remote_paths(self, node: etree.ElementBase) -> set:
+        url_hash = hashlib.sha1(node.text.encode()).hexdigest()
+
+        temp_path = os.path.join(self.options.remote_temp_path, url_hash)
+
+        if self.options.force_overwrite or not os.path.exists(temp_path):
+            for message in self.remote.get_contents(node.text, temp_path):
+                if not message.startswith('Failed to load'):
+                    PapyrusProject.log.info(message)
+                else:
+                    PapyrusProject.log.error(message)
+                    sys.exit(1)
+
+        search_path = os.path.join(temp_path, r'**\*')
+
+        def _get_right_path_for_node(path: str) -> str:
+            if node.tag.endswith('Import'):
+                path = os.path.dirname(path)
+            return path
+
+        common_paths = set([_get_right_path_for_node(f) for f in glob.iglob(search_path, recursive=True)
+                            if os.path.isfile(f) and f.casefold().endswith('.psc')])
+
+        return common_paths
+
+    def _get_script_paths_from_folders_node(self) -> typing.Generator:
         """Returns script paths from the Folders element array"""
-        folder_nodes = ElementHelper.get(self.root_node, 'Folders')
-        if folder_nodes is None:
-            return []
-
-        script_paths: list = []
-        folder_paths: list = []
-
-        for folder_node in folder_nodes:
+        for folder_node in self.folders_node:
             if not folder_node.tag.endswith('Folder'):
                 continue
 
-            folder_text: str = self.parse(folder_node.text)
-
-            if folder_text == os.pardir:
-                self.log.warning('Folder paths cannot be equal to ".."')
+            if folder_node.text == os.pardir:
+                self.log.warning(f'Folder paths cannot be equal to "{os.pardir}"')
                 continue
 
-            no_recurse: bool = self._get_attr_as_bool(folder_node, 'NoRecurse')
+            no_recurse: bool = folder_node.get('NoRecurse') == 'True'
 
             # try to add project path
-            if folder_text == os.curdir:
-                folder_paths.append((self.project_path, no_recurse))
+            if folder_node.text == os.curdir:
+                yield from PathHelper.find_script_paths_from_folder(self.project_path, no_recurse)
                 continue
 
-            folder_path: str = os.path.normpath(folder_text)
+            if folder_node.text.startswith(self.remote_schemas):
+                for common_path in self._get_remote_paths(folder_node):
+                    PapyrusProject.log.info(f'Adding folder path from remote: "{common_path}"...')
+                    yield common_path
+                continue
+
+            folder_path: str = os.path.normpath(folder_node.text)
 
             # try to add absolute path
             if os.path.isabs(folder_path) and os.path.isdir(folder_path):
-                folder_paths.append((folder_path, no_recurse))
+                yield from PathHelper.find_script_paths_from_folder(folder_path, no_recurse)
                 continue
 
             # try to add project-relative folder path
             test_path = os.path.join(self.project_path, folder_path)
             if os.path.isdir(test_path):
-                folder_paths.append((test_path, no_recurse))
+                yield from PathHelper.find_script_paths_from_folder(test_path, no_recurse)
                 continue
 
             # try to add import-relative folder path
             for import_path in self.import_paths:
                 test_path = os.path.join(import_path, folder_path)
                 if os.path.isdir(test_path):
-                    folder_paths.append((test_path, no_recurse))
-                    continue
+                    yield from PathHelper.find_script_paths_from_folder(test_path, no_recurse)
 
-        for folder_path, no_recurse in folder_paths:
-            search_path: str = os.path.join(folder_path, '*' if no_recurse else '**\*')
-            script_paths.extend([f for f in glob.iglob(search_path, recursive=not no_recurse) if os.path.isfile(f) and f.casefold().endswith('.psc')])
-
-        return PathHelper.uniqify(script_paths)
-
-    def _get_script_paths_from_scripts_node(self) -> list:
+    def _get_script_paths_from_scripts_node(self) -> typing.Generator:
         """Returns script paths from the Scripts node"""
-        paths: list = []
-
-        script_nodes = ElementHelper.get(self.root_node, 'Scripts')
-        if script_nodes is None:
-            return []
-
-        for script_node in script_nodes:
+        for script_node in self.scripts_node:
             if not script_node.tag.endswith('Script'):
                 continue
 
-            psc_path: str = self.parse(script_node.text)
+            if not script_node.text:
+                continue
 
-            if ':' in psc_path:
-                psc_path = psc_path.replace(':', os.sep)
+            if ':' in script_node.text:
+                script_node.text = script_node.text.replace(':', os.sep)
 
-            paths.append(os.path.normpath(psc_path))
+            yield os.path.normpath(script_node.text)
 
-        return PathHelper.uniqify(paths)
-
-    def _try_exclude_unmodified_scripts(self) -> list:
-        psc_paths: list = []
+    def _try_exclude_unmodified_scripts(self) -> set:
+        psc_paths: set = set()
 
         for psc_path in self.psc_paths:
             script_name, _ = os.path.splitext(os.path.basename(psc_path))
@@ -437,7 +571,7 @@ class PapyrusProject(ProjectBase):
             # if pex exists, compare time_t in pex header with psc's last modified timestamp
             matching_path: str = ''
             for pex_path in self.pex_paths:
-                if pex_path.endswith('%s.pex' % script_name):
+                if pex_path.endswith(f'{script_name}.pex'):
                     matching_path = pex_path
                     break
 
@@ -447,16 +581,17 @@ class PapyrusProject(ProjectBase):
             try:
                 header = PexReader.get_header(matching_path)
             except ValueError:
-                PapyrusProject.log.warning('Cannot determine compilation time from compiled script due to unknown file magic: "%s"' % matching_path)
+                PapyrusProject.log.warning(f'Cannot determine compilation time from compiled script due to unknown file magic: "{matching_path}"')
                 continue
 
             compiled_time: int = header.compilation_time.value
             if os.path.getmtime(psc_path) < compiled_time:
                 continue
 
-            psc_paths.append(psc_path)
+            if psc_path not in psc_paths:
+                psc_paths.add(psc_path)
 
-        return PathHelper.uniqify(psc_paths)
+        return psc_paths
 
     def build_commands(self) -> list:
         commands: list = []
@@ -466,28 +601,35 @@ class PapyrusProject(ProjectBase):
         compiler_path: str = self.options.compiler_path
         flags_path: str = self.options.flags_path
         output_path: str = self.options.output_path
-        import_paths: str = ';'.join(self.import_paths)
 
         if self.options.no_incremental_build:
             psc_paths = PathHelper.uniqify(self.psc_paths)
         else:
-            psc_paths = self._try_exclude_unmodified_scripts()
+            psc_paths = list(self._try_exclude_unmodified_scripts())
 
         # add .psc scripts whose .pex counterparts do not exist
-        for missing_psc_path in self.missing_scripts:
-            if missing_psc_path not in psc_paths:
-                psc_paths.append(missing_psc_path)
+        for missing_psc_path in [p for p in self.missing_scripts if p not in psc_paths]:
+            psc_paths.append(missing_psc_path)
 
-        # generate list of commands
-        for psc_path in psc_paths:
+        # TODO: depth sorting solution is not foolproof! parse psc files for imports to determine command order
+        for script_path in sorted(psc_paths, key=lambda p: (p.count(os.sep), len(p)), reverse=True):
+            import_paths: list = self.import_paths
+
+            object_name: str = script_path
+
             if self.options.game_type == 'fo4':
-                psc_path = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
+                object_name = PathHelper.calculate_relative_object_name(script_path, self.import_paths)
+
+                # remove unnecessary import paths for script
+                for import_path in reversed(import_paths):
+                    if self._can_remove_folder(import_path, object_name, script_path):
+                        import_paths.remove(import_path)
 
             arguments.clear()
             arguments.append_quoted(compiler_path)
-            arguments.append_quoted(psc_path)
+            arguments.append_quoted(object_name)
             arguments.append_quoted(output_path, 'o')
-            arguments.append_quoted(import_paths, 'i')
+            arguments.append_quoted(';'.join(import_paths), 'i')
             arguments.append_quoted(flags_path, 'f')
 
             if self.options.game_type == 'fo4':

@@ -1,73 +1,115 @@
+import logging
+import os
 import re
 import subprocess
+from decimal import Decimal
 
-from pyro.Logger import Logger
+from pyro.ProcessState import ProcessState
 
 
-class ProcessManager(Logger):
+class ProcessManager:
+    log: logging.Logger = logging.getLogger('pyro')
+
     @staticmethod
-    def run(command: str, use_bsarch: bool = False) -> int:
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False, universal_newlines=True)
+    def _format_time(hours: Decimal, minutes: Decimal, seconds: Decimal) -> str:
+        if hours.compare(0) == 1 and minutes.compare(0) == 1 and seconds.compare(0) == 1:
+            return f'{hours}h {minutes}m {seconds}s'
+        if hours.compare(0) == 0 and minutes.compare(0) == 1 and seconds.compare(0) == 1:
+            return f'{minutes}m {seconds}s'
+        if hours.compare(0) == 0 and minutes.compare(0) == 0 and seconds.compare(0) == 1:
+            return f'{seconds}s'
+        return f'{hours}h {minutes}m {seconds}s'
 
-        papyrus_exclusions = ('Starting', 'Assembly', 'Compilation', 'Batch', 'Copyright', 'Papyrus', 'Failed', 'No output')
-        bsarch_exclusions = ('BSArch', 'Packer', 'Version', 'Files', 'Archive Flags', '[', '*', 'Compressed', 'Retain', 'XBox', 'Startup', 'Embed', 'XMem', 'Bit', 'Format')
+    @staticmethod
+    def run_bsarch(command: str) -> ProcessState:
+        try:
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+        except WindowsError as e:
+            ProcessManager.log.error(f'Cannot create process because: {e.strerror}')
+            return ProcessState.FAILURE
 
-        line_error = re.compile('\(\d+,\d+\)')
+        exclusions = ('BSArch', 'Packer', 'Version', 'Files', 'Archive Flags', '[', '*', 'Compressed', 'Retain', 'XBox', 'Startup', 'Embed', 'XMem', 'Bit', 'Format')
 
         try:
             while process.poll() is None:
                 line = process.stdout.readline().strip()
 
-                if use_bsarch:
-                    if line.startswith(bsarch_exclusions):
-                        continue
+                if line.startswith(exclusions):
+                    continue
 
-                    if line.startswith('Packing'):
-                        package_path = line.split(':', 1)[1].strip()
-                        ProcessManager.log.info('Packaging folder "%s"...' % package_path)
-                        continue
+                if line.startswith('Packing'):
+                    package_path = line.split(':', 1)[1].strip()
+                    ProcessManager.log.info(f'Packaging folder "{package_path}"...')
+                    continue
 
-                    if line.startswith('Archive Name'):
-                        archive_path = line.split(':', 1)[1].strip()
-                        ProcessManager.log.info('Building "%s"...' % archive_path)
-                        continue
+                if line.startswith('Archive Name'):
+                    archive_path = line.split(':', 1)[1].strip()
+                    ProcessManager.log.info(f'Building "{archive_path}"...')
+                    continue
 
-                    if line.startswith('Done'):
-                        archive_time = line.split('in')[1].strip()[:-1]
-                        hours, minutes, seconds = [round(float(n), 2) for n in archive_time.split(':')]
+                if line.startswith('Done'):
+                    archive_time = line.split('in')[1].strip()[:-1]
+                    hours, minutes, seconds = [round(Decimal(n), 3) for n in archive_time.split(':')]
 
-                        timecode = ProcessManager._format_time(hours, minutes, seconds)
+                    timecode = ProcessManager._format_time(hours, minutes, seconds)
 
-                        ProcessManager.log.info('Packaging time: %s' % timecode)
-                        continue
+                    ProcessManager.log.info(f'Packaging time: {timecode}')
+                    continue
 
-                    if line:
-                        ProcessManager.log.info(line)
-                else:
-                    exclude_lines = not line.startswith(papyrus_exclusions)
-
-                    if line and exclude_lines and 'error(s)' not in line:
-                        ProcessManager.log.info(line)
-
-                    if line_error.match(line) is not None:
-                        process.terminate()
-                        return -1
+                if line:
+                    ProcessManager.log.info(line)
 
         except KeyboardInterrupt:
             try:
                 process.terminate()
             except OSError:
                 ProcessManager.log.error('Process interrupted by user.')
-            return -1
+            return ProcessState.INTERRUPTED
 
-        return 0
+        return ProcessState.SUCCESS
 
     @staticmethod
-    def _format_time(hours: float, minutes: float, seconds: float) -> str:
-        if hours > 0.0 and minutes > 0.0 and seconds > 0.0:
-            return '%sh %sm %ss' % (hours, minutes, seconds)
-        if hours == 0.0 and minutes > 0.0 and seconds > 0.0:
-            return '%sm %ss' % (minutes, seconds)
-        if hours == 0.0 and minutes == 0.0 and seconds > 0.0:
-            return '%ss' % seconds
-        return '%sh %sm %ss' % (hours, minutes, seconds)
+    def run_compiler(command: str) -> ProcessState:
+        command_size = len(command)
+
+        if command_size > 32768:
+            ProcessManager.log.error(f'Cannot create process because command exceeds max length: {command_size}')
+            return ProcessState.FAILURE
+
+        try:
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+        except WindowsError as e:
+            ProcessManager.log.error(f'Cannot create process because: {e.strerror}')
+            return ProcessState.FAILURE
+
+        exclusions = ('Starting', 'Assembly', 'Compilation', 'Batch', 'Copyright', 'Papyrus', 'Failed', 'No output')
+
+        line_error = re.compile(r'(.*)(\(\d+,\d+\)):\s+(.*)')
+
+        try:
+            while process.poll() is None:
+                line = process.stdout.readline().strip()
+
+                if not line or line.startswith(exclusions):
+                    continue
+
+                match = line_error.search(line)
+
+                if match is not None:
+                    path, location, message = match.groups()
+                    head, tail = os.path.split(path)
+                    ProcessManager.log.error(f'COMPILATION FAILED: {os.path.basename(head)}\\{tail}{location}: {message}')
+                    process.terminate()
+                    return ProcessState.ERRORS
+
+                if 'error(s)' not in line:
+                    ProcessManager.log.info(line)
+
+        except KeyboardInterrupt:
+            try:
+                process.terminate()
+            except OSError:
+                ProcessManager.log.error('Process interrupted by user.')
+            return ProcessState.INTERRUPTED
+
+        return ProcessState.SUCCESS

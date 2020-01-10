@@ -1,97 +1,9 @@
-import argparse
 import os
 import sys
-from urllib.parse import unquote_plus, urlparse
 
-from pyro.BuildFacade import BuildFacade
-from pyro.Logger import Logger
-from pyro.PapyrusProject import PapyrusProject
-from pyro.ProjectOptions import ProjectOptions
+from pyro.Application import Application
 from pyro.PyroArgumentParser import PyroArgumentParser
 from pyro.PyroRawDescriptionHelpFormatter import PyroRawTextHelpFormatter
-from pyro.TimeElapsed import TimeElapsed
-
-
-class Application(Logger):
-    def __init__(self, args: argparse.Namespace) -> None:
-        self.args = args
-        self._validate_args()
-
-    # noinspection PyUnresolvedReferences
-    @staticmethod
-    def _url2pathname(url_path: str) -> str:
-        url = urlparse(url_path)
-
-        netloc: str = url.netloc
-        path: str = url.path
-
-        if netloc and netloc.startswith('/'):
-            netloc = netloc[1:]
-
-        if path and path.startswith('/'):
-            path = path[1:]
-
-        return os.path.normpath(unquote_plus(os.path.join(netloc, path)))
-
-    def _validate_args(self) -> None:
-        if self.args.show_help:
-            sys.exit(print_help())
-
-        input_path: str = self.args.input_path
-
-        if not input_path:
-            Application.log.error('required argument missing: -i INPUT.ppj')
-            sys.exit(print_help())
-
-        if not input_path.casefold().endswith('.ppj'):
-            Application.log.error('Single script compilation is no longer supported. Use a PPJ file.')
-            sys.exit(print_help())
-
-        if input_path.casefold().startswith('file:'):
-            full_path: str = Application._url2pathname(input_path)
-            input_path = os.path.normpath(full_path)
-
-        if not os.path.isabs(input_path):
-            Application.log.warning('Using working directory: "%s"' % os.getcwd())
-            input_path = os.path.join(os.getcwd(), input_path)
-            Application.log.warning('Using input path: "%s"' % input_path)
-
-        self.args.input_path = input_path
-
-        if not os.path.isfile(self.args.input_path):
-            Application.log.error('Cannot load PPJ at given path because file does not exist: "%s"' % self.args.input_path)
-            sys.exit(print_help())
-
-    def run(self) -> int:
-        options = ProjectOptions(self.args.__dict__)
-        ppj = PapyrusProject(options)
-
-        if not ppj.options.game_path:
-            Application.log.error('Cannot determine game type from arguments or Papyrus Project')
-            sys.exit(print_help())
-
-        Application.print_list('Imports found:', ppj.import_paths)
-
-        Application.print_list('Scripts found:', ppj.psc_paths)
-
-        time_elapsed = TimeElapsed()
-
-        build = BuildFacade(ppj)
-        build.try_compile(time_elapsed)
-
-        if ppj.options.anonymize:
-            build.try_anonymize()
-        else:
-            Application.log.warning('Cannot anonymize scripts because anonymization was disabled by user')
-
-        build.try_pack()
-
-        time_elapsed.print(callback_func=Application.log.info)
-
-        Application.log.info('DONE!')
-
-        return 0
-
 
 if __name__ == '__main__':
     _parser = PyroArgumentParser(add_help=False,
@@ -105,10 +17,13 @@ if __name__ == '__main__':
     _required_arguments = _parser.add_argument_group('required arguments')
     _required_arguments.add_argument('-i', '--input-path',
                                      action='store', type=str,
-                                     help='relative or absolute path to ppj file\n'
+                                     help='relative or absolute path to file\n'
                                           '(if relative, must be relative to current working directory)')
 
     _build_arguments = _parser.add_argument_group('build arguments')
+    _build_arguments.add_argument('--ignore-errors',
+                                  action='store_true', default=False,
+                                  help='ignore compiler errors during build')
     _build_arguments.add_argument('--no-incremental-build',
                                   action='store_true', default=False,
                                   help='do not build incrementally')
@@ -174,19 +89,31 @@ if __name__ == '__main__':
                                 help='relative or absolute path to zip output folder\n'
                                      '(if relative, must be relative to project)')
 
+    _remote_arguments = _parser.add_argument_group('remote arguments')
+    _remote_arguments.add_argument('--access-token',
+                                   action='store', type=str,
+                                   help='personal access token\n(must have public_repo access scope)')
+    _remote_arguments.add_argument('--force-overwrite',
+                                   action='store_true',
+                                   help='download remote files and overwrite existing files\n'
+                                        '(default: skip download when remote folder exists)')
+    _remote_arguments.add_argument('--remote-temp-path',
+                                   action='store', type=str,
+                                   help='relative or absolute path to temp folder for remote files\n'
+                                        '(if relative, must be relative to project)')
+
+    _debug_arguments = _parser.add_argument_group('debugging arguments')
+    _debug_arguments.add_argument('--resolve-ppj',
+                                  action='store_true',
+                                  help='resolve variables and paths in ppj file')
+    _debug_arguments.add_argument('--log-path',
+                                  action='store', type=str,
+                                  help='relative or absolute path to log folder\n'
+                                       '(if relative, must be relative to current working directory)')
+
     _program_arguments = _parser.add_argument_group('program arguments')
-    _program_arguments.add_argument('--log-path',
-                                    action='store', type=str,
-                                    help='relative or absolute path to log folder\n'
-                                         '(if relative, must be relative to current working directory)')
     _program_arguments.add_argument('--help', dest='show_help',
                                     action='store_true', default=False,
                                     help='show help and exit')
 
-
-    def print_help() -> int:
-        _parser.print_help()
-        return 1
-
-
-    Application(_parser.parse_args()).run()
+    Application(_parser).run()

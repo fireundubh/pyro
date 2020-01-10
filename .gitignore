@@ -12,3 +12,4 @@ pyro/tools/
 pyro.build/
 pyro.dist/
 *.bat
+*.psc

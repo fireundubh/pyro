@@ -1,51 +1,51 @@
 import json
+import logging
 import multiprocessing
 import os
+import sys
 import time
 from copy import deepcopy
 
+import psutil
+
 from pyro.Anonymizer import Anonymizer
 from pyro.JsonLogger import JsonLogger
-from pyro.Logger import Logger
 from pyro.PackageManager import PackageManager
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProcessManager import ProcessManager
+from pyro.ProcessState import ProcessState
 from pyro.TimeElapsed import TimeElapsed
 
 
-class BuildFacade(Logger):
-    def __init__(self, ppj: PapyrusProject):
+class BuildFacade:
+    log: logging.Logger = logging.getLogger('pyro')
+
+    ppj: PapyrusProject = None
+    log_file: JsonLogger = None
+
+    def __init__(self, ppj: PapyrusProject) -> None:
         self.ppj = ppj
 
         # WARN: if methods are renamed and their respective option names are not, this will break.
         options: dict = deepcopy(self.ppj.options.__dict__)
 
         for key in options:
-            if key not in ('args', 'input_path', 'worker_limit', 'anonymize', 'bsarch', 'zip', 'zip_compression') and not key.startswith('no_'):
-                setattr(self.ppj.options, key, getattr(self.ppj, 'get_%s' % key)())
-
-        if not self.ppj.options.worker_limit:
-            worker_limit: int = 2
-
-            try:
-                # noinspection Mypy
-                worker_limit = os.cpu_count()  # can be None if indeterminate
-            except NotImplementedError:
-                pass
-
-            self.ppj.options.worker_limit = worker_limit
+            if key in ('args', 'input_path', 'anonymize', 'package', 'zip', 'zip_compression'):
+                continue
+            if key.startswith(('ignore_', 'no_', 'access_', 'force_', 'resolve_')):
+                continue
+            setattr(self.ppj.options, key, getattr(self.ppj, f'get_{key}')())
 
         # record project options in log
         if self.ppj.options.log_path:
             self._rotate_logs(5)
 
             os.makedirs(self.ppj.options.log_path, exist_ok=True)
-            log_path = os.path.join(self.ppj.options.log_path, 'pyro-%s.log' % int(time.time()))
+            log_path = os.path.join(self.ppj.options.log_path, f'pyro-{int(time.time())}.log')
             with open(log_path, mode='w', encoding='utf-8') as f:
-                options = deepcopy(self.ppj.options.__dict__)
-                json.dump(options, f, indent=2)
+                json.dump(self.ppj.options.__dict__, f, indent=2)
 
         self.log_file = JsonLogger(ppj)
         self.log_file.add_record('project_data', {
@@ -61,10 +61,10 @@ class BuildFacade(Logger):
             return
 
         # because we're rotating at start, account for new log file
-        keep_count = keep_count - 1
+        keep_count -= 1
 
         log_files = [f for f in os.listdir(self.ppj.options.log_path) if f.endswith('.log')]
-        if not (len(log_files) > keep_count):
+        if not len(log_files) > keep_count:
             return
 
         log_paths = [os.path.join(self.ppj.options.log_path, f) for f in log_files]
@@ -76,7 +76,7 @@ class BuildFacade(Logger):
             try:
                 os.remove(f)
             except PermissionError:
-                BuildFacade.log.error('Cannot delete log file without permission: %s' % f)
+                BuildFacade.log.error(f'Cannot delete log file without permission: {f}')
 
     def _find_modified_scripts(self) -> list:
         pex_paths: list = []
@@ -85,7 +85,7 @@ class BuildFacade(Logger):
             script_name, _ = os.path.splitext(os.path.basename(psc_path))
 
             # if pex exists, compare time_t in pex header with psc's last modified timestamp
-            pex_match: list = [pex_path for pex_path in self.ppj.pex_paths if pex_path.endswith('%s.pex' % script_name)]
+            pex_match: list = [pex_path for pex_path in self.ppj.pex_paths if pex_path.endswith(f'{script_name}.pex')]
             if not pex_match:
                 continue
 
@@ -96,7 +96,7 @@ class BuildFacade(Logger):
             try:
                 header = PexReader.get_header(pex_path)
             except ValueError:
-                BuildFacade.log.warning('Cannot determine compilation time from compiled script due to unknown file magic: "%s"' % pex_path)
+                BuildFacade.log.warning(f'Cannot determine compilation time from compiled script due to unknown file magic: "{pex_path}"')
                 continue
 
             compiled_time: int = header.compilation_time.value
@@ -107,28 +107,38 @@ class BuildFacade(Logger):
 
         return PathHelper.uniqify(pex_paths)
 
-    def try_compile(self, time_elapsed: TimeElapsed) -> None:
+    @staticmethod
+    def _limit_priority() -> None:
+        process = psutil.Process(os.getpid())
+        process.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS if sys.platform == 'win32' else 19)
+
+    def try_compile(self, time_elapsed: TimeElapsed) -> tuple:
         """Builds and passes commands to Papyrus Compiler"""
         commands: list = self.ppj.build_commands()
 
-        script_count: int = len(self.ppj.psc_paths)
+        command_count: int = len(commands)
+        success_count: int = 0
 
         time_elapsed.start_time = time.time()
 
-        if self.ppj.options.no_parallel:
+        if self.ppj.options.no_parallel or command_count == 1:
             for command in commands:
-                ProcessManager.run(command)
-        elif script_count > 0:
-            if script_count == 1:
-                ProcessManager.run(commands[0])
-            else:
-                multiprocessing.freeze_support()
-                p = multiprocessing.Pool(processes=min(script_count, self.ppj.options.worker_limit))
-                p.imap(ProcessManager.run, commands)
-                p.close()
-                p.join()
+                if ProcessManager.run_compiler(command) == ProcessState.SUCCESS:
+                    success_count += 1
+        elif command_count > 0:
+            multiprocessing.freeze_support()
+            worker_limit = min(command_count, self.ppj.options.worker_limit)
+            pool = multiprocessing.Pool(processes=worker_limit,
+                                        initializer=BuildFacade._limit_priority)
+            for state in pool.imap(ProcessManager.run_compiler, commands):
+                if state == ProcessState.SUCCESS:
+                    success_count += 1
+            pool.close()
+            pool.join()
 
         time_elapsed.end_time = time.time()
+
+        return success_count, command_count - success_count
 
     def try_anonymize(self) -> None:
         """Obfuscates identifying metadata in compiled scripts"""
@@ -140,22 +150,17 @@ class BuildFacade(Logger):
             # these are absolute paths. there's no reason to manipulate them.
             for pex_path in self.ppj.pex_paths:
                 if not os.path.isfile(pex_path):
-                    BuildFacade.log.warning('Cannot locate file to anonymize: "%s"' % pex_path)
+                    BuildFacade.log.warning(f'Cannot locate file to anonymize: "{pex_path}"')
                     continue
 
-                BuildFacade.log.info('Anonymizing "%s"...' % pex_path)
                 Anonymizer.anonymize_script(pex_path)
 
     def try_pack(self) -> None:
         """Generates BSA/BA2 packages for project"""
         package_manager = PackageManager(self.ppj)
+        package_manager.create_packages()
 
-        if self.ppj.options.bsarch and os.path.isfile(self.ppj.options.bsarch_path):
-            package_manager.create_packages()
-        else:
-            BuildFacade.log.warning('Cannot create package(s) because packaging was disabled by user')
-
-        if self.ppj.options.zip:
-            package_manager.create_zip()
-        else:
-            BuildFacade.log.warning('Cannot create archive because zipping was disabled by user')
+    def try_zip(self) -> None:
+        """Generates ZIP file for project"""
+        package_manager = PackageManager(self.ppj)
+        package_manager.create_zip()

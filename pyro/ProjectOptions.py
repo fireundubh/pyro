@@ -6,14 +6,15 @@ from dataclasses import dataclass, field
 @dataclass
 class ProjectOptions:
     args: dict = field(repr=False, default_factory=dict)
+    anonymize: bool = field(init=False, default_factory=bool)
+    package: bool = field(init=False, default_factory=bool)
+    zip: bool = field(init=False, default_factory=bool)
 
     # required arguments
     input_path: str = field(init=False, default_factory=str)
 
     # build arguments
-    anonymize: bool = field(init=False, default_factory=bool)
-    bsarch: bool = field(init=False, default_factory=bool)
-    zip: bool = field(init=False, default_factory=bool)
+    ignore_errors: bool = field(init=False, default_factory=bool)
     no_incremental_build: bool = field(init=False, default_factory=bool)
     no_parallel: bool = field(init=False, default_factory=bool)
     worker_limit: int = field(init=False, default_factory=int)
@@ -37,19 +38,26 @@ class ProjectOptions:
     zip_compression: str = field(init=False, default_factory=str)
     zip_output_path: str = field(init=False, default_factory=str)
 
+    # remote arguments
+    access_token: str = field(init=False, default_factory=str)
+    force_overwrite: bool = field(init=False, default_factory=bool)
+    remote_temp_path: str = field(init=False, default_factory=str)
+
     # program arguments
     log_path: str = field(init=False, default_factory=str)
+    resolve_ppj: bool = field(init=False, default_factory=bool)
 
     def __post_init__(self) -> None:
-        for key in self.__dict__:
-            if key == 'args':
+        for attr_key, attr_value in self.__dict__.items():
+            if attr_key == 'args':
                 continue
             try:
-                value = self.args.get(key)
-                if value and value != getattr(self, key):
-                    setattr(self, key, value)
+                arg_value = self.args.get(attr_key)
             except AttributeError:
                 continue
+            else:
+                if arg_value and arg_value != attr_value:
+                    setattr(self, attr_key, arg_value)
 
     def __setattr__(self, key: str, value: object) -> None:
         # sanitize paths
