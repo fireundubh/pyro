@@ -319,6 +319,13 @@ class PapyrusProject(ProjectBase):
             return PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
         return os.path.basename(psc_path)
 
+    @staticmethod
+    def _can_remove_folder(import_path: str, object_name: str, script_path: str) -> bool:
+        import_path = import_path.casefold()
+        object_name = object_name.casefold()
+        script_path = script_path.casefold()
+        return script_path.startswith(import_path) and os.path.join(import_path, object_name) != script_path
+
     def _find_missing_script_paths(self) -> list:
         """Returns list of script paths for compiled scripts that do not exist"""
         results: list = []
@@ -594,7 +601,6 @@ class PapyrusProject(ProjectBase):
         compiler_path: str = self.options.compiler_path
         flags_path: str = self.options.flags_path
         output_path: str = self.options.output_path
-        import_paths: str = ';'.join(self.import_paths)
 
         if self.options.no_incremental_build:
             psc_paths = PathHelper.uniqify(self.psc_paths)
@@ -605,16 +611,25 @@ class PapyrusProject(ProjectBase):
         for missing_psc_path in [p for p in self.missing_scripts if p not in psc_paths]:
             psc_paths.append(missing_psc_path)
 
-        # generate list of commands
-        for psc_path in psc_paths:
+        # TODO: depth sorting solution is not foolproof! parse psc files for imports to determine command order
+        for script_path in sorted(psc_paths, key=lambda p: (p.count(os.sep), len(p)), reverse=True):
+            import_paths: list = self.import_paths
+
+            object_name: str = script_path
+
             if self.options.game_type == 'fo4':
-                psc_path = PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
+                object_name = PathHelper.calculate_relative_object_name(script_path, self.import_paths)
+
+                # remove unnecessary import paths for script
+                for import_path in reversed(import_paths):
+                    if self._can_remove_folder(import_path, object_name, script_path):
+                        import_paths.remove(import_path)
 
             arguments.clear()
             arguments.append_quoted(compiler_path)
-            arguments.append_quoted(psc_path)
+            arguments.append_quoted(object_name)
             arguments.append_quoted(output_path, 'o')
-            arguments.append_quoted(import_paths, 'i')
+            arguments.append_quoted(';'.join(import_paths), 'i')
             arguments.append_quoted(flags_path, 'f')
 
             if self.options.game_type == 'fo4':
