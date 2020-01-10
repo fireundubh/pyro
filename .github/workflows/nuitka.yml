@@ -32,6 +32,9 @@ jobs:
    - name: Install dependencies
      if: success()
      run: pipenv install
+   - name: Activate Pipenv
+     if: success()
+     run: pipenv shell
    - name: Run build script
      if: success()
      run: python D:\a\pyro\pyro\build.py --no-zip
