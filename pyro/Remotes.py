@@ -42,21 +42,22 @@ class GitHubRemote(RemoteBase):
     def get_contents(self, url: str, output_path: str) -> Generator:
         parsed_url = urlparse(url)
 
-        url_path = parsed_url.path[1:]
+        url_path_parts = parsed_url.path.split('/')
+        url_path_parts.pop(0)  # pop empty space
 
         if parsed_url.netloc == 'api.github.com':
+            url_path_parts.pop(0)  # pop 'repos'
             request_url = url
-            _, owner, repo = url_path.split('/')[:3]
         elif parsed_url.netloc == 'github.com':
-            url_path_parts = parsed_url.path.split('/')[1:]
-            url_path_parts.pop(3)  # pop 'master' (or any other branch)
+            branch = url_path_parts.pop(3)  # pop 'master' (or any other branch)
             url_path_parts.pop(2)  # pop 'tree'
             url_path_parts.insert(2, 'contents')
             url_path = '/'.join(url_path_parts)
-            request_url = f'https://api.github.com/repos/{url_path}'
-            owner, repo = url_path_parts[0], url_path_parts[1]
+            request_url = f'https://api.github.com/repos/{url_path}?ref={branch}'
         else:
             raise NotImplementedError
+
+        owner, repo = url_path_parts[0], url_path_parts[1]
 
         request = Request(request_url)
         request.add_header('Authorization', f'token {self.access_token}')
