@@ -359,8 +359,8 @@ class PapyrusProject(ProjectBase):
 
             if import_node.text.casefold().startswith(self.remote_schemas):
                 local_path = self._get_remote_path(import_node)
-                results.append(local_path)
                 PapyrusProject.log.info(f'Adding import path from remote: "{local_path}"...')
+                results.append(local_path)
                 continue
 
             import_path = os.path.normpath(import_node.text)
@@ -533,7 +533,7 @@ class PapyrusProject(ProjectBase):
             if folder_node.text.casefold().startswith(self.remote_schemas):
                 local_path = self._get_remote_path(folder_node)
                 PapyrusProject.log.info(f'Adding folder path from remote: "{local_path}"...')
-                yield local_path
+                yield from PathHelper.find_script_paths_from_folder(local_path, no_recurse)
                 continue
 
             folder_path: str = os.path.normpath(folder_node.text)
