@@ -1,7 +1,7 @@
 import glob
 import os
 from collections import OrderedDict
-from typing import Generator
+from typing import Generator, Iterable
 from urllib.parse import unquote_plus, urlparse
 
 
@@ -33,7 +33,7 @@ class PathHelper:
                 yield script_path
 
     @staticmethod
-    def uniqify(items: list) -> list:
+    def uniqify(items: Iterable) -> list:
         """Returns ordered list without duplicates"""
         return list(OrderedDict.fromkeys(items))
 
