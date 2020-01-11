@@ -1,4 +1,3 @@
-import glob
 import hashlib
 import io
 import os
@@ -6,6 +5,7 @@ import sys
 import typing
 import zipfile
 from copy import deepcopy
+from urllib.parse import urlparse
 
 from lxml import etree
 
@@ -357,10 +357,10 @@ class PapyrusProject(ProjectBase):
             if not import_node.text:
                 continue
 
-            if import_node.text.startswith(self.remote_schemas):
-                for common_path in self._get_remote_paths(import_node):
-                    PapyrusProject.log.info(f'Adding import path from remote: "{common_path}"...')
-                    results.append(common_path)
+            if import_node.text.casefold().startswith(self.remote_schemas):
+                local_path = self._get_remote_path(import_node)
+                results.append(local_path)
+                PapyrusProject.log.info(f'Adding import path from remote: "{local_path}"...')
                 continue
 
             import_path = os.path.normpath(import_node.text)
@@ -482,8 +482,8 @@ class PapyrusProject(ProjectBase):
 
         return results
 
-    def _get_remote_paths(self, node: etree.ElementBase) -> set:
-        url_hash = hashlib.sha1(node.text.encode()).hexdigest()
+    def _get_remote_path(self, node: etree.ElementBase) -> str:
+        url_hash = hashlib.sha1(node.text.encode()).hexdigest()[:8]
 
         temp_path = os.path.join(self.options.remote_temp_path, url_hash)
 
@@ -495,17 +495,18 @@ class PapyrusProject(ProjectBase):
                     PapyrusProject.log.error(message)
                     sys.exit(1)
 
-        search_path = os.path.join(temp_path, r'**\*')
+        parsed_url = urlparse(node.text)
 
-        def _get_right_path_for_node(path: str) -> str:
-            if node.tag.endswith('Import'):
-                path = os.path.dirname(path)
-            return path
+        if parsed_url.netloc == 'api.github.com':
+            url_path_parts = parsed_url.path.split('/')[2:]
+            url_path_parts.pop(2)  # pop 'contents'
+            url_path = os.sep.join(url_path_parts)
+        else:
+            url_path = os.path.normpath(parsed_url.path)
 
-        common_paths = set([_get_right_path_for_node(f) for f in glob.iglob(search_path, recursive=True)
-                            if os.path.isfile(f) and f.casefold().endswith('.psc')])
+        local_path = os.path.join(temp_path, url_path)
 
-        return common_paths
+        return local_path
 
     def _get_script_paths_from_folders_node(self) -> typing.Generator:
         """Returns script paths from the Folders element array"""
@@ -524,10 +525,10 @@ class PapyrusProject(ProjectBase):
                 yield from PathHelper.find_script_paths_from_folder(self.project_path, no_recurse)
                 continue
 
-            if folder_node.text.startswith(self.remote_schemas):
-                for common_path in self._get_remote_paths(folder_node):
-                    PapyrusProject.log.info(f'Adding folder path from remote: "{common_path}"...')
-                    yield common_path
+            if folder_node.text.casefold().startswith(self.remote_schemas):
+                local_path = self._get_remote_path(folder_node)
+                PapyrusProject.log.info(f'Adding folder path from remote: "{local_path}"...')
+                yield local_path
                 continue
 
             folder_path: str = os.path.normpath(folder_node.text)
