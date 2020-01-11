@@ -247,7 +247,7 @@ class PapyrusProject(ProjectBase):
 
         for node in parent_node.getiterator():
             if node.text:
-                node.text = self.parse(node.text)
+                node.text = self.parse(node.text.strip())
 
             if not node.attrib:
                 continue
