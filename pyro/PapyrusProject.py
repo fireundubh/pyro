@@ -484,7 +484,6 @@ class PapyrusProject(ProjectBase):
 
     def _get_remote_path(self, node: etree.ElementBase) -> str:
         url_hash = hashlib.sha1(node.text.encode()).hexdigest()[:8]
-
         temp_path = os.path.join(self.options.remote_temp_path, url_hash)
 
         if self.options.force_overwrite or not os.path.exists(temp_path):
@@ -532,6 +531,8 @@ class PapyrusProject(ProjectBase):
 
             if folder_node.text.casefold().startswith(self.remote_schemas):
                 local_path = self._get_remote_path(folder_node)
+                PapyrusProject.log.info(f'Adding import path from remote: "{local_path}"...')
+                self.import_paths.insert(0, local_path)
                 PapyrusProject.log.info(f'Adding folder path from remote: "{local_path}"...')
                 yield from PathHelper.find_script_paths_from_folder(local_path, no_recurse)
                 continue

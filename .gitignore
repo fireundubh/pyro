@@ -11,5 +11,6 @@ pyro/temp/
 pyro/tools/
 pyro.build/
 pyro.dist/
+test_data/
 *.bat
 *.psc
