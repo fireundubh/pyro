@@ -501,8 +501,13 @@ class PapyrusProject(ProjectBase):
             url_path_parts = parsed_url.path.split('/')[2:]
             url_path_parts.pop(2)  # pop 'contents'
             url_path = os.sep.join(url_path_parts)
+        elif parsed_url.netloc == 'github.com':
+            url_path_parts = parsed_url.path.split('/')[1:]
+            url_path_parts.pop(3)  # pop 'master'
+            url_path_parts.pop(2)  # pop 'tree'
+            url_path = os.sep.join(url_path_parts)
         else:
-            url_path = os.path.normpath(parsed_url.path)
+            raise NotImplementedError
 
         local_path = os.path.join(temp_path, url_path)
 
