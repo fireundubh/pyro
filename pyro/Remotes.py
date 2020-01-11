@@ -13,6 +13,29 @@ class RemoteBase:
         self.access_token = access_token
 
     @staticmethod
+    def extract_request_args(url: str) -> tuple:
+        parsed_url = urlparse(url)
+
+        url_path_parts = parsed_url.path.split('/')
+        url_path_parts.pop(0)  # pop empty space
+
+        if parsed_url.netloc == 'api.github.com':
+            url_path_parts.pop(0)  # pop 'repos'
+            request_url = url
+        elif parsed_url.netloc == 'github.com':
+            branch = url_path_parts.pop(3)  # pop 'master' (or any other branch)
+            url_path_parts.pop(2)  # pop 'tree'
+            url_path_parts.insert(2, 'contents')
+            url_path = '/'.join(url_path_parts)
+            request_url = f'https://api.github.com/repos/{url_path}?ref={branch}'
+        else:
+            raise NotImplementedError
+
+        owner, repo = url_path_parts[0], url_path_parts[1]
+
+        return owner, repo, request_url
+
+    @staticmethod
     def validate_url(url: str) -> bool:
         try:
             result = urlparse(url)
@@ -33,31 +56,14 @@ class GenericRemote(RemoteBase):
             github = GitHubRemote(self.access_token)
             yield from github.get_contents(url, output_path)
         elif parsed_url.netloc.endswith('bitbucket.org'):
-            raise NotImplementedError()
+            raise NotImplementedError
         else:
-            raise NotImplementedError()
+            raise NotImplementedError
 
 
 class GitHubRemote(RemoteBase):
     def get_contents(self, url: str, output_path: str) -> Generator:
-        parsed_url = urlparse(url)
-
-        url_path_parts = parsed_url.path.split('/')
-        url_path_parts.pop(0)  # pop empty space
-
-        if parsed_url.netloc == 'api.github.com':
-            url_path_parts.pop(0)  # pop 'repos'
-            request_url = url
-        elif parsed_url.netloc == 'github.com':
-            branch = url_path_parts.pop(3)  # pop 'master' (or any other branch)
-            url_path_parts.pop(2)  # pop 'tree'
-            url_path_parts.insert(2, 'contents')
-            url_path = '/'.join(url_path_parts)
-            request_url = f'https://api.github.com/repos/{url_path}?ref={branch}'
-        else:
-            raise NotImplementedError
-
-        owner, repo = url_path_parts[0], url_path_parts[1]
+        owner, repo, request_url = self.extract_request_args(url)
 
         request = Request(request_url)
         request.add_header('Authorization', f'token {self.access_token}')
@@ -69,7 +75,9 @@ class GitHubRemote(RemoteBase):
 
         payload_objects: list = json.loads(response.read().decode('utf-8'))
 
-        yield f'Downloading {len(payload_objects)} files from "{request_url}"...'
+        yield f'Downloading scripts from "{request_url}"... Please wait.'
+
+        script_count: int = 0
 
         for payload_object in payload_objects:
             target_path = os.path.normpath(os.path.join(output_path, owner, repo, payload_object['path']))
@@ -79,6 +87,10 @@ class GitHubRemote(RemoteBase):
             # handle folders
             if not download_url:
                 yield from self.get_contents(payload_object['url'], output_path)
+                continue
+
+            # we only care about scripts
+            if not download_url.casefold().endswith('.psc'):
                 continue
 
             file_response = urlopen(download_url, timeout=30)
@@ -91,3 +103,7 @@ class GitHubRemote(RemoteBase):
 
             with open(target_path, mode='w+b') as f:
                 f.write(file_response.read())
+
+            script_count += 1
+
+        yield f'Downloaded {script_count} scripts from "{request_url}"'
