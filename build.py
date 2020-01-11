@@ -39,14 +39,18 @@ class Application:
 
         files_to_keep: tuple = (
             f'{self.package_name}.exe',
+            'libcrypto-1_1.dll',
+            'libssl-1_1.dll',
             'python37.dll',
+            '_elementpath.pyd',
             '_multiprocessing.pyd',
+            '_psutil_windows.pyd',
             '_queue.pyd',
             '_socket.pyd',
-            'select.pyd',
-            '_elementpath.pyd',
+            '_ssl.pyd',
             'etree.pyd',
-            '_psutil_windows.pyd'
+            'select.pyd',
+            'unicodedata.pyd'
         )
 
         files: list = [f for f in glob.glob(os.path.join(self.dist_path, r'**\*'), recursive=True)

@@ -5,6 +5,7 @@ import os
 import sys
 import typing
 import zipfile
+from copy import deepcopy
 
 from lxml import etree
 
@@ -611,6 +612,8 @@ class PapyrusProject(ProjectBase):
         for missing_psc_path in [p for p in self.missing_scripts if p not in psc_paths]:
             psc_paths.append(missing_psc_path)
 
+        source_import_paths = deepcopy(self.import_paths)
+
         # TODO: depth sorting solution is not foolproof! parse psc files for imports to determine command order
         for script_path in sorted(psc_paths, key=lambda p: (p.count(os.sep), len(p)), reverse=True):
             import_paths: list = self.import_paths
@@ -621,7 +624,7 @@ class PapyrusProject(ProjectBase):
                 object_name = PathHelper.calculate_relative_object_name(script_path, self.import_paths)
 
                 # remove unnecessary import paths for script
-                for import_path in reversed(import_paths):
+                for import_path in reversed(self.import_paths):
                     if self._can_remove_folder(import_path, object_name, script_path):
                         import_paths.remove(import_path)
 
@@ -645,5 +648,7 @@ class PapyrusProject(ProjectBase):
                 arguments.append('-op')
 
             commands.append(arguments.join())
+
+        self.import_paths = source_import_paths
 
         return commands
