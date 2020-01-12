@@ -123,11 +123,7 @@ class PapyrusProject(ProjectBase):
             if not self.options.remote_temp_path:
                 self.options.remote_temp_path = self.get_remote_temp_path()
 
-            if self.options.access_token:
-                self.remote = GenericRemote(self.options.access_token)
-            else:
-                PapyrusProject.log.error('Cannot proceed without personal access token')
-                sys.exit(1)
+            self.remote = GenericRemote(self.options)
 
             # validate remote paths
             for path in self.remote_paths:
@@ -491,26 +487,18 @@ class PapyrusProject(ProjectBase):
         temp_path = os.path.join(self.options.remote_temp_path, url_hash)
 
         if self.options.force_overwrite or not os.path.exists(temp_path):
-            for message in self.remote.fetch_contents(node.text, temp_path):
-                if not message.startswith('Failed to load'):
-                    PapyrusProject.log.info(message)
-                else:
-                    PapyrusProject.log.error(message)
-                    sys.exit(1)
+            try:
+                for message in self.remote.fetch_contents(node.text, temp_path):
+                    if not message.startswith('Failed to load'):
+                        PapyrusProject.log.info(message)
+                    else:
+                        PapyrusProject.log.error(message)
+                        sys.exit(1)
+            except PermissionError as e:
+                PapyrusProject.log.error(e.strerror)
+                sys.exit(1)
 
-        parsed_url = urlparse(node.text)
-
-        if parsed_url.netloc == 'api.github.com':
-            url_path_parts = parsed_url.path.split('/')[2:]
-            url_path_parts.pop(2)  # pop 'contents'
-            url_path = os.sep.join(url_path_parts)
-        elif parsed_url.netloc == 'github.com':
-            url_path_parts = parsed_url.path.split('/')[1:]
-            url_path_parts.pop(3)  # pop 'master' (or any other branch)
-            url_path_parts.pop(2)  # pop 'tree'
-            url_path = os.sep.join(url_path_parts)
-        else:
-            raise NotImplementedError
+        url_path = self.remote.create_local_path(node.text)
 
         local_path = os.path.join(temp_path, url_path)
 

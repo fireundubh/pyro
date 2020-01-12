@@ -34,7 +34,9 @@ class BuildFacade:
         for key in options:
             if key in ('args', 'input_path', 'anonymize', 'package', 'zip', 'zip_compression'):
                 continue
-            if key.startswith(('ignore_', 'no_', 'access_', 'force_', 'resolve_')):
+            if key.startswith(('ignore_', 'no_', 'force_', 'resolve_')):
+                continue
+            if key.endswith('_token'):
                 continue
             setattr(self.ppj.options, key, getattr(self.ppj, f'get_{key}')())
 
