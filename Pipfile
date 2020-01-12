@@ -5,6 +5,7 @@ verify_ssl = true
 
 [dev-packages]
 mypy = "==0.761"
+pylint = "*"
 
 [packages]
 lxml = "==4.4.2"

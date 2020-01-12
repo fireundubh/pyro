@@ -92,7 +92,7 @@ if __name__ == '__main__':
     _remote_arguments = _parser.add_argument_group('remote arguments')
     _remote_arguments.add_argument('--access-token',
                                    action='store', type=str,
-                                   help='personal access token\n(must have public_repo access scope)')
+                                   help='access token for GitHub remotes\n(must have public_repo access scope)')
     _remote_arguments.add_argument('--force-overwrite',
                                    action='store_true',
                                    help='download remote files and overwrite existing files\n'

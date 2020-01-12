@@ -64,7 +64,7 @@ class ProjectBase:
         try:
             return os.path.expanduser(os.path.expandvars(t.substitute(self.variables)))
         except KeyError as e:
-            ProjectBase.log.error(f'Failed to parse variable "{e.args[0]}" in "{value}" - is the variable name correct?')
+            ProjectBase.log.error(f'Failed to parse variable "{e.args[0]}" in "{value}". Is the variable name correct?')
             sys.exit(1)
 
     # build arguments
@@ -123,12 +123,14 @@ class ProjectBase:
         if not self.options.registry_path:
             game_type = self.options.game_type if not game_type else game_type
             if game_type == 'fo4':
-                return r'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\Fallout4\Installed Path'
+                game_name = 'Fallout4'
             elif game_type == 'sse':
-                return r'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\Skyrim Special Edition\Installed Path'
+                game_name = 'Skyrim Special Edition'
             elif game_type == 'tesv':
-                return r'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\Skyrim\Installed Path'
-            raise ValueError('Cannot determine registry path from game type')
+                game_name = 'Skyrim'
+            else:
+                raise ValueError('Cannot determine registry path from game type')
+            return rf'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\\{game_name}\Installed Path'
         return self.options.registry_path.replace('/', '\\')
 
     def get_installed_path(self, game_type: str = '') -> str:
@@ -152,10 +154,11 @@ class ProjectBase:
 
         try:
             registry_key = winreg.OpenKey(registry_type, key_head, 0, winreg.KEY_READ)
-            reg_value, reg_type = winreg.QueryValueEx(registry_key, key_tail)
+            reg_value, _ = winreg.QueryValueEx(registry_key, key_tail)
             winreg.CloseKey(registry_key)
         except WindowsError:
-            ProjectBase.log.error(f'Installed Path for {self.game_types[game_type]} does not exist in Windows Registry. Run the game launcher once, then try again.')
+            ProjectBase.log.error(f'Installed Path for {self.game_types[game_type]} '
+                                  f'does not exist in Windows Registry. Run the game launcher once, then try again.')
             sys.exit(1)
 
         # noinspection PyUnboundLocalVariable
@@ -247,7 +250,7 @@ class ProjectBase:
             if flags_path.endswith('institute_papyrus_flags.flg'):
                 ProjectBase.log.warning('Using game type: Fallout 4 (determined from flags path)')
                 return 'fo4'
-            elif flags_path.endswith('tesv_papyrus_flags.flg'):
+            if flags_path.endswith('tesv_papyrus_flags.flg'):
                 try:
                     self.get_game_path('sse')
                 except FileNotFoundError:

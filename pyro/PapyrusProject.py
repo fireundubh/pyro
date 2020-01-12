@@ -78,8 +78,8 @@ class PapyrusProject(ProjectBase):
         self._update_attributes(self.ppj_root.node)
 
         if self.options.resolve_ppj:
-            xml_output = etree.tostring(self.ppj_root.node, encoding='utf-8', xml_declaration=True, pretty_print=True).decode()
-            PapyrusProject.log.debug(f'Resolved variables and paths in PPJ. Text output:{os.linesep * 2}{xml_output}')
+            xml_output = etree.tostring(self.ppj_root.node, encoding='utf-8', xml_declaration=True, pretty_print=True)
+            PapyrusProject.log.debug(f'Resolved PPJ. Text output:{os.linesep * 2}{xml_output.decode()}')
             sys.exit(1)
 
         self.options.flags_path = self.ppj_root.get('Flags')
@@ -123,11 +123,7 @@ class PapyrusProject(ProjectBase):
             if not self.options.remote_temp_path:
                 self.options.remote_temp_path = self.get_remote_temp_path()
 
-            if self.options.access_token:
-                self.remote = GenericRemote(self.options.access_token)
-            else:
-                PapyrusProject.log.error('Cannot proceed without personal access token')
-                sys.exit(1)
+            self.remote = GenericRemote(self.options)
 
             # validate remote paths
             for path in self.remote_paths:
@@ -167,7 +163,8 @@ class PapyrusProject(ProjectBase):
             game_type: str = self.ppj_root.get('Game', default='').casefold()
 
             if game_type and game_type in self.game_types:
-                PapyrusProject.log.warning(f'Using game type: {self.game_types[game_type]} (determined from Papyrus Project)')
+                valid_game_type: str = self.game_types[game_type]
+                PapyrusProject.log.warning(f'Using game type: {valid_game_type} (determined from Papyrus Project)')
                 self.options.game_type = game_type
 
         if not self.options.game_type:
@@ -189,6 +186,9 @@ class PapyrusProject(ProjectBase):
 
     @property
     def remote_paths(self) -> list:
+        """
+        Collects list of remote paths from Import and Folder nodes
+        """
         results = []
 
         if self.has_imports_node:
@@ -487,26 +487,18 @@ class PapyrusProject(ProjectBase):
         temp_path = os.path.join(self.options.remote_temp_path, url_hash)
 
         if self.options.force_overwrite or not os.path.exists(temp_path):
-            for message in self.remote.get_contents(node.text, temp_path):
-                if not message.startswith('Failed to load'):
-                    PapyrusProject.log.info(message)
-                else:
-                    PapyrusProject.log.error(message)
-                    sys.exit(1)
+            try:
+                for message in self.remote.fetch_contents(node.text, temp_path):
+                    if not message.startswith('Failed to load'):
+                        PapyrusProject.log.info(message)
+                    else:
+                        PapyrusProject.log.error(message)
+                        sys.exit(1)
+            except PermissionError as e:
+                PapyrusProject.log.error(e.strerror)
+                sys.exit(1)
 
-        parsed_url = urlparse(node.text)
-
-        if parsed_url.netloc == 'api.github.com':
-            url_path_parts = parsed_url.path.split('/')[2:]
-            url_path_parts.pop(2)  # pop 'contents'
-            url_path = os.sep.join(url_path_parts)
-        elif parsed_url.netloc == 'github.com':
-            url_path_parts = parsed_url.path.split('/')[1:]
-            url_path_parts.pop(3)  # pop 'master' (or any other branch)
-            url_path_parts.pop(2)  # pop 'tree'
-            url_path = os.sep.join(url_path_parts)
-        else:
-            raise NotImplementedError
+        url_path = self.remote.create_local_path(node.text)
 
         local_path = os.path.join(temp_path, url_path)
 
@@ -589,7 +581,7 @@ class PapyrusProject(ProjectBase):
             try:
                 header = PexReader.get_header(matching_path)
             except ValueError:
-                PapyrusProject.log.warning(f'Cannot determine compilation time from compiled script due to unknown file magic: "{matching_path}"')
+                PapyrusProject.log.warning(f'Cannot determine compilation time due to unknown magic: "{matching_path}"')
                 continue
 
             compiled_time: int = header.compilation_time.value
@@ -602,9 +594,12 @@ class PapyrusProject(ProjectBase):
         return psc_paths
 
     def build_commands(self) -> list:
+        """
+        Builds list of commands for compiling scripts
+        """
         commands: list = []
 
-        arguments: CommandArguments = CommandArguments()
+        arguments = CommandArguments()
 
         compiler_path: str = self.options.compiler_path
         flags_path: str = self.options.flags_path
@@ -636,11 +631,11 @@ class PapyrusProject(ProjectBase):
                         import_paths.remove(import_path)
 
             arguments.clear()
-            arguments.append_quoted(compiler_path)
-            arguments.append_quoted(object_name)
-            arguments.append_quoted(output_path, 'o')
-            arguments.append_quoted(';'.join(import_paths), 'i')
-            arguments.append_quoted(flags_path, 'f')
+            arguments.append(compiler_path, enquote_value=True)
+            arguments.append(object_name, enquote_value=True)
+            arguments.append(output_path, key='o', enquote_value=True)
+            arguments.append(';'.join(import_paths), key='i', enquote_value=True)
+            arguments.append(flags_path, key='f', enquote_value=True)
 
             if self.options.game_type == 'fo4':
                 # noinspection PyUnboundLocalVariable

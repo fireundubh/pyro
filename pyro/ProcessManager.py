@@ -23,12 +23,31 @@ class ProcessManager:
     @staticmethod
     def run_bsarch(command: str) -> ProcessState:
         try:
-            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+            process = subprocess.Popen(command,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT,
+                                       universal_newlines=True)
         except WindowsError as e:
             ProcessManager.log.error(f'Cannot create process because: {e.strerror}')
             return ProcessState.FAILURE
 
-        exclusions = ('BSArch', 'Packer', 'Version', 'Files', 'Archive Flags', '[', '*', 'Compressed', 'Retain', 'XBox', 'Startup', 'Embed', 'XMem', 'Bit', 'Format')
+        exclusions = (
+            '*',
+            '[',
+            'Archive Flags',
+            'Bit',
+            'BSArch',
+            'Compressed',
+            'Embed',
+            'Files',
+            'Format',
+            'Packer',
+            'Retain',
+            'Startup',
+            'Version',
+            'XBox',
+            'XMem'
+        )
 
         try:
             while process.poll() is None:
@@ -77,12 +96,24 @@ class ProcessManager:
             return ProcessState.FAILURE
 
         try:
-            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+            process = subprocess.Popen(command,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT,
+                                       universal_newlines=True)
         except WindowsError as e:
             ProcessManager.log.error(f'Cannot create process because: {e.strerror}')
             return ProcessState.FAILURE
 
-        exclusions = ('Starting', 'Assembly', 'Compilation', 'Batch', 'Copyright', 'Papyrus', 'Failed', 'No output')
+        exclusions = (
+            'Assembly',
+            'Batch',
+            'Compilation',
+            'Copyright',
+            'Failed',
+            'No output',
+            'Papyrus',
+            'Starting'
+        )
 
         line_error = re.compile(r'(.*)(\(\d+,\d+\)):\s+(.*)')
 
@@ -98,7 +129,8 @@ class ProcessManager:
                 if match is not None:
                     path, location, message = match.groups()
                     head, tail = os.path.split(path)
-                    ProcessManager.log.error(f'COMPILATION FAILED: {os.path.basename(head)}\\{tail}{location}: {message}')
+                    ProcessManager.log.error(f'COMPILATION FAILED: '
+                                             f'{os.path.basename(head)}\\{tail}{location}: {message}')
                     process.terminate()
                     return ProcessState.ERRORS
 

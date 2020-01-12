@@ -17,6 +17,9 @@ class Anonymizer:
 
     @staticmethod
     def anonymize_script(path: str) -> None:
+        """
+        Obfuscates script path, user name, and computer name in compiled script
+        """
         try:
             header: PexHeader = PexReader.get_header(path)
         except ValueError:

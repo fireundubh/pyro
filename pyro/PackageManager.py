@@ -91,13 +91,15 @@ class PackageManager:
         return f'{os.path.splitext(package_name)[0]}{self.extension}'
 
     def build_commands(self, containing_folder: str, output_path: str) -> str:
-        """Returns arguments for BSArch as a string"""
+        """
+        Builds command for creating package with BSArch
+        """
         arguments = CommandArguments()
 
-        arguments.append_quoted(self.options.bsarch_path)
+        arguments.append(self.options.bsarch_path, enquote_value=True)
         arguments.append('pack')
-        arguments.append_quoted(containing_folder)
-        arguments.append_quoted(output_path)
+        arguments.append(containing_folder, enquote_value=True)
+        arguments.append(output_path, enquote_value=True)
 
         if self.options.game_type == 'fo4':
             arguments.append('-fo4')
@@ -140,7 +142,7 @@ class PackageManager:
                 try:
                     open(package_path, 'a').close()
                 except PermissionError:
-                    PackageManager.log.error(f'Cannot create package without write permission to file: "{package_path}"')
+                    PackageManager.log.error(f'Cannot create package without write permission to: "{package_path}"')
                     sys.exit(1)
 
             PackageManager.log.info(f'Creating "{package_name}"...')

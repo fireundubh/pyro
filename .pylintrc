@@ -1,0 +1,23 @@
+[MASTER]
+jobs=4
+extension-pkg-whitelist=lxml
+
+[MESSAGES CONTROL]
+disable=
+    import-outside-toplevel,
+    invalid-name,
+    missing-class-docstring,
+    missing-function-docstring,
+    missing-module-docstring,
+    too-few-public-methods,
+    too-many-branches,
+    too-many-instance-attributes,
+    too-many-return-statements,
+    too-many-statements,
+    protected-access,
+    unnecessary-comprehension,
+    unnecessary-pass
+
+[FORMAT]
+max-line-length=120
+logging-format-style=fstr
