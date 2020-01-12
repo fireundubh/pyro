@@ -96,7 +96,7 @@ class BuildFacade:
             try:
                 header = PexReader.get_header(pex_path)
             except ValueError:
-                BuildFacade.log.warning(f'Cannot determine compilation time from compiled script due to unknown file magic: "{pex_path}"')
+                BuildFacade.log.warning(f'Cannot determine compilation time due to unknown magic: "{pex_path}"')
                 continue
 
             compiled_time: int = header.compilation_time.value

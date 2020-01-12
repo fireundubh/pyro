@@ -28,7 +28,7 @@ class Application:
         self.args.input_path = self._try_fix_input_path(self.args.input_path)
 
         if not os.path.isfile(self.args.input_path):
-            Application.log.error(f'Cannot load PPJ at given path because file does not exist: "{self.args.input_path}"')
+            Application.log.error(f'Cannot load nonexistent PPJ at given path: "{self.args.input_path}"')
             self._print_help_and_exit()
 
     def _print_help_and_exit(self) -> None:
@@ -76,6 +76,9 @@ class Application:
             self._print_help_and_exit()
 
     def run(self) -> int:
+        """
+        Entry point
+        """
         _, extension = os.path.splitext(os.path.basename(self.args.input_path).casefold())
 
         if extension == '.pex':
@@ -135,13 +138,16 @@ class Application:
             Application.log.warning('Cannot create ZipFile because Zip is disabled in project')
 
         if success_count > 0:
-            raw_time = time_elapsed.value()
-            avg_time = time_elapsed.average(success_count)
-            s_raw_time, s_avg_time = ('{0:.3f}s'.format(t) for t in (raw_time, avg_time))
+            raw_time, avg_time = ('{0:.3f}s'.format(t)
+                                  for t in (time_elapsed.value(), time_elapsed.average(success_count)))
 
             psc_count = len(ppj.psc_paths)
 
-            Application.log.info(f'Compilation time: {s_raw_time} ({s_avg_time}/script) - {success_count} succeeded, {failed_count} failed ({psc_count} scripts)')
+            Application.log.info(f'Compilation time: '
+                                 f'{raw_time} ({avg_time}/script) - '
+                                 f'{success_count} succeeded, '
+                                 f'{failed_count} failed '
+                                 f'({psc_count} scripts)')
         else:
             Application.log.info('No scripts were compiled.')
 

@@ -9,7 +9,7 @@ class XmlRoot:
 
     def __init__(self, element_tree: etree.ElementTree) -> None:
         self.node = element_tree.getroot()
-        
+
         nsmap, prefix = self.node.nsmap, self.node.prefix
         self.ns = nsmap[prefix] if prefix in nsmap else ''
 

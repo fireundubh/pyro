@@ -14,6 +14,9 @@ class RemoteBase:
 
     @staticmethod
     def extract_request_args(url: str) -> tuple:
+        """
+        Extracts (owner, repo, request_url) from URL
+        """
         parsed_url = urlparse(url)
 
         url_path_parts = parsed_url.path.split('/')
@@ -37,6 +40,9 @@ class RemoteBase:
 
     @staticmethod
     def validate_url(url: str) -> bool:
+        """
+        Tests whether URL has scheme, netloc, and path
+        """
         try:
             result = urlparse(url)
         except HTTPError:
@@ -44,17 +50,23 @@ class RemoteBase:
         else:
             return all([result.scheme, result.netloc, result.path])
 
-    def get_contents(self, url: str, output_path: str) -> Generator:
+    def fetch_contents(self, url: str, output_path: str) -> Generator:
+        """
+        Downloads files from URL to output path
+        """
         pass
 
 
 class GenericRemote(RemoteBase):
-    def get_contents(self, url: str, output_path: str) -> Generator:
+    def fetch_contents(self, url: str, output_path: str) -> Generator:
+        """
+        Downloads files from URL to output path
+        """
         parsed_url = urlparse(url)
 
         if parsed_url.netloc.endswith('github.com'):
             github = GitHubRemote(self.access_token)
-            yield from github.get_contents(url, output_path)
+            yield from github.fetch_contents(url, output_path)
         elif parsed_url.netloc.endswith('bitbucket.org'):
             raise NotImplementedError
         else:
@@ -62,7 +74,10 @@ class GenericRemote(RemoteBase):
 
 
 class GitHubRemote(RemoteBase):
-    def get_contents(self, url: str, output_path: str) -> Generator:
+    def fetch_contents(self, url: str, output_path: str) -> Generator:
+        """
+        Downloads files from URL to output path
+        """
         owner, repo, request_url = self.extract_request_args(url)
 
         request = Request(request_url)
@@ -86,7 +101,7 @@ class GitHubRemote(RemoteBase):
 
             # handle folders
             if not download_url:
-                yield from self.get_contents(payload_object['url'], output_path)
+                yield from self.fetch_contents(payload_object['url'], output_path)
                 continue
 
             # we only care about scripts
@@ -98,8 +113,7 @@ class GitHubRemote(RemoteBase):
                 yield f'Failed to download ({file_response.status}): "{payload_object["download_url"]}"'
                 continue
 
-            target_folder = os.path.dirname(target_path)
-            os.makedirs(target_folder, exist_ok=True)
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
             with open(target_path, mode='w+b') as f:
                 f.write(file_response.read())
