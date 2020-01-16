@@ -109,14 +109,14 @@ class PapyrusProject(ProjectBase):
         self.has_zip_file_node = self.zip_file_node is not None
 
         if self.options.package and self.has_packages_node:
-            package_output = self.packages_node.get('Output')
-            self.options.package_path = package_output if package_output != os.curdir else self.project_path
+            if not self.options.package_path:
+                self.options.package_path = self.packages_node.get('Output')
 
         if self.options.zip and self.has_zip_file_node:
             self.zip_file_name = self.zip_file_node.get('Name')
             self.zip_root_path = self.zip_file_node.get('RootDir')
-            zip_output = self.zip_file_node.get('Output')
-            self.options.zip_output_path = zip_output if zip_output != os.curdir else self.project_path
+            if not self.options.zip_output_path:
+                self.options.zip_output_path = self.zip_file_node.get('Output')
             self.options.zip_compression = self.zip_file_node.get('Compression').casefold()
             self._setup_zipfile_options()
 
