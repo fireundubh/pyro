@@ -1,5 +1,6 @@
 import os
 import sys
+from argparse import SUPPRESS
 
 from pyro.Application import Application
 from pyro.PyroArgumentParser import PyroArgumentParser
@@ -15,10 +16,15 @@ if __name__ == '__main__':
                                  ]))
 
     _required_arguments = _parser.add_argument_group('required arguments')
-    _required_arguments.add_argument('-i', '--input-path',
-                                     action='store', type=str,
-                                     help='relative or absolute path to file\n'
-                                          '(if relative, must be relative to current working directory)')
+    _required_arguments_flex = _required_arguments.add_mutually_exclusive_group()
+    _required_arguments_flex.add_argument('input_path', nargs='?',
+                                          action='store', type=str,
+                                          help='relative or absolute path to file\n'
+                                               '(if relative, must be relative to current working directory)')
+    # deprecated argument format (retained to avoid breaking change)
+    _required_arguments_flex.add_argument('-i', '--input-path',
+                                          action='store', type=str,
+                                          help=SUPPRESS)
 
     _build_arguments = _parser.add_argument_group('build arguments')
     _build_arguments.add_argument('--ignore-errors',
