@@ -25,7 +25,7 @@ class Application:
         if self.args.show_help:
             self._print_help_and_exit()
 
-        self.args.input_path = self._try_fix_input_path(self.args.input_path)
+        self.args.input_path = self._try_fix_input_path(self.args.input_path or self.args.input_path_deprecated)
 
         if not os.path.isfile(self.args.input_path):
             Application.log.error(f'Cannot load nonexistent PPJ at given path: "{self.args.input_path}"')
