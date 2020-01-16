@@ -37,11 +37,12 @@ class ProjectBase:
 
     def __setattr__(self, key: str, value: object) -> None:
         if isinstance(value, str) and key.endswith('path'):
-            value = os.path.normpath(value)
-            if value == '.':
-                value = ''
+            if value != os.curdir:
+                value = os.path.normpath(value)
+                if value == os.curdir:
+                    value = ''
         elif isinstance(value, list) and key.endswith('paths'):
-            value = [os.path.normpath(path) for path in value]
+            value = [os.path.normpath(path) if path != os.curdir else path for path in value]
         super(ProjectBase, self).__setattr__(key, value)
 
     @staticmethod
