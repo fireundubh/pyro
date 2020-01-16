@@ -62,9 +62,10 @@ class ProjectOptions:
     def __setattr__(self, key: str, value: object) -> None:
         # sanitize paths
         if isinstance(value, str) and key.endswith('path'):
-            value = os.path.normpath(value)
-            # normpath converts empty paths to os.curdir which we don't want
-            if value == '.':
-                value = ''
+            if value != os.curdir:
+                value = os.path.normpath(value)
+                # normpath converts empty paths to os.curdir which we don't want
+                if value == os.curdir:
+                    value = ''
 
         super(ProjectOptions, self).__setattr__(key, value)
