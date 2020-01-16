@@ -22,7 +22,7 @@ if __name__ == '__main__':
                                           help='relative or absolute path to file\n'
                                                '(if relative, must be relative to current working directory)')
     # deprecated argument format (retained to avoid breaking change)
-    _required_arguments_flex.add_argument('-i', '--input-path',
+    _required_arguments_flex.add_argument('-i', '--input-path', dest='input_path_deprecated',
                                           action='store', type=str,
                                           help=SUPPRESS)
 
