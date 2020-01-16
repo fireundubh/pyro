@@ -37,10 +37,8 @@ class ProjectBase:
 
     def __setattr__(self, key: str, value: object) -> None:
         if isinstance(value, str) and key.endswith('path'):
-            if value != os.curdir:
+            if os.altsep in value:
                 value = os.path.normpath(value)
-                if value == os.curdir:
-                    value = ''
         elif isinstance(value, list) and key.endswith('paths'):
             value = [os.path.normpath(path) if path != os.curdir else path for path in value]
         super(ProjectBase, self).__setattr__(key, value)
@@ -54,8 +52,8 @@ class ProjectBase:
         :param relative_root_path: Absolute path to directory to join with relative path
         :param fallback_path: Absolute path to return if path empty or unset
         """
-        if path:
-            return path if os.path.isabs(path) else os.path.join(relative_root_path, path)
+        if path or path.startswith((os.curdir, os.pardir)):
+            return path if os.path.isabs(path) else os.path.normpath(os.path.join(relative_root_path, path))
         if isinstance(fallback_path, list):
             return os.path.abspath(os.path.join(*fallback_path))
         return fallback_path
