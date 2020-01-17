@@ -30,6 +30,10 @@ class Anonymizer:
         user_name: str = header.user_name.value
         computer_name: str = header.computer_name.value
 
+        if '.' not in file_path:
+            Anonymizer.log.warning(f'Cannot anonymize script again: "{path}"')
+            return
+
         if not file_path.casefold().endswith('.psc'):
             Anonymizer.log.warning(f'Cannot anonymize script due to invalid file extension: "{path}"')
             return

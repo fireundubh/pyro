@@ -101,10 +101,11 @@ class BuildFacade:
                 BuildFacade.log.warning(f'Cannot determine compilation time due to unknown magic: "{pex_path}"')
                 continue
 
-            compiled_time: int = header.compilation_time.value
+            psc_last_modified: float = os.path.getmtime(psc_path)
+            pex_last_compiled: float = float(header.compilation_time.value)
 
             # if psc is older than the pex
-            if os.path.getmtime(psc_path) >= compiled_time:
+            if psc_last_modified < pex_last_compiled:
                 pex_paths.append(pex_path)
 
         return PathHelper.uniqify(pex_paths)
