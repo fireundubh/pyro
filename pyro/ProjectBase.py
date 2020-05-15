@@ -12,7 +12,12 @@ class ProjectBase:
 
     options: ProjectOptions = None
 
-    game_types: dict = {'sse': 'Skyrim Special Edition', 'tesv': 'Skyrim', 'fo4': 'Fallout 4'}
+    game_types: dict = {
+        'sse': 'Skyrim Special Edition',
+        'tes5': 'Skyrim',
+        'tesv': 'Skyrim',
+        'fo4': 'Fallout 4'
+    }
     variables: dict = {}
 
     program_path: str = ''
@@ -125,7 +130,7 @@ class ProjectBase:
                 game_name = 'Fallout4'
             elif game_type == 'sse':
                 game_name = 'Skyrim Special Edition'
-            elif game_type == 'tesv':
+            elif game_type in ('tes5', 'tesv'):
                 game_name = 'Skyrim'
             else:
                 raise ValueError('Cannot determine registry path from game type')
@@ -217,7 +222,7 @@ class ProjectBase:
                 return 'sse'
             if game_path.endswith('skyrim'):
                 ProjectBase.log.warning('Using game type: Skyrim (determined from game path)')
-                return 'tesv'
+                return 'tes5'
 
         if self.options.registry_path:
             registry_path_parts = self.options.registry_path.casefold().split(os.sep)
@@ -229,7 +234,7 @@ class ProjectBase:
                 return 'sse'
             if 'skyrim' in registry_path_parts:
                 ProjectBase.log.warning('Using game type: Skyrim (determined from registry path)')
-                return 'tesv'
+                return 'tes5'
 
         if self.import_paths:
             for import_path in reversed(self.import_paths):
@@ -242,7 +247,7 @@ class ProjectBase:
                     return 'sse'
                 if 'skyrim' in path_parts:
                     ProjectBase.log.warning('Using game type: Skyrim (determined from import paths)')
-                    return 'tesv'
+                    return 'tes5'
 
         if self.options.flags_path:
             flags_path = self.options.flags_path.casefold()
@@ -254,7 +259,7 @@ class ProjectBase:
                     self.get_game_path('sse')
                 except FileNotFoundError:
                     ProjectBase.log.warning('Using game type: Skyrim (determined from flags path)')
-                    return 'tesv'
+                    return 'tes5'
                 else:
                     ProjectBase.log.warning('Using game type: Skyrim Special Edition (determined from flags path)')
                     return 'sse'

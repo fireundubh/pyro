@@ -92,7 +92,7 @@
     <xs:simpleType name="gameType">
         <xs:restriction base="xs:string">
             <xs:pattern value="[sS][sS][eE]"/>
-            <xs:pattern value="[tT][eE][sS]5"/>
+            <xs:pattern value="[tT][eE][sS][5vV]"/>
             <xs:pattern value="[fF][oO]4"/>
         </xs:restriction>
     </xs:simpleType>
