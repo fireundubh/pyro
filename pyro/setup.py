@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='Pyro',
-    description='A parallelized incremental build system for TESV, SSE, and FO4 projects',
+    description='A parallelized incremental build system for TES5, SSE, and FO4 projects',
     author='fireundubh',
     author_email='fireundubh@gmail.com',
     license='MIT License',

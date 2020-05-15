@@ -9,8 +9,8 @@ pylint = "*"
 
 [packages]
 lxml = "==4.4.2"
-nuitka = "==0.6.6"
+nuitka = "==0.6.7"
 psutil = "==5.6.7"
 
 [requires]
-python_version = "3.7.5"
+python_version = "3.7.7"
