@@ -21,11 +21,11 @@ jobs:
    - name: Set up Visual Studio environment
      if: success()
      uses: seanmiddleditch/gha-setup-vsdevenv@v1
-   - name: Set up Python 3.7.5 (x64)
+   - name: Set up Python 3.7.7 (x64)
      if: success()
      uses: actions/setup-python@v1
      with:
-      python-version: 3.7.5
+      python-version: 3.7.7
       architecture: x64
    - uses: dschep/install-pipenv-action@v1
      if: success()
