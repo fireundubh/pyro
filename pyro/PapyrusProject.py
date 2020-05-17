@@ -25,18 +25,17 @@ class PapyrusProject(ProjectBase):
     imports_node: etree.ElementBase = None
     packages_node: etree.ElementBase = None
     scripts_node: etree.ElementBase = None
-    zip_file_node: etree.ElementBase = None
+    zip_files_node: etree.ElementBase = None
 
     has_folders_node: bool = False
     has_imports_node: bool = False
     has_packages_node: bool = False
     has_scripts_node: bool = False
-    has_zip_file_node: bool = False
+    has_zip_files_node: bool = False
 
     remote: RemoteBase = None
     remote_schemas: tuple = ('http:', 'https:')
 
-    namespace: str = ''
     zip_file_name: str = ''
     zip_root_path: str = ''
 
@@ -105,20 +104,16 @@ class PapyrusProject(ProjectBase):
         self.packages_node = self.ppj_root.find('Packages')
         self.has_packages_node = self.packages_node is not None
 
-        self.zip_file_node = self.ppj_root.find('ZipFile')
-        self.has_zip_file_node = self.zip_file_node is not None
+        self.zip_files_node = self.ppj_root.find('ZipFiles')
+        self.has_zip_files_node = self.zip_files_node is not None
 
         if self.options.package and self.has_packages_node:
             if not self.options.package_path:
                 self.options.package_path = self.packages_node.get('Output')
 
-        if self.options.zip and self.has_zip_file_node:
-            self.zip_file_name = self.zip_file_node.get('Name')
-            self.zip_root_path = self.zip_file_node.get('RootDir')
+        if self.options.zip and self.has_zip_files_node:
             if not self.options.zip_output_path:
-                self.options.zip_output_path = self.zip_file_node.get('Output')
-            self.options.zip_compression = self.zip_file_node.get('Compression').casefold()
-            self._setup_zipfile_options()
+                self.options.zip_output_path = self.zip_files_node.get('Output')
 
         # initialize remote if needed
         if self.remote_paths:
@@ -254,7 +249,7 @@ class PapyrusProject(ProjectBase):
             if not node.attrib:
                 continue
 
-            tag = node.tag.replace('{%s}' % self.namespace, '')
+            tag = node.tag.replace('{%s}' % self.ppj_root.ns, '')
 
             if tag == 'PapyrusProject':
                 if 'Game' not in node.attrib:
@@ -281,41 +276,24 @@ class PapyrusProject(ProjectBase):
                 if 'NoRecurse' not in node.attrib:
                     node.set('NoRecurse', 'False')
 
+            elif tag == 'ZipFiles':
+                if 'Output' not in node.attrib:
+                    node.set('Output', self.options.zip_output_path)
+
             elif tag == 'ZipFile':
                 if 'Name' not in node.attrib:
                     node.set('Name', self.project_name)
                 if 'RootDir' not in node.attrib:
                     node.set('RootDir', self.project_path)
-                if 'Output' not in node.attrib:
-                    node.set('Output', self.options.zip_output_path)
                 if 'Compression' not in node.attrib:
                     node.set('Compression', 'deflate')
+                else:
+                    node.set('Compression', node.get('Compression').casefold())
 
             # parse values
             for key, value in node.attrib.items():
                 value = value.casefold() in ('true', '1') if key in bool_keys + ['NoRecurse'] else self.parse(value)
                 node.set(key, str(value))
-
-    def _setup_zipfile_options(self) -> None:
-        # zip - required attribute
-        if not os.path.isabs(self.zip_root_path):
-            test_path: str = os.path.normpath(os.path.join(self.project_path, self.zip_root_path))
-
-            if os.path.isdir(test_path):
-                self.zip_root_path = test_path
-            else:
-                PapyrusProject.log.error(f'Cannot resolve RootDir path to existing folder: "{self.zip_root_path}"')
-                sys.exit(1)
-
-        # zip - optional attributes
-        if not self.zip_file_name.casefold().endswith('.zip'):
-            self.zip_file_name = f'{self.zip_file_name}.zip'
-
-        if self.options.zip_compression not in ('store', 'deflate'):
-            self.options.zip_compression = 'deflate'
-
-        use_store = self.options.zip_compression == 'store'
-        self.compress_type: int = zipfile.ZIP_STORED if use_store else zipfile.ZIP_DEFLATED
 
     def _calculate_object_name(self, psc_path: str) -> str:
         if self.options.game_type == 'fo4':

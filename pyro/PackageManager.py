@@ -21,13 +21,24 @@ class PackageManager:
 
     ppj: PapyrusProject = None
     options: ProjectOptions = None
-    extension: str = ''
+    pak_extension: str = ''
+    zip_extension: str = ''
 
     def __init__(self, ppj: PapyrusProject) -> None:
         self.ppj = ppj
         self.options = ppj.options
 
-        self.extension = '.ba2' if self.options.game_type == 'fo4' else '.bsa'
+        self.pak_extension = '.ba2' if self.options.game_type == 'fo4' else '.bsa'
+        self.zip_extension = '.zip'
+
+    @staticmethod
+    def _check_write_permission(file_path: str) -> None:
+        if os.path.isfile(file_path):
+            try:
+                open(file_path, 'a').close()
+            except PermissionError:
+                PackageManager.log.error(f'Cannot create file without write permission to: "{file_path}"')
+                sys.exit(1)
 
     @staticmethod
     def _generate_include_paths(includes_node: etree.ElementBase, root_path: str) -> typing.Generator:
@@ -87,8 +98,13 @@ class PackageManager:
 
     def _fix_package_extension(self, package_name: str) -> str:
         if not package_name.casefold().endswith(('.ba2', '.bsa')):
-            return f'{package_name}{self.extension}'
-        return f'{os.path.splitext(package_name)[0]}{self.extension}'
+            return f'{package_name}{self.pak_extension}'
+        return f'{os.path.splitext(package_name)[0]}{self.pak_extension}'
+
+    def _fix_zip_extension(self, zip_name: str) -> str:
+        if not zip_name.casefold().endswith('.zip'):
+            return f'{zip_name}{self.zip_extension}'
+        return f'{os.path.splitext(zip_name)[0]}{self.zip_extension}'
 
     def build_commands(self, containing_folder: str, output_path: str) -> str:
         """
@@ -125,27 +141,22 @@ class PackageManager:
             if not package_node.tag.endswith('Package'):
                 continue
 
-            package_name: str = package_node.get('Name')
+            file_name: str = package_node.get('Name')
 
-            # ensure successive package names do not conflict if project name is used
-            if i > 0 and (package_name == self.ppj.project_name or package_name in package_names):
-                package_name = f'{self.ppj.project_name} ({i})'
+            # prevent clobbering files previously created in this session
+            if file_name.casefold() in package_names:
+                file_name = f'{self.ppj.project_name} ({i})'
 
-            if package_name.casefold() not in package_names:
-                package_names.append(package_name.casefold())
+            if file_name.casefold() not in package_names:
+                package_names.append(file_name.casefold())
 
-            package_name = self._fix_package_extension(package_name)
+            file_name = self._fix_package_extension(file_name)
 
-            package_path: str = os.path.join(self.options.package_path, package_name)
+            file_path: str = os.path.join(self.options.package_path, file_name)
 
-            if os.path.isfile(package_path):
-                try:
-                    open(package_path, 'a').close()
-                except PermissionError:
-                    PackageManager.log.error(f'Cannot create package without write permission to: "{package_path}"')
-                    sys.exit(1)
+            self._check_write_permission(file_path)
 
-            PackageManager.log.info(f'Creating "{package_name}"...')
+            PackageManager.log.info(f'Creating "{file_name}"...')
 
             for source_path in self._generate_include_paths(package_node, package_node.get('RootDir')):
                 PackageManager.log.info(f'+ "{source_path}"')
@@ -161,7 +172,7 @@ class PackageManager:
                 shutil.copy2(source_path, target_path)
 
             # run bsarch
-            command: str = self.build_commands(self.options.temp_path, package_path)
+            command: str = self.build_commands(self.options.temp_path, file_path)
             ProcessManager.run_bsarch(command)
 
             # clear temporary data
@@ -169,25 +180,60 @@ class PackageManager:
                 shutil.rmtree(self.options.temp_path, ignore_errors=True)
 
     def create_zip(self) -> None:
-        PackageManager.log.info(f'Creating "{self.ppj.zip_file_name}"...')
+        # ensure zip output path exists
+        if not os.path.isdir(self.options.zip_output_path):
+            os.makedirs(self.options.zip_output_path, exist_ok=True)
 
-        # ensure that zip output folder exists
-        zip_output_path: str = os.path.join(self.options.zip_output_path, self.ppj.zip_file_name)
-        os.makedirs(os.path.dirname(zip_output_path), exist_ok=True)
+        zip_names: list = []
 
-        try:
-            with zipfile.ZipFile(zip_output_path, mode='w', compression=self.ppj.compress_type) as z:
-                for include_path in self._generate_include_paths(self.ppj.zip_file_node, self.ppj.zip_root_path):
-                    PackageManager.log.info(f'+ "{include_path}"')
+        for i, zip_node in enumerate(self.ppj.zip_files_node):
+            if not zip_node.tag.endswith('ZipFile'):
+                continue
 
-                    if self.ppj.zip_root_path not in include_path:
-                        PackageManager.log.warning(f'Cannot add file to ZIP outside RootDir: "{include_path}"')
-                        continue
+            file_name: str = zip_node.get('Name')
 
-                    arcname: str = os.path.relpath(include_path, self.ppj.zip_root_path)
-                    z.write(include_path, arcname, compress_type=self.ppj.compress_type)
+            # prevent clobbering files previously created in this session
+            if file_name.casefold() in zip_names:
+                file_name = f'{file_name} ({i})'
 
-            PackageManager.log.info(f'Wrote ZIP file: "{zip_output_path}"')
-        except PermissionError:
-            PackageManager.log.error(f'Cannot open ZIP file for writing: "{zip_output_path}"')
-            sys.exit(1)
+            if file_name.casefold() not in zip_names:
+                zip_names.append(file_name.casefold())
+
+            file_name = self._fix_zip_extension(file_name)
+
+            file_path: str = os.path.join(self.options.zip_output_path, file_name)
+
+            self._check_write_permission(file_path)
+
+            compress_type: int = zipfile.ZIP_STORED if zip_node.get('Compression') == 'store' else zipfile.ZIP_DEFLATED
+
+            zip_root_path: str = zip_node.get('RootDir')
+
+            PackageManager.log.info(f'Creating "{file_name}"...')
+
+            # try to resolve relative RootDir path to absolute path
+            if not os.path.isabs(zip_root_path):
+                test_path: str = os.path.normpath(os.path.join(self.ppj.project_path, zip_root_path))
+
+                if os.path.isdir(test_path):
+                    zip_root_path = test_path
+                else:
+                    PapyrusProject.log.error(f'Cannot resolve RootDir path to existing folder: "{zip_root_path}"')
+                    sys.exit(1)
+
+            try:
+                with zipfile.ZipFile(file_path, mode='w', compression=compress_type) as z:
+                    for include_path in self._generate_include_paths(zip_node, zip_root_path):
+                        PackageManager.log.info(f'+ "{include_path}"')
+
+                        if zip_root_path not in include_path:
+                            PackageManager.log.warning(f'Cannot add file to ZIP outside RootDir: "{include_path}"')
+                            continue
+
+                        arcname: str = os.path.relpath(include_path, zip_root_path)
+                        z.write(include_path, arcname, compress_type=compress_type)
+
+                PackageManager.log.info(f'Wrote ZIP file: "{file_path}"')
+            except PermissionError:
+                PackageManager.log.error(f'Cannot open ZIP file for writing: "{file_path}"')
+                sys.exit(1)
