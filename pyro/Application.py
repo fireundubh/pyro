@@ -71,7 +71,7 @@ class Application:
             Application.log.error('Cannot proceed with Package enabled without Packages defined in project')
             self._print_help_and_exit()
 
-        if ppj.options.zip and not ppj.has_zip_file_node:
+        if ppj.options.zip and not ppj.has_zip_files_node:
             Application.log.error('Cannot proceed with Zip enabled without ZipFile defined in project')
             self._print_help_and_exit()
 

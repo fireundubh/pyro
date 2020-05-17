@@ -15,7 +15,7 @@
                     <xs:element minOccurs="0" name="Folders" type="ppj:folderList"/>
                     <xs:element minOccurs="0" name="Scripts" type="ppj:scriptList"/>
                     <xs:element minOccurs="0" name="Packages" type="ppj:packageList"/>
-                    <xs:element minOccurs="0" name="ZipFile" type="ppj:zipList"/>
+                    <xs:element minOccurs="0" name="ZipFiles" type="ppj:zipList"/>
                 </xs:choice>
             </xs:sequence>
             <xs:attribute name="Game" type="ppj:gameType"/>
@@ -63,12 +63,9 @@
     </xs:complexType>
     <xs:complexType name="zipList">
         <xs:sequence>
-            <xs:element maxOccurs="unbounded" ref="Include"/>
+            <xs:element maxOccurs="unbounded" ref="ZipFile"/>
         </xs:sequence>
-        <xs:attribute name="Name" type="xs:string"/>
-        <xs:attribute name="RootDir" type="xs:string" use="required"/>
         <xs:attribute name="Output" type="xs:string"/>
-        <xs:attribute name="Compression" type="ppj:compressionType" default="deflate"/>
     </xs:complexType>
     <xs:complexType name="variable">
         <xs:attribute name="Name" type="xs:string" use="required"/>
@@ -119,6 +116,16 @@
             </xs:sequence>
             <xs:attribute name="Name" type="xs:string"/>
             <xs:attribute name="RootDir" type="xs:string" use="required"/>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="ZipFile">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element maxOccurs="unbounded" ref="Include"/>
+            </xs:sequence>
+            <xs:attribute name="Name" type="xs:string"/>
+            <xs:attribute name="RootDir" type="xs:string" use="required"/>
+            <xs:attribute name="Compression" type="ppj:compressionType" default="deflate"/>
         </xs:complexType>
     </xs:element>
 </xs:schema>
