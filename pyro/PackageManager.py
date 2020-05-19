@@ -113,11 +113,7 @@ class PackageManager:
 
         test_path: str = os.path.normpath(os.path.join(self.ppj.project_path, path))
 
-        if os.path.isdir(test_path):
-            return test_path
-
-        PackageManager.log.error(f'Cannot resolve path to existing folder: "{path}"')
-        return ''
+        return test_path if os.path.isdir(test_path) else ''
 
     def build_commands(self, containing_folder: str, output_path: str) -> str:
         """
@@ -220,7 +216,8 @@ class PackageManager:
 
             compress_type: int = zipfile.ZIP_STORED if zip_node.get('Compression') == 'store' else zipfile.ZIP_DEFLATED
 
-            zip_root_path: str = self._try_resolve_project_relative_path(zip_node.get('RootDir'))
+            root_dir: str = zip_node.get('RootDir')
+            zip_root_path: str = self._try_resolve_project_relative_path(root_dir)
 
             if zip_root_path:
                 PackageManager.log.info(f'Creating "{file_name}"...')
@@ -241,3 +238,6 @@ class PackageManager:
                 except PermissionError:
                     PackageManager.log.error(f'Cannot open ZIP file for writing: "{file_path}"')
                     sys.exit(1)
+            else:
+                PackageManager.log.error(f'Cannot resolve RootDir path to existing folder: "{root_dir}"')
+                sys.exit(1)
