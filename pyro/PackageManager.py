@@ -10,6 +10,7 @@ import zipfile
 from lxml import etree
 
 from pyro.CommandArguments import CommandArguments
+from pyro.CaseInsensitiveList import CaseInsensitiveList
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
 from pyro.ProcessManager import ProcessManager
@@ -106,6 +107,18 @@ class PackageManager:
             return f'{zip_name}{self.zip_extension}'
         return f'{os.path.splitext(zip_name)[0]}{self.zip_extension}'
 
+    def _try_resolve_project_relative_path(self, path: str) -> str:
+        if os.path.isabs(path):
+            return path
+
+        test_path: str = os.path.normpath(os.path.join(self.ppj.project_path, path))
+
+        if os.path.isdir(test_path):
+            return test_path
+
+        PackageManager.log.error(f'Cannot resolve path to existing folder: "{path}"')
+        return ''
+
     def build_commands(self, containing_folder: str, output_path: str) -> str:
         """
         Builds command for creating package with BSArch
@@ -135,7 +148,7 @@ class PackageManager:
         if not os.path.isdir(self.options.package_path):
             os.makedirs(self.options.package_path, exist_ok=True)
 
-        package_names: list = []
+        file_names = CaseInsensitiveList()
 
         for i, package_node in enumerate(self.ppj.packages_node):
             if not package_node.tag.endswith('Package'):
@@ -144,11 +157,11 @@ class PackageManager:
             file_name: str = package_node.get('Name')
 
             # prevent clobbering files previously created in this session
-            if file_name.casefold() in package_names:
+            if file_name in file_names:
                 file_name = f'{self.ppj.project_name} ({i})'
 
-            if file_name.casefold() not in package_names:
-                package_names.append(file_name.casefold())
+            if file_name not in file_names:
+                file_names.append(file_name)
 
             file_name = self._fix_package_extension(file_name)
 
@@ -184,7 +197,7 @@ class PackageManager:
         if not os.path.isdir(self.options.zip_output_path):
             os.makedirs(self.options.zip_output_path, exist_ok=True)
 
-        zip_names: list = []
+        file_names = CaseInsensitiveList()
 
         for i, zip_node in enumerate(self.ppj.zip_files_node):
             if not zip_node.tag.endswith('ZipFile'):
@@ -193,11 +206,11 @@ class PackageManager:
             file_name: str = zip_node.get('Name')
 
             # prevent clobbering files previously created in this session
-            if file_name.casefold() in zip_names:
+            if file_name in file_names:
                 file_name = f'{file_name} ({i})'
 
-            if file_name.casefold() not in zip_names:
-                zip_names.append(file_name.casefold())
+            if file_name not in file_names:
+                file_names.append(file_name)
 
             file_name = self._fix_zip_extension(file_name)
 
@@ -207,33 +220,24 @@ class PackageManager:
 
             compress_type: int = zipfile.ZIP_STORED if zip_node.get('Compression') == 'store' else zipfile.ZIP_DEFLATED
 
-            zip_root_path: str = zip_node.get('RootDir')
+            zip_root_path: str = self._try_resolve_project_relative_path(zip_node.get('RootDir'))
 
-            PackageManager.log.info(f'Creating "{file_name}"...')
+            if zip_root_path:
+                PackageManager.log.info(f'Creating "{file_name}"...')
 
-            # try to resolve relative RootDir path to absolute path
-            if not os.path.isabs(zip_root_path):
-                test_path: str = os.path.normpath(os.path.join(self.ppj.project_path, zip_root_path))
+                try:
+                    with zipfile.ZipFile(file_path, mode='w', compression=compress_type) as z:
+                        for include_path in self._generate_include_paths(zip_node, zip_root_path):
+                            PackageManager.log.info(f'+ "{include_path}"')
 
-                if os.path.isdir(test_path):
-                    zip_root_path = test_path
-                else:
-                    PapyrusProject.log.error(f'Cannot resolve RootDir path to existing folder: "{zip_root_path}"')
+                            if zip_root_path not in include_path:
+                                PackageManager.log.warning(f'Cannot add file to ZIP outside RootDir: "{include_path}"')
+                                continue
+
+                            arcname: str = os.path.relpath(include_path, zip_root_path)
+                            z.write(include_path, arcname, compress_type=compress_type)
+
+                    PackageManager.log.info(f'Wrote ZIP file: "{file_path}"')
+                except PermissionError:
+                    PackageManager.log.error(f'Cannot open ZIP file for writing: "{file_path}"')
                     sys.exit(1)
-
-            try:
-                with zipfile.ZipFile(file_path, mode='w', compression=compress_type) as z:
-                    for include_path in self._generate_include_paths(zip_node, zip_root_path):
-                        PackageManager.log.info(f'+ "{include_path}"')
-
-                        if zip_root_path not in include_path:
-                            PackageManager.log.warning(f'Cannot add file to ZIP outside RootDir: "{include_path}"')
-                            continue
-
-                        arcname: str = os.path.relpath(include_path, zip_root_path)
-                        z.write(include_path, arcname, compress_type=compress_type)
-
-                PackageManager.log.info(f'Wrote ZIP file: "{file_path}"')
-            except PermissionError:
-                PackageManager.log.error(f'Cannot open ZIP file for writing: "{file_path}"')
-                sys.exit(1)
