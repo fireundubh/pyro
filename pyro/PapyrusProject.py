@@ -394,7 +394,12 @@ class PapyrusProject(ProjectBase):
             script_folder_path = os.path.dirname(psc_path)
 
             for import_path in self.import_paths:
-                relpath = os.path.relpath(script_folder_path, import_path)
+                # TODO: figure out how to handle imports on different drives
+                try:
+                    relpath = os.path.relpath(script_folder_path, import_path)
+                except ValueError as e:
+                    PapyrusProject.log.warning(f'{e} (path: "{script_folder_path}", start: "{import_path}")')
+                    continue
 
                 test_path = os.path.normpath(os.path.join(import_path, relpath))
                 if os.path.isdir(test_path):
