@@ -4,37 +4,45 @@
     id="PapyrusProject"
     targetNamespace="PapyrusProject.xsd"
     xmlns="PapyrusProject.xsd"
-    xmlns:ppj="PapyrusProject.xsd"
+    xmlns:pyro="PapyrusProject.xsd"
     xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    
+    <!-- Elements -->
     <xs:element name="PapyrusProject">
         <xs:complexType>
             <xs:sequence>
                 <xs:choice maxOccurs="unbounded">
-                    <xs:element minOccurs="0" name="Variables" type="ppj:variableList"/>
-                    <xs:element minOccurs="0" name="Imports" type="ppj:importList"/>
-                    <xs:element minOccurs="0" name="Folders" type="ppj:folderList"/>
-                    <xs:element minOccurs="0" name="Scripts" type="ppj:scriptList"/>
-                    <xs:element minOccurs="0" name="Packages" type="ppj:packageList"/>
-                    <xs:element minOccurs="0" name="ZipFiles" type="ppj:zipList"/>
+                    <xs:element minOccurs="0" name="Variables" type="pyro:variableList"/>
+                    <xs:element minOccurs="0" name="Imports" type="pyro:importList"/>
+                    <xs:element minOccurs="0" name="Folders" type="pyro:folderList"/>
+                    <xs:element minOccurs="0" name="Scripts" type="pyro:scriptList"/>
+                    <xs:element minOccurs="0" name="Packages" type="pyro:packageList"/>
+                    <xs:element minOccurs="0" name="ZipFiles" type="pyro:zipList"/>
                 </xs:choice>
             </xs:sequence>
-            <xs:attribute name="Game" type="ppj:gameType"/>
+            <xs:attribute name="Game" type="pyro:gameType"/>
             <xs:attribute name="Output" type="xs:string"/>
             <xs:attribute name="Flags" type="xs:string"/>
-            <xs:attribute name="Asm" type="ppj:asmType" default="none"/>
-            <xs:attribute name="Optimize" type="ppj:bool" default="false"/>
-            <xs:attribute name="Release" type="ppj:bool" default="false"/>
-            <xs:attribute name="Final" type="ppj:bool" default="false"/>
-            <xs:attribute name="Anonymize" type="ppj:bool" default="false"/>
-            <xs:attribute name="Package" type="ppj:bool" default="false"/>
-            <xs:attribute name="Zip" type="ppj:bool" default="false"/>
+            <xs:attribute name="Asm" type="pyro:asmType" default="none"/>
+            <xs:attribute name="Optimize" type="pyro:bool" default="false"/>
+            <xs:attribute name="Release" type="pyro:bool" default="false"/>
+            <xs:attribute name="Final" type="pyro:bool" default="false"/>
+            <xs:attribute name="Anonymize" type="pyro:bool" default="false"/>
+            <xs:attribute name="Package" type="pyro:bool" default="false"/>
+            <xs:attribute name="Zip" type="pyro:bool" default="false"/>
         </xs:complexType>
     </xs:element>
+    <xs:element name="Folder" type="pyro:recursablePath"/>
+    <xs:element name="Include" type="pyro:recursablePath"/>
+    <xs:element name="Package" type="pyro:includeBase"/>
+    <xs:element name="ZipFile" type="pyro:includeZip"/>
+    
+    <!-- Complex Types -->
     <xs:complexType name="variableList">
         <xs:sequence>
-            <xs:element maxOccurs="unbounded" name="Variable" type="ppj:variable"/>
+            <xs:element maxOccurs="unbounded" name="Variable" type="pyro:nameValuePair"/>
         </xs:sequence>
-    </xs:complexType>
+    </xs:complexType>    
     <xs:complexType name="importList">
         <xs:sequence>
             <xs:element maxOccurs="unbounded" name="Import" type="xs:string"/>
@@ -42,7 +50,7 @@
     </xs:complexType>
     <xs:complexType name="folderList">
         <xs:sequence>
-            <xs:element maxOccurs="unbounded" ref="Folder"/>
+            <xs:element maxOccurs="unbounded" ref="pyro:Folder"/>
         </xs:sequence>
     </xs:complexType>
     <xs:complexType name="scriptList">
@@ -50,27 +58,43 @@
             <xs:element maxOccurs="unbounded" name="Script" type="xs:string"/>
         </xs:sequence>
     </xs:complexType>
-    <xs:complexType name="includeList">
-        <xs:sequence>
-            <xs:element maxOccurs="unbounded" ref="Include"/>
-        </xs:sequence>
-    </xs:complexType>
     <xs:complexType name="packageList">
         <xs:sequence>
-            <xs:element maxOccurs="unbounded" ref="Package"/>
+            <xs:element maxOccurs="unbounded" ref="pyro:Package"/>
         </xs:sequence>
         <xs:attribute name="Output" type="xs:string"/>
     </xs:complexType>
     <xs:complexType name="zipList">
         <xs:sequence>
-            <xs:element maxOccurs="unbounded" ref="ZipFile"/>
+            <xs:element maxOccurs="unbounded" ref="pyro:ZipFile"/>
         </xs:sequence>
         <xs:attribute name="Output" type="xs:string"/>
     </xs:complexType>
-    <xs:complexType name="variable">
+    
+    <!-- Reusable Complex Types -->
+    <xs:complexType name="nameValuePair">
         <xs:attribute name="Name" type="xs:string" use="required"/>
         <xs:attribute name="Value" type="xs:string" use="required"/>
     </xs:complexType>
+    <xs:complexType name="recursablePath" mixed="true">
+        <xs:attribute name="NoRecurse" type="pyro:bool" default="false"/>
+    </xs:complexType>
+    <xs:complexType name="includeBase">
+        <xs:sequence>
+            <xs:element maxOccurs="unbounded" ref="pyro:Include"/>
+        </xs:sequence>
+        <xs:attribute name="Name" type="xs:string"/>
+        <xs:attribute name="RootDir" type="xs:string" use="required"/>
+    </xs:complexType>
+    <xs:complexType name="includeZip">
+        <xs:complexContent>
+            <xs:extension base="includeBase">
+                <xs:attribute name="Compression" type="pyro:compressionType" default="deflate"/>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+    
+    <!-- Simple Types -->
     <xs:simpleType name="asmType">
         <xs:restriction base="xs:string">
             <xs:pattern value="[nN][oO][nN][eE]"/>
@@ -99,33 +123,4 @@
             <xs:pattern value="[dD][eE][fF][lL][aA][tT][eE]"/>
         </xs:restriction>
     </xs:simpleType>
-    <xs:element name="Folder">
-        <xs:complexType mixed="true">
-            <xs:attribute name="NoRecurse" type="ppj:bool" default="false"/>
-        </xs:complexType>
-    </xs:element>
-    <xs:element name="Include">
-        <xs:complexType mixed="true">
-            <xs:attribute name="NoRecurse" type="ppj:bool" default="false"/>
-        </xs:complexType>
-    </xs:element>
-    <xs:element name="Package">
-        <xs:complexType>
-            <xs:sequence>
-                <xs:element maxOccurs="unbounded" ref="Include"/>
-            </xs:sequence>
-            <xs:attribute name="Name" type="xs:string"/>
-            <xs:attribute name="RootDir" type="xs:string" use="required"/>
-        </xs:complexType>
-    </xs:element>
-    <xs:element name="ZipFile">
-        <xs:complexType>
-            <xs:sequence>
-                <xs:element maxOccurs="unbounded" ref="Include"/>
-            </xs:sequence>
-            <xs:attribute name="Name" type="xs:string"/>
-            <xs:attribute name="RootDir" type="xs:string" use="required"/>
-            <xs:attribute name="Compression" type="ppj:compressionType" default="deflate"/>
-        </xs:complexType>
-    </xs:element>
 </xs:schema>
