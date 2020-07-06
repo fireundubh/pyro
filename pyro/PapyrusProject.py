@@ -3,9 +3,7 @@ import io
 import os
 import sys
 import typing
-import zipfile
 from copy import deepcopy
-from urllib.parse import urlparse
 
 from lxml import etree
 
@@ -14,7 +12,8 @@ from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProjectBase import ProjectBase
 from pyro.ProjectOptions import ProjectOptions
-from pyro.Remotes import GenericRemote, RemoteBase
+from pyro.Remotes import (GenericRemote,
+                          RemoteBase)
 from pyro.XmlHelper import XmlHelper
 from pyro.XmlRoot import XmlRoot
 
@@ -148,6 +147,7 @@ class PapyrusProject(ProjectBase):
             sys.exit(1)
 
         # this adds implicit imports from script paths
+        PapyrusProject.log.info('Attempting to discover implicit imports from script paths...')
         implicit_script_paths: list = self._get_implicit_script_imports()
         PathHelper.merge_implicit_import_paths(implicit_script_paths, self.import_paths)
 
