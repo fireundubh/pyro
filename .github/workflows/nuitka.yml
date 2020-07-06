@@ -21,17 +21,20 @@ jobs:
    - name: Set up Visual Studio environment
      if: success()
      uses: seanmiddleditch/gha-setup-vsdevenv@v1
-   - name: Set up Python 3.7.7 (x64)
+   - name: Set up Python 3.8.3 (x64)
      if: success()
      uses: actions/setup-python@v1
      with:
-      python-version: 3.7.7
+      python-version: 3.8.3
       architecture: x64
    - uses: dschep/install-pipenv-action@v1
      if: success()
-   - name: Install dependencies
+   - name: Create virtual environment
      if: success()
-     run: pipenv install
+     run: python -m venv env
+   - name: Install requirements
+     if: success()
+     run: pip install -r requirements.txt
    - name: Run build script
      if: success()
      run: python D:\a\pyro\pyro\build.py --no-zip
