@@ -27,8 +27,6 @@ jobs:
      with:
       python-version: 3.8.3
       architecture: x64
-   - uses: dschep/install-pipenv-action@v1
-     if: success()
    - name: Create virtual environment
      if: success()
      run: python -m venv env
