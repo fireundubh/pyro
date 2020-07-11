@@ -207,7 +207,7 @@ class PapyrusProject(ProjectBase):
         return results
 
     def _parse_variables(self, variables_node: etree.ElementBase) -> None:
-        reserved_characters: tuple = ('!', '#', '%', '^', '&', '*')
+        reserved_characters: tuple = ('!', '#', '^', '&', '*')
 
         for variable_node in variables_node:
             if not variable_node.tag.endswith('Variable'):
