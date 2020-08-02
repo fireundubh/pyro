@@ -4,6 +4,7 @@ import os
 import sys
 
 from pyro.BuildFacade import BuildFacade
+from pyro.Comparators import startswith
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
@@ -40,7 +41,7 @@ class Application:
             Application.log.error('required argument missing: -i INPUT.ppj')
             self._print_help_and_exit()
 
-        if input_path.casefold().startswith('file:'):
+        if startswith(input_path, 'file:', ignorecase=True):
             full_path = PathHelper.url2pathname(input_path)
             input_path = os.path.normpath(full_path)
 

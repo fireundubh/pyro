@@ -10,6 +10,7 @@ import zipfile
 from lxml import etree
 
 from pyro.CommandArguments import CommandArguments
+from pyro.Comparators import endswith, startswith
 from pyro.CaseInsensitiveList import CaseInsensitiveList
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
@@ -98,12 +99,12 @@ class PackageManager:
                     yield from PathHelper.find_include_paths(search_path, no_recurse)
 
     def _fix_package_extension(self, package_name: str) -> str:
-        if not package_name.casefold().endswith(('.ba2', '.bsa')):
+        if not endswith(package_name, ('.ba2', '.bsa'), ignorecase=True):
             return f'{package_name}{self.pak_extension}'
         return f'{os.path.splitext(package_name)[0]}{self.pak_extension}'
 
     def _fix_zip_extension(self, zip_name: str) -> str:
-        if not zip_name.casefold().endswith('.zip'):
+        if not endswith(zip_name, '.zip', ignorecase=True):
             return f'{zip_name}{self.zip_extension}'
         return f'{os.path.splitext(zip_name)[0]}{self.zip_extension}'
 
@@ -174,7 +175,7 @@ class PackageManager:
                 target_path = os.path.join(self.options.temp_path, relpath)
 
                 # fix target path if user passes a deeper package root (RootDir)
-                if source_path.casefold().endswith('.pex') and not relpath.casefold().startswith('scripts'):
+                if endswith(source_path, '.pex', ignorecase=True) and not startswith(relpath, 'scripts', ignorecase=True):
                     target_path = os.path.join(self.options.temp_path, 'Scripts', relpath)
 
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)

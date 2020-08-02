@@ -7,6 +7,7 @@ from pyro.PyroArgumentParser import PyroArgumentParser
 from pyro.PyroRawDescriptionHelpFormatter import PyroRawTextHelpFormatter
 
 if __name__ == '__main__':
+    # noinspection PyTypeChecker
     _parser = PyroArgumentParser(add_help=False,
                                  formatter_class=PyroRawTextHelpFormatter,
                                  description=os.linesep.join([

@@ -1,3 +1,4 @@
+import glob
 import logging
 import os
 import sys
@@ -64,6 +65,7 @@ class ProjectBase:
         return fallback_path
 
     def parse(self, value: str) -> str:
+        """Expands string tokens and environment variables, and returns the parsed string"""
         t = StringTemplate(value)
         try:
             return os.path.expanduser(os.path.expandvars(t.substitute(self.variables)))
@@ -73,7 +75,11 @@ class ProjectBase:
 
     # build arguments
     def get_worker_limit(self) -> int:
-        """Returns worker limit from arguments"""
+        """
+        Returns worker limit from arguments
+
+        Used by: BuildFacade
+        """
         if self.options.worker_limit > 0:
             return self.options.worker_limit
         try:
@@ -87,13 +93,21 @@ class ProjectBase:
 
     # compiler arguments
     def get_compiler_path(self) -> str:
-        """Returns absolute compiler path from arguments"""
+        """
+        Returns absolute compiler path from arguments
+
+        Used by: BuildFacade
+        """
         return self._get_path(self.options.compiler_path,
                               relative_root_path=os.getcwd(),
                               fallback_path=[self.options.game_path, 'Papyrus Compiler', 'PapyrusCompiler.exe'])
 
     def get_flags_path(self) -> str:
-        """Returns absolute flags path or flags file name from arguments or game path"""
+        """
+        Returns absolute flags path or flags file name from arguments or game path
+
+        Used by: BuildFacade
+        """
         if self.options.flags_path:
             if self.options.flags_path.casefold() in ('institute_papyrus_flags.flg', 'tesv_papyrus_flags.flg'):
                 return self.options.flags_path
@@ -105,14 +119,22 @@ class ProjectBase:
         return 'Institute_Papyrus_Flags.flg' if game_path.endswith('fallout 4') else 'TESV_Papyrus_Flags.flg'
 
     def get_output_path(self) -> str:
-        """Returns absolute output path from arguments"""
+        """
+        Returns absolute output path from arguments
+
+        Used by: BuildFacade
+        """
         return self._get_path(self.options.output_path,
                               relative_root_path=self.project_path,
                               fallback_path=[self.program_path, 'out'])
 
     # game arguments
     def get_game_path(self, game_type: str = '') -> str:
-        """Returns absolute game path from arguments or Windows Registry"""
+        """
+        Returns absolute game path from arguments or Windows Registry
+
+        Used by: BuildFacade, ProjectBase
+        """
         if self.options.game_path:
             if os.path.isabs(self.options.game_path):
                 return self.options.game_path
@@ -124,21 +146,24 @@ class ProjectBase:
         raise FileNotFoundError('Cannot determine game path')
 
     def get_registry_path(self, game_type: str = '') -> str:
+        """Returns path to game installed path in Windows Registry from game type"""
         if not self.options.registry_path:
             game_type = self.options.game_type if not game_type else game_type
-            if game_type == 'fo4':
-                game_name = 'Fallout4'
-            elif game_type == 'sse':
-                game_name = 'Skyrim Special Edition'
-            elif game_type in ('tes5', 'tesv'):
-                game_name = 'Skyrim'
-            else:
-                raise ValueError('Cannot determine registry path from game type')
+            try:
+                game_name = self.game_types[game_type]
+            except KeyError:
+                raise KeyError('Cannot determine registry path from game type')
+            if game_name.startswith('Fallout'):
+                game_name = game_name.replace(' ', '')
             return rf'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\\{game_name}\Installed Path'
         return self.options.registry_path.replace('/', '\\')
 
     def get_installed_path(self, game_type: str = '') -> str:
-        """Returns absolute game path using Windows Registry"""
+        """
+        Returns path to game installed path in Windows Registry
+
+        Used by: BuildFacade, ProjectBase
+        """
         import winreg
 
         registry_path = self.options.registry_path

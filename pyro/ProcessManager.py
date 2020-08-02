@@ -22,6 +22,12 @@ class ProcessManager:
 
     @staticmethod
     def run_bsarch(command: str) -> ProcessState:
+        """
+        Creates bsarch process and logs output to console
+
+        :param command: Command to execute, including absolute path to executable and its arguments
+        :return: ProcessState (SUCCESS, FAILURE, INTERRUPTED, ERRORS)
+        """
         try:
             process = subprocess.Popen(command,
                                        stdout=subprocess.PIPE,
@@ -89,6 +95,12 @@ class ProcessManager:
 
     @staticmethod
     def run_compiler(command: str) -> ProcessState:
+        """
+        Creates compiler process and logs output to console
+
+        :param command: Command to execute, including absolute path to executable and its arguments
+        :return: ProcessState (SUCCESS, FAILURE, INTERRUPTED, ERRORS)
+        """
         command_size = len(command)
 
         if command_size > 32768:
