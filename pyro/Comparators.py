@@ -29,7 +29,7 @@ def endswith(a_source: str, a_suffix: Union[str, tuple],
     suffixes = a_suffix if isinstance(a_suffix, tuple) else (a_suffix,)
 
     for suffix in suffixes:
-        source_suffix = source[len(suffix) - 1:]
+        source_suffix = source[-len(suffix):]
 
         if not ignorecase:
             if source_suffix == suffix:
