@@ -25,8 +25,31 @@ class BuildFacade:
     ppj: PapyrusProject = None
     log_file: JsonLogger = None
 
+    time_elapsed: TimeElapsed = TimeElapsed()
+
+    scripts_count: int = 0
+    success_count: int = 0
+    command_count: int = 0
+
+    @property
+    def failed_count(self) -> int:
+        return self.command_count - self.success_count
+
+    @property
+    def build_time(self) -> str:
+        raw_time, avg_time = ('{0:.3f}s'.format(t)
+                              for t in (self.time_elapsed.value(), self.time_elapsed.average(self.success_count)))
+
+        return f'Compilation time: ' \
+               f'{raw_time} ({avg_time}/script) - ' \
+               f'{self.success_count} succeeded, ' \
+               f'{self.failed_count} failed ' \
+               f'({self.scripts_count} scripts)'
+
     def __init__(self, ppj: PapyrusProject) -> None:
         self.ppj = ppj
+
+        self.scripts_count = len(self.ppj.psc_paths)
 
         # WARN: if methods are renamed and their respective option names are not, this will break.
         options: dict = deepcopy(self.ppj.options.__dict__)
@@ -115,33 +138,30 @@ class BuildFacade:
         process = psutil.Process(os.getpid())
         process.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS if sys.platform == 'win32' else 19)
 
-    def try_compile(self, time_elapsed: TimeElapsed) -> tuple:
+    def try_compile(self) -> None:
         """Builds and passes commands to Papyrus Compiler"""
         commands: list = self.ppj.build_commands()
 
-        command_count: int = len(commands)
-        success_count: int = 0
+        self.command_count = len(commands)
 
-        time_elapsed.start_time = time.time()
+        self.time_elapsed.start_time = time.time()
 
-        if self.ppj.options.no_parallel or command_count == 1:
+        if self.ppj.options.no_parallel or self.command_count == 1:
             for command in commands:
                 if ProcessManager.run_compiler(command) == ProcessState.SUCCESS:
-                    success_count += 1
-        elif command_count > 0:
+                    self.success_count += 1
+        elif self.command_count > 0:
             multiprocessing.freeze_support()
-            worker_limit = min(command_count, self.ppj.options.worker_limit)
+            worker_limit = min(self.command_count, self.ppj.options.worker_limit)
             pool = multiprocessing.Pool(processes=worker_limit,
                                         initializer=BuildFacade._limit_priority)
             for state in pool.imap(ProcessManager.run_compiler, commands):
                 if state == ProcessState.SUCCESS:
-                    success_count += 1
+                    self.success_count += 1
             pool.close()
             pool.join()
 
-        time_elapsed.end_time = time.time()
-
-        return success_count, command_count - success_count
+        self.time_elapsed.end_time = time.time()
 
     def try_anonymize(self) -> None:
         """Obfuscates identifying metadata in compiled scripts"""
