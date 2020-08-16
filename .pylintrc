@@ -19,5 +19,5 @@ disable=
     unnecessary-pass
 
 [FORMAT]
-max-line-length=120
+max-line-length=260
 logging-format-style=fstr

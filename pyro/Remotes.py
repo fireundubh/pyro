@@ -5,6 +5,7 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from pyro.Comparators import endswith
 from pyro.ProjectOptions import ProjectOptions
 
 
@@ -154,7 +155,7 @@ class BitbucketRemote(RemoteBase):
 
                 if payload_object_type == 'commit_file':
                     # we only care about scripts
-                    if not download_url.casefold().endswith('.psc'):
+                    if not endswith(download_url, '.psc', ignorecase=True):
                         continue
 
                     file_response = urlopen(download_url, timeout=30)
@@ -210,7 +211,7 @@ class GitHubRemote(RemoteBase):
                 continue
 
             # we only care about scripts
-            if not download_url.casefold().endswith('.psc'):
+            if not endswith(download_url, '.psc', ignorecase=True):
                 continue
 
             file_response = urlopen(download_url, timeout=30)

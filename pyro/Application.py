@@ -4,6 +4,7 @@ import os
 import sys
 
 from pyro.BuildFacade import BuildFacade
+from pyro.Comparators import startswith
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
@@ -40,7 +41,7 @@ class Application:
             Application.log.error('required argument missing: -i INPUT.ppj')
             self._print_help_and_exit()
 
-        if input_path.casefold().startswith('file:'):
+        if startswith(input_path, 'file:', ignorecase=True):
             full_path = PathHelper.url2pathname(input_path)
             input_path = os.path.normpath(full_path)
 
@@ -102,8 +103,6 @@ class Application:
         for path in ppj.psc_paths:
             Application.log.info(f'+ "{path}"')
 
-        time_elapsed = TimeElapsed()
-
         build = BuildFacade(ppj)
 
         # bsarch path is not set until BuildFacade initializes
@@ -111,45 +110,33 @@ class Application:
             Application.log.error('Cannot proceed with Package enabled without valid BSArch path')
             self._print_help_and_exit()
 
-        success_count, failed_count = build.try_compile(time_elapsed)
+        build.try_compile()
 
         if ppj.options.anonymize:
-            if failed_count == 0 or ppj.options.ignore_errors:
+            if build.failed_count == 0 or ppj.options.ignore_errors:
                 build.try_anonymize()
             else:
-                Application.log.warning(f'Cannot anonymize scripts because {failed_count} scripts failed to compile')
+                Application.log.warning(f'Cannot anonymize scripts because {build.failed_count} scripts failed to compile')
         else:
             Application.log.warning('Cannot anonymize scripts because Anonymize is disabled in project')
 
         if ppj.options.package:
-            if failed_count == 0 or ppj.options.ignore_errors:
+            if build.failed_count == 0 or ppj.options.ignore_errors:
                 build.try_pack()
             else:
-                Application.log.warning(f'Cannot create Packages because {failed_count} scripts failed to compile')
+                Application.log.warning(f'Cannot create Packages because {build.failed_count} scripts failed to compile')
         else:
             Application.log.warning('Cannot create Packages because Package is disabled in project')
 
         if ppj.options.zip:
-            if failed_count == 0 or ppj.options.ignore_errors:
+            if build.failed_count == 0 or ppj.options.ignore_errors:
                 build.try_zip()
             else:
-                Application.log.warning(f'Cannot create ZipFile because {failed_count} scripts failed to compile')
+                Application.log.warning(f'Cannot create ZipFile because {build.failed_count} scripts failed to compile')
         else:
             Application.log.warning('Cannot create ZipFile because Zip is disabled in project')
 
-        if success_count > 0:
-            raw_time, avg_time = ('{0:.3f}s'.format(t)
-                                  for t in (time_elapsed.value(), time_elapsed.average(success_count)))
-
-            psc_count = len(ppj.psc_paths)
-
-            Application.log.info(f'Compilation time: '
-                                 f'{raw_time} ({avg_time}/script) - '
-                                 f'{success_count} succeeded, '
-                                 f'{failed_count} failed '
-                                 f'({psc_count} scripts)')
-        else:
-            Application.log.info('No scripts were compiled.')
+        Application.log.info(build.build_time if build.success_count > 0 else 'No scripts were compiled.')
 
         Application.log.info('DONE!')
 

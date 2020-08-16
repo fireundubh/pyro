@@ -4,6 +4,8 @@ from collections import OrderedDict
 from typing import Generator, Iterable
 from urllib.parse import unquote_plus, urlparse
 
+from pyro.Comparators import endswith
+
 
 class PathHelper:
     @staticmethod
@@ -29,7 +31,7 @@ class PathHelper:
         """Yields existing script paths starting from absolute folder path"""
         search_path: str = os.path.join(folder_path, '*' if no_recurse else r'**\*')
         for script_path in glob.iglob(search_path, recursive=not no_recurse):
-            if os.path.isfile(script_path) and script_path.casefold().endswith('.psc'):
+            if os.path.isfile(script_path) and endswith(script_path, '.psc', ignorecase=True):
                 yield script_path
 
     @staticmethod

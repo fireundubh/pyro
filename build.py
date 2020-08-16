@@ -15,7 +15,7 @@ class Application:
     def __init__(self, args: argparse.Namespace) -> None:
         self.root_path: str = os.path.dirname(__file__)
 
-        self.pipenv_cmd: str = args.pipenv_cmd
+        self.local_venv_path: str = args.local_venv_path
         self.package_name: str = 'pyro'
         self.no_zip: bool = args.no_zip
         self.vcvars64_path: str = args.vcvars64_path
@@ -23,6 +23,19 @@ class Application:
         self.dist_path: str = os.path.join(self.root_path, f'{self.package_name}.dist')
         self.root_tools_path: str = os.path.join(self.root_path, 'tools')
         self.dist_tools_path: str = os.path.join(self.dist_path, 'tools')
+
+        self.nuitka_args: list = [
+            'python', '-m', 'nuitka',
+            '--standalone', 'pyro',
+            '--include-package=pyro',
+            '--experimental=use_pefile',
+            '--python-flag=nosite',
+            f'--python-for-scons={sys.executable}',
+            '--assume-yes-for-downloads',
+            '--plugin-enable=multiprocessing',
+            '--show-progress',
+            '--file-reference-choice=runtime'
+        ]
 
     def __setattr__(self, key: str, value: object) -> None:
         # sanitize paths
@@ -68,14 +81,29 @@ class Application:
         zip_path: str = os.path.join(self.root_path, 'bin', f'{self.package_name}.zip')
         os.makedirs(os.path.dirname(zip_path), exist_ok=True)
 
-        files: list = [f for f in glob.glob(os.path.join(self.dist_path, r'**\*'), recursive=True) if os.path.isfile(f)]
+        files: list = [f for f in glob.glob(os.path.join(self.dist_path, r'**\*'), recursive=True)
+                       if os.path.isfile(f)]
 
         with zipfile.ZipFile(zip_path, 'w') as z:
             for f in files:
-                z.write(f, os.path.join(self.package_name, os.path.relpath(f, self.dist_path)), compress_type=zipfile.ZIP_STORED)
+                z.write(f, os.path.join(self.package_name, os.path.relpath(f, self.dist_path)),
+                        compress_type=zipfile.ZIP_STORED)
                 Application.log.info(f'Added file to archive: {f}')
 
         return zip_path
+
+    @staticmethod
+    def exec_process(cmd: list, env: dict) -> int:
+        try:
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, universal_newlines=True, env=env)
+            while process.poll() is None:
+                line: str = process.stdout.readline().strip()
+                if line:
+                    Application.log.info(line)
+        except FileNotFoundError:
+            Application.log.error(f'Cannot run command: {cmd}')
+            return 1
+        return 0
 
     def run(self) -> int:
         if not sys.platform == 'win32':
@@ -106,7 +134,7 @@ class Application:
 
             # noinspection PyUnboundLocalVariable
             while process.poll() is None:
-                line: str = process.stdout.readline().strip()
+                line = process.stdout.readline().strip()
                 Application.log.info(line)
 
                 if 'post-execution' in line:
@@ -122,24 +150,11 @@ class Application:
                     key, value = line.split('=', maxsplit=1)
                     environ[key] = value
 
-        args: list = [
-            self.pipenv_cmd, 'run', 'python', '-m', 'nuitka',
-            '--standalone', 'pyro',
-            '--include-package=pyro',
-            '--experimental=use_pefile',
-            '--python-flag=nosite',
-            f'--python-for-scons={sys.executable}',
-            '--assume-yes-for-downloads',
-            '--plugin-enable=multiprocessing',
-            '--show-progress',
-            '--file-reference-choice=runtime'
-        ]
+        if fail_state == 0:
+            fail_state = self.exec_process(self.local_venv_path.split(' '), environ)
 
-        try:
-            process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, env=environ)
-        except FileNotFoundError as e:
-            Application.log.error(f'Cannot run command: {" ".join(args)}')
-            fail_state = 1
+        if fail_state == 0:
+            fail_state = self.exec_process(self.nuitka_args, environ)
 
         if fail_state == 0:
             # noinspection PyUnboundLocalVariable
@@ -206,7 +221,7 @@ class Application:
 
             return fail_state
 
-        Application.log.error(f'Failed to execute command: {" ".join(args)}')
+        Application.log.error(f'Failed to execute command: {" ".join(self.nuitka_args)}')
 
         Application.log.warning(f'Resetting: "{self.dist_path}"')
         shutil.rmtree(self.dist_path, ignore_errors=True)
@@ -217,9 +232,9 @@ class Application:
 if __name__ == '__main__':
     _parser = argparse.ArgumentParser(description='Pyro Build Script')
 
-    _parser.add_argument('--pipenv-cmd',
-                         action='store', default='pipenv',
-                         help='command to use for pipenv')
+    _parser.add_argument('--local-venv-path',
+                         action='store', default=os.path.join(os.path.dirname(sys.executable), 'activate.bat'),
+                         help='path to local venv activate script')
 
     _parser.add_argument('--no-zip',
                          action='store_true', default=False,

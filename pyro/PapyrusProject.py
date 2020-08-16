@@ -3,18 +3,18 @@ import io
 import os
 import sys
 import typing
-import zipfile
 from copy import deepcopy
-from urllib.parse import urlparse
 
 from lxml import etree
 
 from pyro.CommandArguments import CommandArguments
+from pyro.Comparators import startswith
 from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProjectBase import ProjectBase
 from pyro.ProjectOptions import ProjectOptions
-from pyro.Remotes import GenericRemote, RemoteBase
+from pyro.Remotes import (GenericRemote,
+                          RemoteBase)
 from pyro.XmlHelper import XmlHelper
 from pyro.XmlRoot import XmlRoot
 
@@ -34,7 +34,7 @@ class PapyrusProject(ProjectBase):
     has_zip_files_node: bool = False
 
     remote: RemoteBase = None
-    remote_schemas: tuple = ('http:', 'https:')
+    remote_schemas: tuple = ('https:', 'http:')
 
     zip_file_name: str = ''
     zip_root_path: str = ''
@@ -148,6 +148,7 @@ class PapyrusProject(ProjectBase):
             sys.exit(1)
 
         # this adds implicit imports from script paths
+        PapyrusProject.log.info('Attempting to discover implicit imports from script paths...')
         implicit_script_paths: list = self._get_implicit_script_imports()
         PathHelper.merge_implicit_import_paths(implicit_script_paths, self.import_paths)
 
@@ -193,7 +194,7 @@ class PapyrusProject(ProjectBase):
                 if not node.tag.endswith('Import'):
                     continue
 
-                if node.text.casefold().startswith(self.remote_schemas):
+                if startswith(node.text, self.remote_schemas, ignorecase=True):
                     results.append(node.text)
 
         if self.has_folders_node:
@@ -201,13 +202,13 @@ class PapyrusProject(ProjectBase):
                 if not node.tag.endswith('Folder'):
                     continue
 
-                if node.text.casefold().startswith(self.remote_schemas):
+                if startswith(node.text, self.remote_schemas, ignorecase=True):
                     results.append(node.text)
 
         return results
 
     def _parse_variables(self, variables_node: etree.ElementBase) -> None:
-        reserved_characters: tuple = ('!', '#', '$', '%', '^', '&', '*')
+        reserved_characters: tuple = ('!', '#', '^', '&', '*')
 
         for variable_node in variables_node:
             if not variable_node.tag.endswith('Variable'):
@@ -337,7 +338,7 @@ class PapyrusProject(ProjectBase):
             if not import_node.text:
                 continue
 
-            if import_node.text.casefold().startswith(self.remote_schemas):
+            if startswith(import_node.text, self.remote_schemas, ignorecase=True):
                 local_path = self._get_remote_path(import_node)
                 PapyrusProject.log.info(f'Adding import path from remote: "{local_path}"...')
                 results.append(local_path)
@@ -357,6 +358,9 @@ class PapyrusProject(ProjectBase):
 
             if os.path.isdir(import_path):
                 results.append(import_path)
+            else:
+                self.log.error(f'Import path does not exist: "{import_path}"')
+                sys.exit(1)
 
         return PathHelper.uniqify(results)
 
@@ -394,7 +398,12 @@ class PapyrusProject(ProjectBase):
             script_folder_path = os.path.dirname(psc_path)
 
             for import_path in self.import_paths:
-                relpath = os.path.relpath(script_folder_path, import_path)
+                # TODO: figure out how to handle imports on different drives
+                try:
+                    relpath = os.path.relpath(script_folder_path, import_path)
+                except ValueError as e:
+                    PapyrusProject.log.warning(f'{e} (path: "{script_folder_path}", start: "{import_path}")')
+                    continue
 
                 test_path = os.path.normpath(os.path.join(import_path, relpath))
                 if os.path.isdir(test_path):
@@ -501,7 +510,7 @@ class PapyrusProject(ProjectBase):
                 yield from PathHelper.find_script_paths_from_folder(self.project_path, no_recurse)
                 continue
 
-            if folder_node.text.casefold().startswith(self.remote_schemas):
+            if startswith(folder_node.text, self.remote_schemas, ignorecase=True):
                 local_path = self._get_remote_path(folder_node)
                 PapyrusProject.log.info(f'Adding import path from remote: "{local_path}"...')
                 self.import_paths.insert(0, local_path)
@@ -613,9 +622,9 @@ class PapyrusProject(ProjectBase):
             arguments.clear()
             arguments.append(compiler_path, enquote_value=True)
             arguments.append(object_name, enquote_value=True)
-            arguments.append(output_path, key='o', enquote_value=True)
-            arguments.append(';'.join(import_paths), key='i', enquote_value=True)
             arguments.append(flags_path, key='f', enquote_value=True)
+            arguments.append(';'.join(import_paths), key='i', enquote_value=True)
+            arguments.append(output_path, key='o', enquote_value=True)
 
             if self.options.game_type == 'fo4':
                 # noinspection PyUnboundLocalVariable
