@@ -156,41 +156,6 @@ class Application:
         if fail_state == 0:
             fail_state = self.exec_process(self.nuitka_args, environ)
 
-        if fail_state == 0:
-            # noinspection PyUnboundLocalVariable
-            while process.poll() is None:
-                line = process.stdout.readline().strip()
-
-                if not line:
-                    continue
-
-                if line.startswith(('Courtesy Notice', 'Executing', 'Nuitka:INFO:Optimizing', 'Nuitka:INFO:Doing', 'Nuitka:INFO:Demoting')):
-                    continue
-
-                if line.startswith('Error, cannot locate suitable C compiler'):
-                    Application.log.error('Cannot locate suitable C compiler.')
-                    fail_state = 1
-                    break
-
-                if line.startswith('Error, mismatch between') and 'arches' in line:
-                    _, message = line.split('between')
-                    Application.log.error(f'Cannot proceed with mismatching architectures: {message.replace(" arches", "")}')
-                    fail_state = 1
-                    break
-
-                if line.startswith('Error'):
-                    Application.log.error(line)
-                    fail_state = 1
-                    break
-
-                if line.startswith('Nuitka:INFO'):
-                    line = line.replace('Nuitka:INFO:', '')
-
-                if line.startswith('PASS 2'):
-                    line = 'PASS 2:'
-
-                Application.log.info(line)
-
         if fail_state == 0 and not os.path.exists(self.dist_path) or f'{self.package_name}.exe' not in os.listdir(self.dist_path):
             Application.log.error(f'Cannot find {self.package_name}.exe in folder or folder does not exist: {self.dist_path}')
             fail_state = 1
