@@ -3,6 +3,8 @@ import sys
 from argparse import SUPPRESS
 
 from pyro.Application import Application
+from pyro.Enums.GameType import GameType
+from pyro.Enums.ZipCompression import ZipCompression
 from pyro.PyroArgumentParser import PyroArgumentParser
 from pyro.PyroRawDescriptionHelpFormatter import PyroRawTextHelpFormatter
 
@@ -12,7 +14,7 @@ if __name__ == '__main__':
                                  formatter_class=PyroRawTextHelpFormatter,
                                  description=os.linesep.join([
                                      '-' * 80,
-                                     ''.join([c.center(3) for c in 'PYRO']).center(80),
+                                     ''.join(c.center(3) for c in 'PYRO').center(80),
                                      '-' * 53 + ' github.com/fireundubh/pyro'
                                  ]))
 
@@ -58,8 +60,8 @@ if __name__ == '__main__':
 
     _game_arguments = _parser.add_argument_group('game arguments')
     _game_arguments.add_argument('-g', '--game-type',
-                                 action='store', type=str,
-                                 choices={'fo4', 'tes5', 'tesv', 'sse'},
+                                 action='store', type=GameType,
+                                 choices=list(GameType),
                                  help='set game type (choices: fo4, tes5, sse)')
 
     _game_path_arguments = _game_arguments.add_mutually_exclusive_group()
@@ -88,8 +90,8 @@ if __name__ == '__main__':
 
     _zip_arguments = _parser.add_argument_group('zip arguments')
     _zip_arguments.add_argument('--zip-compression',
-                                action='store', type=str,
-                                choices={'store', 'deflate'},
+                                action='store', type=ZipCompression,
+                                choices=list(ZipCompression),
                                 help='set compression method (choices: store, deflate)')
     _zip_arguments.add_argument('--zip-output-path',
                                 action='store', type=str,
@@ -113,10 +115,10 @@ if __name__ == '__main__':
     _debug_arguments.add_argument('--resolve-ppj',
                                   action='store_true',
                                   help='resolve variables and paths in ppj file')
-    _debug_arguments.add_argument('--log-path',
-                                  action='store', type=str,
-                                  help='relative or absolute path to log folder\n'
-                                       '(if relative, must be relative to current working directory)')
+    # _debug_arguments.add_argument('--log-path',
+    #                               action='store', type=str,
+    #                               help='relative or absolute path to log folder\n'
+    #                                    '(if relative, must be relative to current working directory)')
 
     _program_arguments = _parser.add_argument_group('program arguments')
     _program_arguments.add_argument('--help', dest='show_help',

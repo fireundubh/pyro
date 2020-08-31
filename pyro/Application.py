@@ -3,13 +3,13 @@ import logging
 import os
 import sys
 
+from pyro.Enums.BuildEvent import BuildEvent
 from pyro.BuildFacade import BuildFacade
 from pyro.Comparators import startswith
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProjectOptions import ProjectOptions
-from pyro.TimeElapsed import TimeElapsed
 
 
 class Application:
@@ -110,6 +110,8 @@ class Application:
             Application.log.error('Cannot proceed with Package enabled without valid BSArch path')
             self._print_help_and_exit()
 
+        build.try_build_event(BuildEvent.PRE)
+
         build.try_compile()
 
         if ppj.options.anonymize:
@@ -139,5 +141,8 @@ class Application:
         Application.log.info(build.build_time if build.success_count > 0 else 'No scripts were compiled.')
 
         Application.log.info('DONE!')
+
+        if build.failed_count == 0:
+            build.try_build_event(BuildEvent.POST)
 
         return 0

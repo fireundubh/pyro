@@ -4,7 +4,7 @@ import re
 import subprocess
 from decimal import Decimal
 
-from pyro.ProcessState import ProcessState
+from pyro.Enums.ProcessState import ProcessState
 
 
 class ProcessManager:
@@ -19,6 +19,35 @@ class ProcessManager:
         if hours.compare(0) == 0 and minutes.compare(0) == 0 and seconds.compare(0) == 1:
             return f'{seconds}s'
         return f'{hours}h {minutes}m {seconds}s'
+
+    @staticmethod
+    def run_command(command: str, cwd: str, env: dict) -> ProcessState:
+        try:
+            process = subprocess.Popen(command,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT,
+                                       universal_newlines=True,
+                                       shell=True,
+                                       cwd=cwd,
+                                       env=env)
+        except WindowsError as e:
+            ProcessManager.log.error(f'Cannot create process because: {e.strerror}')
+            return ProcessState.FAILURE
+
+        try:
+            while process.poll() is None:
+                line: str = process.stdout.readline().strip()
+                if line:
+                    ProcessManager.log.info(line)
+
+        except KeyboardInterrupt:
+            try:
+                process.terminate()
+            except OSError:
+                ProcessManager.log.error('Process interrupted by user.')
+            return ProcessState.INTERRUPTED
+
+        return ProcessState.SUCCESS
 
     @staticmethod
     def run_bsarch(command: str) -> ProcessState:

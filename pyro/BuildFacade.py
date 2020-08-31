@@ -1,4 +1,3 @@
-import json
 import logging
 import multiprocessing
 import os
@@ -9,13 +8,14 @@ from copy import deepcopy
 import psutil
 
 from pyro.Anonymizer import Anonymizer
-from pyro.JsonLogger import JsonLogger
+from pyro.Enums.BuildEvent import BuildEvent
+from pyro.Comparators import is_command_node
 from pyro.PackageManager import PackageManager
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProcessManager import ProcessManager
-from pyro.ProcessState import ProcessState
+from pyro.Enums.ProcessState import ProcessState
 from pyro.TimeElapsed import TimeElapsed
 
 
@@ -23,7 +23,6 @@ class BuildFacade:
     log: logging.Logger = logging.getLogger('pyro')
 
     ppj: PapyrusProject = None
-    log_file: JsonLogger = None
 
     time_elapsed: TimeElapsed = TimeElapsed()
 
@@ -63,46 +62,6 @@ class BuildFacade:
                 continue
             setattr(self.ppj.options, key, getattr(self.ppj, f'get_{key}')())
 
-        # record project options in log
-        if self.ppj.options.log_path:
-            self._rotate_logs(5)
-
-            os.makedirs(self.ppj.options.log_path, exist_ok=True)
-            log_path = os.path.join(self.ppj.options.log_path, f'pyro-{int(time.time())}.log')
-            with open(log_path, mode='w', encoding='utf-8') as f:
-                json.dump(self.ppj.options.__dict__, f, indent=2)
-
-        self.log_file = JsonLogger(ppj)
-        self.log_file.add_record('project_data', {
-            'program_path': ppj.program_path,
-            'project_path': ppj.project_path,
-            'import_paths': ppj.import_paths,
-            'psc_paths': ppj.psc_paths,
-            'pex_paths': ppj.pex_paths
-        })
-
-    def _rotate_logs(self, keep_count: int) -> None:
-        if not os.path.isdir(self.ppj.options.log_path):
-            return
-
-        # because we're rotating at start, account for new log file
-        keep_count -= 1
-
-        log_files = [f for f in os.listdir(self.ppj.options.log_path) if f.endswith('.log')]
-        if not len(log_files) > keep_count:
-            return
-
-        log_paths = [os.path.join(self.ppj.options.log_path, f) for f in log_files]
-
-        logs_to_retain = log_paths[-keep_count:]
-        logs_to_remove = [f for f in log_paths if f not in logs_to_retain]
-
-        for f in logs_to_remove:
-            try:
-                os.remove(f)
-            except PermissionError:
-                BuildFacade.log.error(f'Cannot delete log file without permission: {f}')
-
     def _find_modified_scripts(self) -> list:
         pex_paths: list = []
 
@@ -137,6 +96,22 @@ class BuildFacade:
     def _limit_priority() -> None:
         process = psutil.Process(os.getpid())
         process.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS if sys.platform == 'win32' else 19)
+
+    def try_build_event(self, event: BuildEvent) -> None:
+        if event == BuildEvent.PRE:
+            has_event_node, event_node = self.ppj.has_pre_build_node, self.ppj.pre_build_node
+        elif event == BuildEvent.POST:
+            has_event_node, event_node = self.ppj.has_post_build_node, self.ppj.post_build_node
+        else:
+            raise NotImplementedError
+
+        if has_event_node:
+            BuildFacade.log.info(event_node.get('Description'))
+
+            environ: dict = os.environ.copy()
+            command: str = ' && '.join(node.text for node in filter(is_command_node, event_node))
+
+            ProcessManager.run_command(command, self.ppj.project_path, environ)
 
     def try_compile(self) -> None:
         """Builds and passes commands to Papyrus Compiler"""

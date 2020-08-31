@@ -10,8 +10,14 @@ import zipfile
 from lxml import etree
 
 from pyro.CommandArguments import CommandArguments
-from pyro.Comparators import endswith, startswith
+from pyro.Comparators import (endswith,
+                              is_include_node,
+                              is_package_node,
+                              is_zipfile_node,
+                              startswith)
 from pyro.CaseInsensitiveList import CaseInsensitiveList
+from pyro.Enums.GameType import GameType
+from pyro.Enums.ZipCompression import ZipCompression
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
 from pyro.ProcessManager import ProcessManager
@@ -30,7 +36,7 @@ class PackageManager:
         self.ppj = ppj
         self.options = ppj.options
 
-        self.pak_extension = '.ba2' if self.options.game_type == 'fo4' else '.bsa'
+        self.pak_extension = '.ba2' if self.options.game_type == GameType.FO4 else '.bsa'
         self.zip_extension = '.zip'
 
     @staticmethod
@@ -44,10 +50,7 @@ class PackageManager:
 
     @staticmethod
     def _generate_include_paths(includes_node: etree.ElementBase, root_path: str) -> typing.Generator:
-        for include_node in includes_node:
-            if not include_node.tag.endswith('Include'):
-                continue
-
+        for include_node in filter(is_include_node, includes_node):
             no_recurse: bool = include_node.get('NoRecurse') == 'True'
             wildcard_pattern: str = '*' if no_recurse else r'**\*'
 
@@ -127,9 +130,9 @@ class PackageManager:
         arguments.append(containing_folder, enquote_value=True)
         arguments.append(output_path, enquote_value=True)
 
-        if self.options.game_type == 'fo4':
+        if self.options.game_type == GameType.FO4:
             arguments.append('-fo4')
-        elif self.options.game_type == 'sse':
+        elif self.options.game_type == GameType.SSE:
             arguments.append('-sse')
         else:
             arguments.append('-tes5')
@@ -147,10 +150,7 @@ class PackageManager:
 
         file_names = CaseInsensitiveList()
 
-        for i, package_node in enumerate(self.ppj.packages_node):
-            if not package_node.tag.endswith('Package'):
-                continue
-
+        for i, package_node in enumerate(filter(is_package_node, self.ppj.packages_node)):
             file_name: str = package_node.get('Name')
 
             # prevent clobbering files previously created in this session
@@ -196,10 +196,7 @@ class PackageManager:
 
         file_names = CaseInsensitiveList()
 
-        for i, zip_node in enumerate(self.ppj.zip_files_node):
-            if not zip_node.tag.endswith('ZipFile'):
-                continue
-
+        for i, zip_node in enumerate(filter(is_zipfile_node, self.ppj.zip_files_node)):
             file_name: str = zip_node.get('Name')
 
             # prevent clobbering files previously created in this session
@@ -215,7 +212,10 @@ class PackageManager:
 
             self._check_write_permission(file_path)
 
-            compress_type: int = zipfile.ZIP_STORED if zip_node.get('Compression') == 'store' else zipfile.ZIP_DEFLATED
+            try:
+                compress_type = ZipCompression[zip_node.get('Compression')]
+            except KeyError:
+                compress_type = ZipCompression.STORE
 
             root_dir: str = zip_node.get('RootDir')
             zip_root_path: str = self._try_resolve_project_relative_path(root_dir)
@@ -224,7 +224,7 @@ class PackageManager:
                 PackageManager.log.info(f'Creating "{file_name}"...')
 
                 try:
-                    with zipfile.ZipFile(file_path, mode='w', compression=compress_type) as z:
+                    with zipfile.ZipFile(file_path, mode='w', compression=compress_type.value) as z:
                         for include_path in self._generate_include_paths(zip_node, zip_root_path):
                             PackageManager.log.info(f'+ "{include_path}"')
 
@@ -233,7 +233,7 @@ class PackageManager:
                                 continue
 
                             arcname: str = os.path.relpath(include_path, zip_root_path)
-                            z.write(include_path, arcname, compress_type=compress_type)
+                            z.write(include_path, arcname, compress_type=compress_type.value)
 
                     PackageManager.log.info(f'Wrote ZIP file: "{file_path}"')
                 except PermissionError:

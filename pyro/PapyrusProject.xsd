@@ -18,6 +18,8 @@
                     <xs:element minOccurs="0" name="Scripts" type="pyro:scriptList"/>
                     <xs:element minOccurs="0" name="Packages" type="pyro:packageList"/>
                     <xs:element minOccurs="0" name="ZipFiles" type="pyro:zipList"/>
+                    <xs:element minOccurs="0" name="PreBuildEvent" type="pyro:commandList"/>
+                    <xs:element minOccurs="0" name="PostBuildEvent" type="pyro:commandList"/>
                 </xs:choice>
             </xs:sequence>
             <xs:attribute name="Game" type="pyro:gameType"/>
@@ -36,7 +38,7 @@
     <xs:element name="Include" type="pyro:recursablePath"/>
     <xs:element name="Package" type="pyro:includeBase"/>
     <xs:element name="ZipFile" type="pyro:includeZip"/>
-    
+
     <!-- Complex Types -->
     <xs:complexType name="variableList">
         <xs:sequence>
@@ -69,6 +71,13 @@
             <xs:element maxOccurs="unbounded" ref="pyro:ZipFile"/>
         </xs:sequence>
         <xs:attribute name="Output" type="xs:string"/>
+    </xs:complexType>
+    <xs:complexType name="commandList">
+        <xs:sequence>
+            <xs:element maxOccurs="unbounded" name="Command" type="xs:string"/>
+        </xs:sequence>
+        <xs:attribute name="Description" type="xs:string"/>
+        <xs:attribute name="UseInBuild" type="pyro:bool"/>
     </xs:complexType>
     
     <!-- Reusable Complex Types -->
