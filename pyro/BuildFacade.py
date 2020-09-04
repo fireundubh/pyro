@@ -1,6 +1,7 @@
 import logging
 import multiprocessing
 import os
+import re
 import sys
 import time
 from copy import deepcopy
@@ -108,8 +109,10 @@ class BuildFacade:
         if has_event_node:
             BuildFacade.log.info(event_node.get('Description'))
 
+            reformat = lambda s: re.sub('[ \t\n\r]+', ' ', s.strip())
+
             environ: dict = os.environ.copy()
-            command: str = ' && '.join(node.text for node in filter(is_command_node, event_node))
+            command: str = ' && '.join(reformat(node.text) for node in filter(is_command_node, event_node))
 
             ProcessManager.run_command(command, self.ppj.project_path, environ)
 
