@@ -4,20 +4,30 @@ from collections import OrderedDict
 from typing import Generator, Iterable
 from urllib.parse import unquote_plus, urlparse
 
-from pyro.Comparators import endswith
+from pyro.Comparators import endswith, startswith
 
 
 class PathHelper:
     @staticmethod
-    def calculate_relative_object_name(path: str, import_paths: list) -> str:
+    def calculate_relative_object_name(script_path: str, import_paths: list) -> str:
         """Returns import-relative path from absolute path (should be used only for Fallout 4 paths)"""
         # reverse the list to find the best import path
+        file_name = os.path.basename(script_path)
+
         for import_path in reversed(PathHelper.uniqify(import_paths)):
+            if not os.path.isabs(import_path):
+                import_path = os.path.join(os.getcwd(), import_path)
+
             import_path = os.path.normpath(import_path)
-            if import_path in path:
-                relative_path = os.path.relpath(path, import_path)
-                return relative_path
-        raise ValueError(f'Cannot build import-relative path from absolute path: "{path}"')
+
+            if len(script_path) > len(import_path):
+                if startswith(script_path, import_path, ignorecase=True):
+                    file_name = script_path[len(import_path):]
+                    if file_name[0] == '\\' or file_name[0] == '/':
+                        file_name = file_name[1:]
+                    break
+
+        return file_name
 
     @staticmethod
     def find_include_paths(search_path: str, no_recurse: bool) -> Generator:

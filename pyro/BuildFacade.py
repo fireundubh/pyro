@@ -19,6 +19,8 @@ from pyro.ProcessManager import ProcessManager
 from pyro.Enums.ProcessState import ProcessState
 from pyro.TimeElapsed import TimeElapsed
 
+from pyro.Comparators import endswith
+
 
 class BuildFacade:
     log: logging.Logger = logging.getLogger('pyro')
@@ -66,11 +68,11 @@ class BuildFacade:
     def _find_modified_scripts(self) -> list:
         pex_paths: list = []
 
-        for psc_path in self.ppj.psc_paths:
-            script_name, _ = os.path.splitext(os.path.basename(psc_path))
+        for object_name, script_path in self.ppj.psc_paths.items():
+            script_name, _ = os.path.splitext(os.path.basename(script_path))
 
             # if pex exists, compare time_t in pex header with psc's last modified timestamp
-            pex_match: list = [pex_path for pex_path in self.ppj.pex_paths if pex_path.endswith(f'{script_name}.pex')]
+            pex_match: list = [pex_path for pex_path in self.ppj.pex_paths if endswith(pex_path, f'{script_name}.pex', ignorecase=True)]
             if not pex_match:
                 continue
 
@@ -84,7 +86,7 @@ class BuildFacade:
                 BuildFacade.log.warning(f'Cannot determine compilation time due to unknown magic: "{pex_path}"')
                 continue
 
-            psc_last_modified: float = os.path.getmtime(psc_path)
+            psc_last_modified: float = os.path.getmtime(script_path)
             pex_last_compiled: float = float(header.compilation_time.value)
 
             # if psc is older than the pex

@@ -100,7 +100,7 @@ class Application:
             Application.log.info(f'+ "{path}"')
 
         Application.log.info('Scripts found:')
-        for path in ppj.psc_paths:
+        for _, path in ppj.psc_paths.items():
             Application.log.info(f'+ "{path}"')
 
         build = BuildFacade(ppj)
