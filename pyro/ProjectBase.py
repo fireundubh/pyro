@@ -240,6 +240,8 @@ class ProjectBase:
         parts: list = path.casefold().split(os.sep)
         if self.game_names[GameType.FO4].casefold() in parts:
             return GameType.FO4
+        if self.game_names[GameType.FO4].casefold().replace(' ', '') in parts:
+            return GameType.FO4
         if self.game_names[GameType.SSE].casefold() in parts:
             return GameType.SSE
         if self.game_names[GameType.TES5].casefold() in parts:
