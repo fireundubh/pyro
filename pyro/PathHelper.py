@@ -69,7 +69,7 @@ class PathHelper:
             implicit_path = os.path.normpath(implicit_path)
 
             # do not add import paths that are already declared
-            if implicit_path in import_paths:
+            if any(endswith(x, implicit_path, ignorecase=True) for x in import_paths):
                 continue
 
             # insert implicit path before ancestor import path, if ancestor exists
