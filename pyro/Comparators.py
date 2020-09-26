@@ -39,3 +39,35 @@ def endswith(a_source: str, a_suffix: Union[str, tuple],
                 return True
 
     return False
+
+
+def is_command_node(node):
+    return node is not None and node.tag.endswith('Command') and node.text is not None
+
+
+def is_folder_node(node):
+    return node is not None and node.tag.endswith('Folder') and node.text is not None
+
+
+def is_import_node(node):
+    return node is not None and node.tag.endswith('Import') and node.text is not None
+
+
+def is_include_node(node):
+    return node is not None and node.tag.endswith('Include') and node.text is not None
+
+
+def is_package_node(node):
+    return node is not None and node.tag.endswith('Package')
+
+
+def is_script_node(node):
+    return node is not None and node.tag.endswith('Script') and node.text is not None
+
+
+def is_variable_node(node):
+    return node is not None and node.tag.endswith('Variable')
+
+
+def is_zipfile_node(node):
+    return node is not None and node.tag.endswith('ZipFile')

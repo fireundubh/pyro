@@ -13,7 +13,7 @@ class Anonymizer:
     @staticmethod
     def _randomize_str(size: int, uppercase: bool = False) -> str:
         charset = string.ascii_uppercase if uppercase else string.ascii_lowercase
-        return ''.join([random.choice(charset) for _ in range(size)])
+        return ''.join(random.choice(charset) for _ in range(size))
 
     @staticmethod
     def anonymize_script(path: str) -> None:

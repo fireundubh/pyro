@@ -3,13 +3,13 @@ import logging
 import os
 import sys
 
+from pyro.Enums.BuildEvent import BuildEvent
 from pyro.BuildFacade import BuildFacade
 from pyro.Comparators import startswith
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProjectOptions import ProjectOptions
-from pyro.TimeElapsed import TimeElapsed
 
 
 class Application:
@@ -100,7 +100,7 @@ class Application:
             Application.log.info(f'+ "{path}"')
 
         Application.log.info('Scripts found:')
-        for path in ppj.psc_paths:
+        for _, path in ppj.psc_paths.items():
             Application.log.info(f'+ "{path}"')
 
         build = BuildFacade(ppj)
@@ -109,6 +109,8 @@ class Application:
         if ppj.options.package and not os.path.isfile(ppj.options.bsarch_path):
             Application.log.error('Cannot proceed with Package enabled without valid BSArch path')
             self._print_help_and_exit()
+
+        build.try_build_event(BuildEvent.PRE)
 
         build.try_compile()
 
@@ -139,5 +141,8 @@ class Application:
         Application.log.info(build.build_time if build.success_count > 0 else 'No scripts were compiled.')
 
         Application.log.info('DONE!')
+
+        if build.failed_count == 0:
+            build.try_build_event(BuildEvent.POST)
 
         return 0

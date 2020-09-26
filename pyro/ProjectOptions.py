@@ -2,6 +2,8 @@ import os
 
 from dataclasses import dataclass, field
 
+from pyro.Enums.GameType import GameType
+
 
 @dataclass
 class ProjectOptions:
@@ -20,7 +22,7 @@ class ProjectOptions:
     worker_limit: int = field(init=False, default_factory=int)
 
     # game arguments
-    game_type: str = field(init=False, default_factory=str)
+    game_type: GameType = field(init=False, default=None)
     game_path: str = field(init=False, default_factory=str)
     registry_path: str = field(init=False, default_factory=str)
 
