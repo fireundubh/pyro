@@ -134,6 +134,20 @@ class PackageManager:
             arguments.append('-fo4')
         elif self.options.game_type == GameType.SSE:
             arguments.append('-sse')
+
+            # SSE has an ctd bug with uncompressed textures in a bsa that
+            # has an Embed Filenames flag on it, so force it to false.
+            has_textures = False
+            
+            for f in glob.iglob(os.path.join(containing_folder, r'**/*'), recursive=True):
+                if not os.path.isfile(f):
+                    continue
+                if endswith(f, '.dds', ignorecase=True):
+                    has_textures = True
+                    break
+
+            if has_textures:
+                arguments.append('-af:0x3')
         else:
             arguments.append('-tes5')
 
