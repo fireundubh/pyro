@@ -133,13 +133,13 @@ class BuildFacade:
         elif self.command_count > 0:
             multiprocessing.freeze_support()
             worker_limit = min(self.command_count, self.ppj.options.worker_limit)
-            pool = multiprocessing.Pool(processes=worker_limit,
-                                        initializer=BuildFacade._limit_priority)
-            for state in pool.imap(ProcessManager.run_compiler, commands):
-                if state == ProcessState.SUCCESS:
-                    self.success_count += 1
-            pool.close()
-            pool.join()
+            with multiprocessing.Pool(processes=worker_limit,
+                                      initializer=BuildFacade._limit_priority) as pool:
+                for state in pool.imap(ProcessManager.run_compiler, commands):
+                    if state == ProcessState.SUCCESS:
+                        self.success_count += 1
+                pool.close()
+                pool.join()
 
         self.time_elapsed.end_time = time.time()
 
