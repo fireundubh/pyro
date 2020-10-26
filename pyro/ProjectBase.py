@@ -5,7 +5,6 @@ from typing import List, Union
 
 from pyro.Comparators import (endswith,
                               startswith)
-from pyro.Enums.GameType import GameType
 from pyro.ProjectOptions import ProjectOptions
 from pyro.StringTemplate import StringTemplate
 
@@ -16,14 +15,14 @@ class ProjectBase:
     options: ProjectOptions = None
 
     flag_types: dict = {
-        GameType.FO4: 'Institute_Papyrus_Flags.flg',
-        GameType.SSE: 'TESV_Papyrus_Flags.flg',
-        GameType.TES5: 'TESV_Papyrus_Flags.flg',
+        'fo4': 'Institute_Papyrus_Flags.flg',
+        'sse': 'TESV_Papyrus_Flags.flg',
+        'tes5': 'TESV_Papyrus_Flags.flg',
     }
     game_names: dict = {
-        GameType.FO4: 'Fallout 4',
-        GameType.SSE: 'Skyrim Special Edition',
-        GameType.TES5: 'Skyrim',
+        'fo4': 'Fallout 4',
+        'sse': 'Skyrim Special Edition',
+        'tes5': 'Skyrim',
     }
     variables: dict = {}
 
@@ -121,10 +120,10 @@ class ProjectBase:
                 return self.options.flags_path
             return os.path.join(self.project_path, self.options.flags_path)
 
-        if endswith(self.options.game_path, self.game_names[GameType.FO4], ignorecase=True):
-            return self.flag_types[GameType.FO4]
+        if endswith(self.options.game_path, self.game_names['fo4'], ignorecase=True):
+            return self.flag_types['fo4']
 
-        return self.flag_types[GameType.TES5]
+        return self.flag_types['tes5']
 
     def get_output_path(self) -> str:
         """
@@ -137,7 +136,7 @@ class ProjectBase:
                               fallback_path=[self.program_path, 'out'])
 
     # game arguments
-    def get_game_path(self, game_type: GameType = None) -> str:
+    def get_game_path(self, game_type: str = '') -> str:
         """
         Returns absolute game path from arguments or Windows Registry
 
@@ -153,7 +152,7 @@ class ProjectBase:
 
         raise FileNotFoundError('Cannot determine game path')
 
-    def get_registry_path(self, game_type: GameType = None) -> str:
+    def get_registry_path(self, game_type: str = '') -> str:
         """Returns path to game installed path in Windows Registry from game type"""
         if not self.options.registry_path:
             game_type = self.options.game_type if not game_type else game_type
@@ -166,7 +165,7 @@ class ProjectBase:
             return rf'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\\{game_name}\Installed Path'
         return self.options.registry_path.replace('/', '\\')
 
-    def get_installed_path(self, game_type: GameType = None) -> str:
+    def get_installed_path(self, game_type: str = '') -> str:
         """
         Returns path to game installed path in Windows Registry
 
@@ -236,40 +235,40 @@ class ProjectBase:
                               relative_root_path=self.project_path,
                               fallback_path=[self.program_path, 'remote'])
 
-    def _get_game_type_from_path(self, path: str) -> Union[None, GameType]:
+    def _get_game_type_from_path(self, path: str) -> str:
         parts: list = path.casefold().split(os.sep)
-        if self.game_names[GameType.FO4].casefold() in parts:
-            return GameType.FO4
-        if self.game_names[GameType.FO4].casefold().replace(' ', '') in parts:
-            return GameType.FO4
-        if self.game_names[GameType.SSE].casefold() in parts:
-            return GameType.SSE
-        if self.game_names[GameType.TES5].casefold() in parts:
-            return GameType.TES5
-        return None
+        if self.game_names['fo4'].casefold() in parts:
+            return 'fo4'
+        if self.game_names['fo4'].casefold().replace(' ', '') in parts:
+            return 'fo4'
+        if self.game_names['sse'].casefold() in parts:
+            return 'sse'
+        if self.game_names['tes5'].casefold() in parts:
+            return 'tes5'
+        return ''
 
     # program arguments
-    def get_game_type(self) -> GameType:
+    def get_game_type(self) -> str:
         """Returns game type from arguments or Papyrus Project"""
-        if isinstance(self.options.game_type, str) and self.options.game_type:
-            if GameType.has_member(self.options.game_type):
-                return GameType[self.options.game_type]
+        if self.options.game_type:
+            return self.options.game_type
 
         if self.options.game_path:
-            if endswith(self.options.game_path, self.game_names[GameType.FO4], ignorecase=True):
-                ProjectBase.log.warning(f'Using game type: {self.game_names[GameType.FO4]} (determined from game path)')
-                return GameType.FO4
-            if endswith(self.options.game_path, self.game_names[GameType.SSE], ignorecase=True):
-                ProjectBase.log.warning(f'Using game type: {self.game_names[GameType.SSE]} (determined from game path)')
-                return GameType.SSE
-            if endswith(self.options.game_path, self.game_names[GameType.TES5], ignorecase=True):
-                ProjectBase.log.warning(f'Using game type: {self.game_names[GameType.TES5]} (determined from game path)')
-                return GameType.TES5
+            if endswith(self.options.game_path, self.game_names['fo4'], ignorecase=True):
+                ProjectBase.log.warning(f"Using game type: {self.game_names['fo4']} (determined from game path)")
+                return 'fo4'
+            if endswith(self.options.game_path, self.game_names['sse'], ignorecase=True):
+                ProjectBase.log.warning(f"Using game type: {self.game_names['sse']} (determined from game path)")
+                return 'sse'
+            if endswith(self.options.game_path, self.game_names['tes5'], ignorecase=True):
+                ProjectBase.log.warning(f"Using game type: {self.game_names['tes5']} (determined from game path)")
+                return 'tes5'
 
         if self.options.registry_path:
             game_type = self._get_game_type_from_path(self.options.registry_path)
-            ProjectBase.log.warning(f'Using game type: {self.game_names[game_type]} (determined from registry path)')
-            return game_type
+            if game_type:
+                ProjectBase.log.warning(f'Using game type: {self.game_names[game_type]} (determined from registry path)')
+                return game_type
 
         if self.import_paths:
             for import_path in reversed(self.import_paths):
@@ -279,18 +278,18 @@ class ProjectBase:
                     return game_type
 
         if self.options.flags_path:
-            if endswith(self.options.flags_path, self.flag_types[GameType.FO4], ignorecase=True):
-                ProjectBase.log.warning(f'Using game type: {self.game_names[GameType.FO4]} (determined from flags path)')
-                return GameType.FO4
-            if endswith(self.options.flags_path, self.flag_types[GameType.TES5], ignorecase=True):
+            if endswith(self.options.flags_path, self.flag_types['fo4'], ignorecase=True):
+                ProjectBase.log.warning(f"Using game type: {self.game_names['fo4']} (determined from flags path)")
+                return 'fo4'
+            if endswith(self.options.flags_path, self.flag_types['tes5'], ignorecase=True):
                 try:
-                    self.get_game_path(GameType.SSE)
+                    self.get_game_path('sse')
                 except FileNotFoundError:
-                    ProjectBase.log.warning(f'Using game type: {self.game_names[GameType.TES5]} (determined from flags path)')
-                    return GameType.TES5
+                    ProjectBase.log.warning(f"Using game type: {self.game_names['tes5']} (determined from flags path)")
+                    return 'tes5'
                 else:
-                    ProjectBase.log.warning(f'Using game type: {self.game_names[GameType.SSE]} (determined from flags path)')
-                    return GameType.SSE
+                    ProjectBase.log.warning(f"Using game type: {self.game_names['sse']} (determined from flags path)")
+                    return 'sse'
 
         raise AssertionError('Cannot return game type from arguments or Papyrus Project')
 

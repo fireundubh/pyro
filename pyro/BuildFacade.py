@@ -111,10 +111,13 @@ class BuildFacade:
         if has_event_node:
             BuildFacade.log.info(event_node.get('Description'))
 
-            reformat = lambda s: re.sub('[ \t\n\r]+', ' ', s.strip())
+            ws: re.Pattern = re.compile('[ \t\n\r]+')
 
             environ: dict = os.environ.copy()
-            command: str = ' && '.join(reformat(node.text) for node in filter(is_command_node, event_node))
+            command: str = ' && '.join(
+                ws.sub(' ', node.text.strip())
+                for node in filter(is_command_node, event_node)
+            )
 
             ProcessManager.run_command(command, self.ppj.project_path, environ)
 
@@ -133,13 +136,13 @@ class BuildFacade:
         elif self.command_count > 0:
             multiprocessing.freeze_support()
             worker_limit = min(self.command_count, self.ppj.options.worker_limit)
-            pool = multiprocessing.Pool(processes=worker_limit,
-                                        initializer=BuildFacade._limit_priority)
-            for state in pool.imap(ProcessManager.run_compiler, commands):
-                if state == ProcessState.SUCCESS:
-                    self.success_count += 1
-            pool.close()
-            pool.join()
+            with multiprocessing.Pool(processes=worker_limit,
+                                      initializer=BuildFacade._limit_priority) as pool:
+                for state in pool.imap(ProcessManager.run_compiler, commands):
+                    if state == ProcessState.SUCCESS:
+                        self.success_count += 1
+                pool.close()
+                pool.join()
 
         self.time_elapsed.end_time = time.time()
 

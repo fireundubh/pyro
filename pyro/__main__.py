@@ -3,8 +3,6 @@ import sys
 from argparse import SUPPRESS
 
 from pyro.Application import Application
-from pyro.Enums.GameType import GameType
-from pyro.Enums.ZipCompression import ZipCompression
 from pyro.PyroArgumentParser import PyroArgumentParser
 from pyro.PyroRawDescriptionHelpFormatter import PyroRawTextHelpFormatter
 
@@ -60,8 +58,8 @@ if __name__ == '__main__':
 
     _game_arguments = _parser.add_argument_group('game arguments')
     _game_arguments.add_argument('-g', '--game-type',
-                                 action='store', type=GameType,
-                                 choices=list(GameType),
+                                 action='store', type=str,
+                                 choices=('fo4', 'tes5', 'sse'),
                                  help='set game type (choices: fo4, tes5, sse)')
 
     _game_path_arguments = _game_arguments.add_mutually_exclusive_group()
@@ -90,8 +88,8 @@ if __name__ == '__main__':
 
     _zip_arguments = _parser.add_argument_group('zip arguments')
     _zip_arguments.add_argument('--zip-compression',
-                                action='store', type=ZipCompression,
-                                choices=list(ZipCompression),
+                                action='store', type=str,
+                                choices=('store', 'deflate'),
                                 help='set compression method (choices: store, deflate)')
     _zip_arguments.add_argument('--zip-output-path',
                                 action='store', type=str,
