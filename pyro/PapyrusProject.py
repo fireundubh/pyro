@@ -13,7 +13,6 @@ from pyro.Comparators import (is_folder_node,
                               is_script_node,
                               is_variable_node,
                               startswith)
-from pyro.Enums.GameType import GameType
 from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProjectBase import ProjectBase
@@ -180,13 +179,11 @@ class PapyrusProject(ProjectBase):
 
         # we need to set the game type after imports are populated but before pex paths are populated
         # allow xml to set game type but defer to passed argument
-        if not self.options.game_type:
-            game_type: str = self.ppj_root.get('Game', default='').upper()
-
-            if game_type and GameType.has_member(game_type):
-                valid_game_type: GameType = GameType[game_type]
-                PapyrusProject.log.warning(f'Using game type: {self.game_names[valid_game_type]} (determined from Papyrus Project)')
-                self.options.game_type = valid_game_type
+        if self.options.game_type not in ('fo4', 'tes5', 'sse'):
+            game_type = self.ppj_root.get('Game', default='').lower()
+            if game_type and game_type in self.game_names:
+                PapyrusProject.log.warning(f'Using game type: {self.game_names[game_type]} (determined from Papyrus Project)')
+                self.options.game_type = game_type
 
         if not self.options.game_type:
             self.options.game_type = self.get_game_type()
@@ -598,11 +595,11 @@ class PapyrusProject(ProjectBase):
         for object_name, script_path in psc_paths.items():
             import_paths: list = self.import_paths
 
-            if self.options.game_type != GameType.FO4:
+            if self.options.game_type != 'fo4':
                 object_name = script_path
 
             # remove unnecessary import paths for script
-            if self.options.game_type == GameType.FO4:
+            if self.options.game_type == 'fo4':
                 for import_path in reversed(self.import_paths):
                     if self._can_remove_folder(import_path, object_name, script_path):
                         import_paths.remove(import_path)
@@ -614,7 +611,7 @@ class PapyrusProject(ProjectBase):
             arguments.append(';'.join(import_paths), key='i', enquote_value=True)
             arguments.append(output_path, key='o', enquote_value=True)
 
-            if self.options.game_type == GameType.FO4:
+            if self.options.game_type == 'fo4':
                 # noinspection PyUnboundLocalVariable
                 if self.release:
                     arguments.append('-release')

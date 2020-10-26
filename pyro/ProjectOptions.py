@@ -2,8 +2,6 @@ import os
 
 from dataclasses import dataclass, field
 
-from pyro.Enums.GameType import GameType
-
 
 @dataclass
 class ProjectOptions:
@@ -22,7 +20,7 @@ class ProjectOptions:
     worker_limit: int = field(init=False, default_factory=int)
 
     # game arguments
-    game_type: GameType = field(init=False, default=None)
+    game_type: str = field(init=False, default_factory=str)
     game_path: str = field(init=False, default_factory=str)
     registry_path: str = field(init=False, default_factory=str)
 
@@ -62,9 +60,11 @@ class ProjectOptions:
                     setattr(self, attr_key, arg_value)
 
     def __setattr__(self, key: str, value: object) -> None:
-        # sanitize paths
-        if isinstance(value, str) and key.endswith('path'):
-            if os.altsep in value:
+        if value and isinstance(value, str):
+            # sanitize paths
+            if key.endswith('path') and os.altsep in value:
                 value = os.path.normpath(value)
+            if key in ('game_type', 'zip_compression'):
+                value = value.lower()
 
         super(ProjectOptions, self).__setattr__(key, value)

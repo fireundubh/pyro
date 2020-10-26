@@ -16,7 +16,6 @@ from pyro.Comparators import (endswith,
                               is_zipfile_node,
                               startswith)
 from pyro.CaseInsensitiveList import CaseInsensitiveList
-from pyro.Enums.GameType import GameType
 from pyro.Enums.ZipCompression import ZipCompression
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
@@ -36,7 +35,7 @@ class PackageManager:
         self.ppj = ppj
         self.options = ppj.options
 
-        self.pak_extension = '.ba2' if self.options.game_type == GameType.FO4 else '.bsa'
+        self.pak_extension = '.ba2' if self.options.game_type == 'fo4' else '.bsa'
         self.zip_extension = '.zip'
 
     @staticmethod
@@ -130,9 +129,9 @@ class PackageManager:
         arguments.append(containing_folder, enquote_value=True)
         arguments.append(output_path, enquote_value=True)
 
-        if self.options.game_type == GameType.FO4:
+        if self.options.game_type == 'fo4':
             arguments.append('-fo4')
-        elif self.options.game_type == GameType.SSE:
+        elif self.options.game_type == 'sse':
             arguments.append('-sse')
 
             # SSE has an ctd bug with uncompressed textures in a bsa that
@@ -227,7 +226,10 @@ class PackageManager:
             self._check_write_permission(file_path)
 
             try:
-                compress_type = ZipCompression[zip_node.get('Compression')]
+                if self.options.zip_compression in ('store', 'deflate'):
+                    compress_type = ZipCompression[self.options.zip_compression]
+                else:
+                    compress_type = ZipCompression[zip_node.get('Compression')]
             except KeyError:
                 compress_type = ZipCompression.STORE
 
