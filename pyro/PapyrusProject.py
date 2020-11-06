@@ -13,6 +13,10 @@ from pyro.Comparators import (is_folder_node,
                               is_script_node,
                               is_variable_node,
                               startswith)
+from pyro.Constants import (GameName,
+                            GameType,
+                            XmlAttributeName,
+                            XmlTagName)
 from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 from pyro.ProjectBase import ProjectBase
@@ -76,7 +80,7 @@ class PapyrusProject(ProjectBase):
                 PapyrusProject.log.info('Successfully validated XML Schema.')
 
         # variables need to be parsed before nodes are updated
-        variables_node = self.ppj_root.find('Variables')
+        variables_node = self.ppj_root.find(XmlTagName.VARIABLES)
         if variables_node is not None:
             self._parse_variables(variables_node)
 
@@ -89,45 +93,45 @@ class PapyrusProject(ProjectBase):
             PapyrusProject.log.debug(f'Resolved PPJ. Text output:{os.linesep * 2}{xml_output.decode()}')
             sys.exit(1)
 
-        self.options.flags_path = self.ppj_root.get('Flags')
-        self.options.output_path = self.ppj_root.get('Output')
+        self.options.flags_path = self.ppj_root.get(XmlAttributeName.FLAGS)
+        self.options.output_path = self.ppj_root.get(XmlAttributeName.OUTPUT)
 
-        self.optimize = self.ppj_root.get('Optimize') == 'True'
-        self.release = self.ppj_root.get('Release') == 'True'
-        self.final = self.ppj_root.get('Final') == 'True'
+        self.optimize = self.ppj_root.get(XmlAttributeName.OPTIMIZE) == 'True'
+        self.release = self.ppj_root.get(XmlAttributeName.RELEASE) == 'True'
+        self.final = self.ppj_root.get(XmlAttributeName.FINAL) == 'True'
 
-        self.options.anonymize = self.ppj_root.get('Anonymize') == 'True'
-        self.options.package = self.ppj_root.get('Package') == 'True'
-        self.options.zip = self.ppj_root.get('Zip') == 'True'
+        self.options.anonymize = self.ppj_root.get(XmlAttributeName.ANONYMIZE) == 'True'
+        self.options.package = self.ppj_root.get(XmlAttributeName.PACKAGE) == 'True'
+        self.options.zip = self.ppj_root.get(XmlAttributeName.ZIP) == 'True'
 
-        self.imports_node = self.ppj_root.find('Imports')
+        self.imports_node = self.ppj_root.find(XmlTagName.IMPORTS)
         self.has_imports_node = self.imports_node is not None
 
-        self.scripts_node = self.ppj_root.find('Scripts')
+        self.scripts_node = self.ppj_root.find(XmlTagName.SCRIPTS)
         self.has_scripts_node = self.scripts_node is not None
 
-        self.folders_node = self.ppj_root.find('Folders')
+        self.folders_node = self.ppj_root.find(XmlTagName.FOLDERS)
         self.has_folders_node = self.folders_node is not None
 
-        self.packages_node = self.ppj_root.find('Packages')
+        self.packages_node = self.ppj_root.find(XmlTagName.PACKAGES)
         self.has_packages_node = self.packages_node is not None
 
-        self.zip_files_node = self.ppj_root.find('ZipFiles')
+        self.zip_files_node = self.ppj_root.find(XmlTagName.ZIP_FILES)
         self.has_zip_files_node = self.zip_files_node is not None
 
-        self.pre_build_node = self.ppj_root.find('PreBuildEvent')
+        self.pre_build_node = self.ppj_root.find(XmlTagName.PRE_BUILD_EVENT)
         self.has_pre_build_node = self.pre_build_node is not None
 
-        self.post_build_node = self.ppj_root.find('PostBuildEvent')
+        self.post_build_node = self.ppj_root.find(XmlTagName.POST_BUILD_EVENT)
         self.has_post_build_node = self.post_build_node is not None
 
         if self.options.package and self.has_packages_node:
             if not self.options.package_path:
-                self.options.package_path = self.packages_node.get('Output')
+                self.options.package_path = self.packages_node.get(XmlAttributeName.OUTPUT)
 
         if self.options.zip and self.has_zip_files_node:
             if not self.options.zip_output_path:
-                self.options.zip_output_path = self.zip_files_node.get('Output')
+                self.options.zip_output_path = self.zip_files_node.get(XmlAttributeName.OUTPUT)
 
         # initialize remote if needed
         if self.remote_paths:
@@ -179,11 +183,12 @@ class PapyrusProject(ProjectBase):
 
         # we need to set the game type after imports are populated but before pex paths are populated
         # allow xml to set game type but defer to passed argument
-        if self.options.game_type not in ('fo4', 'tes5', 'sse'):
-            game_type = self.ppj_root.get('Game', default='').lower()
-            if game_type and game_type in self.game_names:
-                PapyrusProject.log.warning(f'Using game type: {self.game_names[game_type]} (determined from Papyrus Project)')
-                self.options.game_type = game_type
+        if self.options.game_type not in GameType.values():
+            game_type: str = self.ppj_root.get(XmlAttributeName.GAME, default='')
+            self.options.game_type = GameType.get(game_type)
+
+            if self.options.game_type:
+                PapyrusProject.log.warning(f'Using game type: {GameName.get(game_type)} (determined from Papyrus Project)')
 
         if not self.options.game_type:
             self.options.game_type = self.get_game_type()
@@ -223,7 +228,7 @@ class PapyrusProject(ProjectBase):
         reserved_characters: tuple = ('!', '#', '^', '&', '*')
 
         for node in filter(is_variable_node, variables_node):
-            key, value = node.get('Name', default=''), node.get('Value', default='')
+            key, value = node.get(XmlAttributeName.NAME, default=''), node.get(XmlAttributeName.VALUE, default='')
 
             if any([not key, not value]):
                 continue
@@ -249,8 +254,19 @@ class PapyrusProject(ProjectBase):
 
     def _update_attributes(self, parent_node: etree.ElementBase) -> None:
         """Updates attributes of element tree with missing attributes and default values"""
-        ppj_bool_keys = ['Optimize', 'Release', 'Final', 'Anonymize', 'Package', 'Zip']
-        other_bool_keys = ['NoRecurse', 'UseInBuild']
+        ppj_bool_keys = [
+            XmlAttributeName.OPTIMIZE,
+            XmlAttributeName.RELEASE,
+            XmlAttributeName.FINAL,
+            XmlAttributeName.ANONYMIZE,
+            XmlAttributeName.PACKAGE,
+            XmlAttributeName.ZIP
+        ]
+
+        other_bool_keys = [
+            XmlAttributeName.NO_RECURSE,
+            XmlAttributeName.USE_IN_BUILD
+        ]
 
         for node in parent_node.getiterator():
             if node.text:
@@ -261,50 +277,50 @@ class PapyrusProject(ProjectBase):
 
             tag = node.tag.replace('{%s}' % self.ppj_root.ns, '')
 
-            if tag == 'PapyrusProject':
-                if 'Game' not in node.attrib:
-                    node.set('Game', '')
-                if 'Flags' not in node.attrib:
-                    node.set('Flags', self.options.flags_path)
-                if 'Output' not in node.attrib:
-                    node.set('Output', self.options.output_path)
+            if tag == XmlTagName.PAPYRUS_PROJECT:
+                if XmlAttributeName.GAME not in node.attrib:
+                    node.set(XmlAttributeName.GAME, '')
+                if XmlAttributeName.FLAGS not in node.attrib:
+                    node.set(XmlAttributeName.FLAGS, self.options.flags_path)
+                if XmlAttributeName.OUTPUT not in node.attrib:
+                    node.set(XmlAttributeName.OUTPUT, self.options.output_path)
                 for key in ppj_bool_keys:
                     if key not in node.attrib:
                         node.set(key, 'False')
 
-            elif tag == 'Packages':
-                if 'Output' not in node.attrib:
-                    node.set('Output', self.options.package_path)
+            elif tag == XmlTagName.PACKAGES:
+                if XmlAttributeName.OUTPUT not in node.attrib:
+                    node.set(XmlAttributeName.OUTPUT, self.options.package_path)
 
-            elif tag == 'Package':
-                if 'Name' not in node.attrib:
-                    node.set('Name', self.project_name)
-                if 'RootDir' not in node.attrib:
-                    node.set('RootDir', self.project_path)
+            elif tag == XmlTagName.PACKAGE:
+                if XmlAttributeName.NAME not in node.attrib:
+                    node.set(XmlAttributeName.NAME, self.project_name)
+                if XmlAttributeName.ROOT_DIR not in node.attrib:
+                    node.set(XmlAttributeName.ROOT_DIR, self.project_path)
 
-            elif tag in ('Folder', 'Include'):
-                if 'NoRecurse' not in node.attrib:
-                    node.set('NoRecurse', 'False')
+            elif tag in (XmlTagName.FOLDER, XmlTagName.INCLUDE):
+                if XmlAttributeName.NO_RECURSE not in node.attrib:
+                    node.set(XmlAttributeName.NO_RECURSE, 'False')
 
-            elif tag == 'ZipFiles':
-                if 'Output' not in node.attrib:
-                    node.set('Output', self.options.zip_output_path)
+            elif tag == XmlTagName.ZIP_FILES:
+                if XmlAttributeName.OUTPUT not in node.attrib:
+                    node.set(XmlAttributeName.OUTPUT, self.options.zip_output_path)
 
-            elif tag == 'ZipFile':
-                if 'Name' not in node.attrib:
-                    node.set('Name', self.project_name)
-                if 'RootDir' not in node.attrib:
-                    node.set('RootDir', self.project_path)
-                if 'Compression' not in node.attrib:
-                    node.set('Compression', 'deflate')
+            elif tag == XmlTagName.ZIP_FILE:
+                if XmlAttributeName.NAME not in node.attrib:
+                    node.set(XmlAttributeName.NAME, self.project_name)
+                if XmlAttributeName.ROOT_DIR not in node.attrib:
+                    node.set(XmlAttributeName.ROOT_DIR, self.project_path)
+                if XmlAttributeName.COMPRESSION not in node.attrib:
+                    node.set(XmlAttributeName.COMPRESSION, 'deflate')
                 else:
-                    node.set('Compression', node.get('Compression').casefold())
+                    node.set(XmlAttributeName.COMPRESSION, node.get(XmlAttributeName.COMPRESSION).casefold())
 
-            elif tag == 'PreBuildEvent' or tag == 'PostBuildEvent':
-                if 'Description' not in node.attrib:
-                    node.set('Description', '')
-                if 'UseInBuild' not in node.attrib:
-                    node.set('UseInBuild', 'True')
+            elif tag == XmlTagName.PRE_BUILD_EVENT or tag == XmlTagName.POST_BUILD_EVENT:
+                if XmlAttributeName.DESCRIPTION not in node.attrib:
+                    node.set(XmlAttributeName.DESCRIPTION, '')
+                if XmlAttributeName.USE_IN_BUILD not in node.attrib:
+                    node.set(XmlAttributeName.USE_IN_BUILD, 'True')
 
             # parse values
             for key, value in node.attrib.items():
@@ -319,7 +335,7 @@ class PapyrusProject(ProjectBase):
         import_path = import_path.casefold()
         object_name = object_name.casefold()
         script_path = script_path.casefold()
-        return script_path.startswith(import_path) and os.path.join(import_path, object_name) != script_path
+        return startswith(script_path, import_path) and os.path.join(import_path, object_name) != script_path
 
     def _find_missing_script_paths(self) -> dict:
         """Returns list of script paths for compiled scripts that do not exist"""
@@ -491,10 +507,10 @@ class PapyrusProject(ProjectBase):
         """Returns script paths from the Folders element array"""
         for folder_node in filter(is_folder_node, self.folders_node):
             if folder_node.text == os.pardir:
-                self.log.warning(f'Folder paths cannot be equal to "{os.pardir}"')
+                PapyrusProject.log.warning(f'Folder paths cannot be equal to "{os.pardir}"')
                 continue
 
-            no_recurse: bool = folder_node.get('NoRecurse') == 'True'
+            no_recurse: bool = folder_node.get(XmlAttributeName.NO_RECURSE) == 'True'
 
             # try to add project path
             if folder_node.text == os.curdir:
@@ -595,11 +611,11 @@ class PapyrusProject(ProjectBase):
         for object_name, script_path in psc_paths.items():
             import_paths: list = self.import_paths
 
-            if self.options.game_type != 'fo4':
+            if self.options.game_type != GameType.FO4:
                 object_name = script_path
 
             # remove unnecessary import paths for script
-            if self.options.game_type == 'fo4':
+            if self.options.game_type == GameType.FO4:
                 for import_path in reversed(self.import_paths):
                     if self._can_remove_folder(import_path, object_name, script_path):
                         import_paths.remove(import_path)
@@ -611,7 +627,7 @@ class PapyrusProject(ProjectBase):
             arguments.append(';'.join(import_paths), key='i', enquote_value=True)
             arguments.append(output_path, key='o', enquote_value=True)
 
-            if self.options.game_type == 'fo4':
+            if self.options.game_type == GameType.FO4:
                 # noinspection PyUnboundLocalVariable
                 if self.release:
                     arguments.append('-release')

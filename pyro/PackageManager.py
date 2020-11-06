@@ -16,6 +16,8 @@ from pyro.Comparators import (endswith,
                               is_zipfile_node,
                               startswith)
 from pyro.CaseInsensitiveList import CaseInsensitiveList
+from pyro.Constants import (GameType,
+                            XmlAttributeName)
 from pyro.Enums.ZipCompression import ZipCompression
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
@@ -35,7 +37,7 @@ class PackageManager:
         self.ppj = ppj
         self.options = ppj.options
 
-        self.pak_extension = '.ba2' if self.options.game_type == 'fo4' else '.bsa'
+        self.pak_extension = '.ba2' if self.options.game_type == GameType.FO4 else '.bsa'
         self.zip_extension = '.zip'
 
     @staticmethod
@@ -50,7 +52,7 @@ class PackageManager:
     @staticmethod
     def _generate_include_paths(includes_node: etree.ElementBase, root_path: str) -> typing.Generator:
         for include_node in filter(is_include_node, includes_node):
-            no_recurse: bool = include_node.get('NoRecurse') == 'True'
+            no_recurse: bool = include_node.get(XmlAttributeName.NO_RECURSE) == 'True'
             wildcard_pattern: str = '*' if no_recurse else r'**\*'
 
             if include_node.text.startswith(os.pardir):
@@ -129,9 +131,9 @@ class PackageManager:
         arguments.append(containing_folder, enquote_value=True)
         arguments.append(output_path, enquote_value=True)
 
-        if self.options.game_type == 'fo4':
+        if self.options.game_type == GameType.FO4:
             arguments.append('-fo4')
-        elif self.options.game_type == 'sse':
+        elif self.options.game_type == GameType.SSE:
             arguments.append('-sse')
 
             # SSE has an ctd bug with uncompressed textures in a bsa that
@@ -164,7 +166,7 @@ class PackageManager:
         file_names = CaseInsensitiveList()
 
         for i, package_node in enumerate(filter(is_package_node, self.ppj.packages_node)):
-            file_name: str = package_node.get('Name')
+            file_name: str = package_node.get(XmlAttributeName.NAME)
 
             # prevent clobbering files previously created in this session
             if file_name in file_names:
@@ -181,10 +183,10 @@ class PackageManager:
 
             PackageManager.log.info(f'Creating "{file_name}"...')
 
-            for source_path in self._generate_include_paths(package_node, package_node.get('RootDir')):
+            for source_path in self._generate_include_paths(package_node, package_node.get(XmlAttributeName.ROOT_DIR)):
                 PackageManager.log.info(f'+ "{source_path}"')
 
-                relpath = os.path.relpath(source_path, package_node.get('RootDir'))
+                relpath = os.path.relpath(source_path, package_node.get(XmlAttributeName.ROOT_DIR))
                 target_path = os.path.join(self.options.temp_path, relpath)
 
                 # fix target path if user passes a deeper package root (RootDir)
@@ -210,7 +212,7 @@ class PackageManager:
         file_names = CaseInsensitiveList()
 
         for i, zip_node in enumerate(filter(is_zipfile_node, self.ppj.zip_files_node)):
-            file_name: str = zip_node.get('Name')
+            file_name: str = zip_node.get(XmlAttributeName.NAME)
 
             # prevent clobbering files previously created in this session
             if file_name in file_names:
@@ -229,11 +231,11 @@ class PackageManager:
                 if self.options.zip_compression in ('store', 'deflate'):
                     compress_type = ZipCompression[self.options.zip_compression]
                 else:
-                    compress_type = ZipCompression[zip_node.get('Compression')]
+                    compress_type = ZipCompression[zip_node.get(XmlAttributeName.COMPRESSION)]
             except KeyError:
                 compress_type = ZipCompression.STORE
 
-            root_dir: str = zip_node.get('RootDir')
+            root_dir: str = zip_node.get(XmlAttributeName.ROOT_DIR)
             zip_root_path: str = self._try_resolve_project_relative_path(root_dir)
 
             if zip_root_path:
