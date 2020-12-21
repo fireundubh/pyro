@@ -51,13 +51,9 @@ class ProjectOptions:
         for attr_key, attr_value in self.__dict__.items():
             if attr_key == 'args':
                 continue
-            try:
-                arg_value = self.args.get(attr_key)
-            except AttributeError:
-                continue
-            else:
-                if arg_value and arg_value != attr_value:
-                    setattr(self, attr_key, arg_value)
+            arg_value = self.args.get(attr_key)
+            if arg_value and arg_value != attr_value:
+                setattr(self, attr_key, arg_value)
 
     def __setattr__(self, key: str, value: object) -> None:
         if value and isinstance(value, str):
@@ -65,6 +61,6 @@ class ProjectOptions:
             if key.endswith('path') and os.altsep in value:
                 value = os.path.normpath(value)
             if key in ('game_type', 'zip_compression'):
-                value = value.lower()
+                value = value.casefold()
 
         super(ProjectOptions, self).__setattr__(key, value)

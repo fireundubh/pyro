@@ -11,6 +11,7 @@ import psutil
 from pyro.Anonymizer import Anonymizer
 from pyro.Enums.BuildEvent import BuildEvent
 from pyro.Comparators import is_command_node
+from pyro.Constants import XmlAttributeName
 from pyro.PackageManager import PackageManager
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
@@ -109,7 +110,7 @@ class BuildFacade:
             raise NotImplementedError
 
         if has_event_node:
-            BuildFacade.log.info(event_node.get('Description'))
+            BuildFacade.log.info(event_node.get(XmlAttributeName.DESCRIPTION))
 
             ws: re.Pattern = re.compile('[ \t\n\r]+')
 
