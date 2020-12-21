@@ -158,6 +158,8 @@ class ProcessManager:
 
         line_error = re.compile(r'(.*)(\(\d+,\d+\)):\s+(.*)')
 
+        error_count = 0
+
         try:
             while process.poll() is None:
                 line = process.stdout.readline().strip()
@@ -173,9 +175,9 @@ class ProcessManager:
                     ProcessManager.log.error(f'COMPILATION FAILED: '
                                              f'{os.path.basename(head)}\\{tail}{location}: {message}')
                     process.terminate()
-                    return ProcessState.ERRORS
+                    error_count += 1
 
-                if 'error(s)' not in line:
+                elif 'error(s)' not in line:
                     ProcessManager.log.info(line)
 
         except KeyboardInterrupt:
@@ -185,4 +187,4 @@ class ProcessManager:
                 ProcessManager.log.error('Process interrupted by user.')
             return ProcessState.INTERRUPTED
 
-        return ProcessState.SUCCESS
+        return ProcessState.SUCCESS if error_count == 0 else ProcessState.ERRORS
