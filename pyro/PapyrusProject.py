@@ -512,6 +512,9 @@ class PapyrusProject(ProjectBase):
 
             no_recurse: bool = folder_node.get(XmlAttributeName.NO_RECURSE) == 'True'
 
+            if ':' in folder_node.text:
+                folder_node.text = folder_node.text.replace(':', os.sep)
+
             # try to add project path
             if folder_node.text == os.curdir:
                 yield from PathHelper.find_script_paths_from_folder(self.project_path, no_recurse)
