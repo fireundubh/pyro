@@ -31,6 +31,9 @@ if __name__ == '__main__':
     _build_arguments.add_argument('--ignore-errors',
                                   action='store_true', default=False,
                                   help='ignore compiler errors during build')
+    _build_arguments.add_argument('--no-implicit-imports',
+                                  action='store_true', default=False,
+                                  help='do not build with implicit imports')
     _build_arguments.add_argument('--no-incremental-build',
                                   action='store_true', default=False,
                                   help='do not build incrementally')
