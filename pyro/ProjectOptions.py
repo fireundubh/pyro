@@ -15,6 +15,7 @@ class ProjectOptions:
 
     # build arguments
     ignore_errors: bool = field(init=False, default_factory=bool)
+    no_implicit_imports: bool = field(init=False, default_factory=bool)
     no_incremental_build: bool = field(init=False, default_factory=bool)
     no_parallel: bool = field(init=False, default_factory=bool)
     worker_limit: int = field(init=False, default_factory=int)

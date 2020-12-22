@@ -153,15 +153,16 @@ class PapyrusProject(ProjectBase):
             PapyrusProject.log.error('Failed to build list of import paths')
             sys.exit(1)
 
-        # ensure that folder paths are implicitly imported
-        implicit_folder_paths: list = self._get_implicit_folder_imports()
+        if not self.options.no_implicit_imports:
+            # ensure that folder paths are implicitly imported
+            implicit_folder_paths: list = self._get_implicit_folder_imports()
 
-        if len(implicit_folder_paths) > 0:
-            PapyrusProject.log.info('Implicitly imported folder paths found:')
-            for path in implicit_folder_paths:
-                PapyrusProject.log.info(f'+ "{path}"')
+            if len(implicit_folder_paths) > 0:
+                PapyrusProject.log.info('Implicitly imported folder paths found:')
+                for path in implicit_folder_paths:
+                    PapyrusProject.log.info(f'+ "{path}"')
 
-            PathHelper.merge_implicit_import_paths(implicit_folder_paths, self.import_paths)
+                PathHelper.merge_implicit_import_paths(implicit_folder_paths, self.import_paths)
 
         # we need to populate psc paths after explicit and implicit import paths are populated
         # this also needs to be set before we populate implicit import paths from psc paths
@@ -171,15 +172,16 @@ class PapyrusProject(ProjectBase):
             PapyrusProject.log.error('Failed to build list of script paths')
             sys.exit(1)
 
-        # this adds implicit imports from script paths
-        implicit_script_paths: list = self._get_implicit_script_imports()
+        if not self.options.no_implicit_imports:
+            # this adds implicit imports from script paths
+            implicit_script_paths: list = self._get_implicit_script_imports()
 
-        if len(implicit_script_paths) > 0:
-            PapyrusProject.log.info('Implicitly imported script paths found:')
-            for path in implicit_script_paths:
-                PapyrusProject.log.info(f'+ "{path}"')
+            if len(implicit_script_paths) > 0:
+                PapyrusProject.log.info('Implicitly imported script paths found:')
+                for path in implicit_script_paths:
+                    PapyrusProject.log.info(f'+ "{path}"')
 
-            PathHelper.merge_implicit_import_paths(implicit_script_paths, self.import_paths)
+                PathHelper.merge_implicit_import_paths(implicit_script_paths, self.import_paths)
 
         # we need to set the game type after imports are populated but before pex paths are populated
         # allow xml to set game type but defer to passed argument
