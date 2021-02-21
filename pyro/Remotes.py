@@ -211,7 +211,7 @@ class GitHubRemote(RemoteBase):
                 continue
 
             # we only care about scripts
-            if not endswith(download_url, '.psc', ignorecase=True):
+            if payload_object['type'] != 'file' and not endswith(payload_object['name'], '.psc', ignorecase=True):
                 continue
 
             file_response = urlopen(download_url, timeout=30)
