@@ -1,20 +1,20 @@
 import json
+import multiprocessing
 import os
-from typing import Generator
+from typing import Generator, Optional
 from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from pyro.Comparators import endswith
-from pyro.ProjectOptions import ProjectOptions
 
 
 class RemoteBase:
     access_token: str = ''
 
-    def __init__(self, options: ProjectOptions) -> None:
-        self.options = options
-        self.access_token = options.access_token
+    def __init__(self, *, access_token: str = '', worker_limit: int = -1) -> None:
+        self.access_token = access_token
+        self.worker_limit = worker_limit
 
     @staticmethod
     def create_local_path(url: str) -> str:
@@ -23,25 +23,20 @@ class RemoteBase:
         """
         parsed_url = urlparse(url)
 
+        netloc = parsed_url.netloc
+
         url_path_parts = parsed_url.path.split('/')
         url_path_parts.pop(0)  # pop empty space
 
-        if parsed_url.netloc == 'api.github.com':
-            url_path_parts.pop(3)  # pop 'contents'
-            url_path_parts.pop(0)  # pop 'repos'
-        elif parsed_url.netloc == 'github.com':
-            url_path_parts.pop(3)  # pop 'master' (or any other branch)
-            url_path_parts.pop(2)  # pop 'tree'
-        elif parsed_url.netloc == 'api.bitbucket.org':
-            url_path_parts.pop(5)  # pop branch
-            url_path_parts.pop(4)  # pop 'src'
-            url_path_parts.pop(1)  # pop 'repositories'
-            url_path_parts.pop(0)  # pop '2.0'
-        elif parsed_url.netloc == 'bitbucket.org':
-            url_path_parts.pop(3)  # pop branch
-            url_path_parts.pop(2)  # pop 'src'
-        else:
-            raise NotImplementedError
+        url_patterns: dict = {
+            'api.github.com': (3, 0),           # pop 'contents', 'repos'
+            'github.com': (3, 2),               # pop branch, 'tree'
+            'api.bitbucket.org': (5, 4, 1, 0),  # pop branch, 'src', 'repositories', '2.0'
+            'bitbucket.org': (3, 2)             # pop branch, 'src'
+        }
+
+        for i in url_patterns[netloc]:
+            url_path_parts.pop(i)
 
         url_path = os.sep.join(url_path_parts)
 
@@ -104,12 +99,13 @@ class GenericRemote(RemoteBase):
         parsed_url = urlparse(url)
 
         if parsed_url.netloc.endswith('github.com'):
-            if not self.options.access_token:
+            if not self.access_token:
                 raise PermissionError('Cannot download from GitHub remote without access token')
-            github = GitHubRemote(self.options)
+            github = GitHubRemote(access_token=self.access_token,
+                                  worker_limit=self.worker_limit)
             yield from github.fetch_contents(url, output_path)
         elif parsed_url.netloc.endswith('bitbucket.org'):
-            bitbucket = BitbucketRemote(self.options)
+            bitbucket = BitbucketRemote()
             yield from bitbucket.fetch_contents(url, output_path)
         else:
             raise NotImplementedError
@@ -179,6 +175,20 @@ class BitbucketRemote(RemoteBase):
 
 
 class GitHubRemote(RemoteBase):
+    @staticmethod
+    def download_file(file: tuple) -> Optional[str]:
+        url, target_path = file
+
+        file_response = urlopen(url, timeout=30)
+
+        if file_response.status != 200:
+            return f'Failed to download ({file_response.status}): "{url}"'
+
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+
+        with open(target_path, mode='w+b') as f:
+            f.write(file_response.read())
+
     def fetch_contents(self, url: str, output_path: str) -> Generator:
         """
         Downloads files from URL to output path
@@ -198,7 +208,7 @@ class GitHubRemote(RemoteBase):
 
         yield f'Downloading scripts from "{request_url}"... Please wait.'
 
-        script_count: int = 0
+        scripts: list = []
 
         for payload_object in payload_objects:
             target_path = os.path.normpath(os.path.join(output_path, owner, repo, payload_object['path']))
@@ -214,17 +224,17 @@ class GitHubRemote(RemoteBase):
             if payload_object['type'] != 'file' and not endswith(payload_object['name'], '.psc', ignorecase=True):
                 continue
 
-            file_response = urlopen(download_url, timeout=30)
-            if file_response.status != 200:
-                yield f'Failed to download ({file_response.status}): "{payload_object["download_url"]}"'
-                continue
+            scripts.append((download_url, target_path))
 
-            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+        script_count: int = len(scripts)
 
-            with open(target_path, mode='w+b') as f:
-                f.write(file_response.read())
-
-            script_count += 1
+        multiprocessing.freeze_support()
+        worker_limit: int = min(script_count, self.worker_limit)
+        with multiprocessing.Pool(processes=worker_limit) as pool:
+            for download_result in pool.imap_unordered(self.download_file, scripts):
+                yield download_result
+            pool.close()
+            pool.join()
 
         if script_count > 0:
             yield f'Downloaded {script_count} scripts from "{request_url}"'

@@ -138,7 +138,11 @@ class PapyrusProject(ProjectBase):
             if not self.options.remote_temp_path:
                 self.options.remote_temp_path = self.get_remote_temp_path()
 
-            self.remote = GenericRemote(self.options)
+            if self.options.worker_limit == 0:
+                self.options.worker_limit = self.get_worker_limit()
+
+            self.remote = GenericRemote(access_token=self.options.access_token,
+                                        worker_limit=self.options.worker_limit)
 
             # validate remote paths
             for path in self.remote_paths:
@@ -490,11 +494,12 @@ class PapyrusProject(ProjectBase):
         if self.options.force_overwrite or not os.path.exists(temp_path):
             try:
                 for message in self.remote.fetch_contents(node.text, temp_path):
-                    if not message.startswith('Failed to load'):
-                        PapyrusProject.log.info(message)
-                    else:
-                        PapyrusProject.log.error(message)
-                        sys.exit(1)
+                    if message:
+                        if not startswith(message, 'Failed to load'):
+                            PapyrusProject.log.info(message)
+                        else:
+                            PapyrusProject.log.error(message)
+                            sys.exit(1)
             except PermissionError as e:
                 PapyrusProject.log.error(e.strerror)
                 sys.exit(1)
