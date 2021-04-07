@@ -107,14 +107,15 @@ class ProjectBase:
         Used by: BuildFacade
         """
         if self.options.flags_path:
-            if endswith(self.options.flags_path, tuple(FlagsName.values()), ignorecase=True):
+            if startswith(self.options.flags_path, tuple(FlagsName.values()), ignorecase=True):
                 return self.options.flags_path
             if os.path.isabs(self.options.flags_path):
                 return self.options.flags_path
             return os.path.join(self.project_path, self.options.flags_path)
 
-        if endswith(self.options.game_path, GameName.FO4, ignorecase=True):
-            return FlagsName.FO4
+        if self.options.game_path:
+            if endswith(self.options.game_path, GameName.FO4, ignorecase=True):
+                return FlagsName.FO4
 
         return FlagsName.TES5
 
