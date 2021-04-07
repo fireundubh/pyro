@@ -139,7 +139,7 @@ class PackageManager:
             # SSE has an ctd bug with uncompressed textures in a bsa that
             # has an Embed Filenames flag on it, so force it to false.
             has_textures = False
-            
+
             for f in glob.iglob(os.path.join(containing_folder, r'**/*'), recursive=True):
                 if not os.path.isfile(f):
                     continue
@@ -168,6 +168,11 @@ class PackageManager:
         for i, package_node in enumerate(filter(is_package_node, self.ppj.packages_node)):
             file_name: str = package_node.get(XmlAttributeName.NAME)
 
+            # noinspection PyProtectedMember
+            root_dir = self.ppj._get_path(package_node.get(XmlAttributeName.ROOT_DIR),
+                                          relative_root_path=self.ppj.project_path,
+                                          fallback_path=[self.ppj.project_path, os.path.basename(file_name)])
+
             # prevent clobbering files previously created in this session
             if file_name in file_names:
                 file_name = f'{self.ppj.project_name} ({i})'
@@ -183,10 +188,10 @@ class PackageManager:
 
             PackageManager.log.info(f'Creating "{file_name}"...')
 
-            for source_path in self._generate_include_paths(package_node, package_node.get(XmlAttributeName.ROOT_DIR)):
+            for source_path in self._generate_include_paths(package_node, root_dir):
                 PackageManager.log.info(f'+ "{source_path}"')
 
-                relpath = os.path.relpath(source_path, package_node.get(XmlAttributeName.ROOT_DIR))
+                relpath = os.path.relpath(source_path, root_dir)
                 target_path = os.path.join(self.options.temp_path, relpath)
 
                 # fix target path if user passes a deeper package root (RootDir)

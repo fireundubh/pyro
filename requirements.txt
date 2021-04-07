@@ -1,3 +1,3 @@
 lxml
-nuitka==0.6.8.4
+nuitka
 psutil

@@ -1,3 +1,4 @@
+import glob
 import hashlib
 import io
 import os
@@ -8,7 +9,8 @@ from copy import deepcopy
 from lxml import etree
 
 from pyro.CommandArguments import CommandArguments
-from pyro.Comparators import (is_folder_node,
+from pyro.Comparators import (endswith,
+                              is_folder_node,
                               is_import_node,
                               is_script_node,
                               is_variable_node,
@@ -96,6 +98,9 @@ class PapyrusProject(ProjectBase):
         self.options.flags_path = self.ppj_root.get(XmlAttributeName.FLAGS)
         self.options.output_path = self.ppj_root.get(XmlAttributeName.OUTPUT)
 
+        if self.options.output_path and not os.path.isabs(self.options.output_path):
+            self.options.output_path = self.get_output_path()
+
         self.optimize = self.ppj_root.get(XmlAttributeName.OPTIMIZE) == 'True'
         self.release = self.ppj_root.get(XmlAttributeName.RELEASE) == 'True'
         self.final = self.ppj_root.get(XmlAttributeName.FINAL) == 'True'
@@ -138,7 +143,11 @@ class PapyrusProject(ProjectBase):
             if not self.options.remote_temp_path:
                 self.options.remote_temp_path = self.get_remote_temp_path()
 
-            self.remote = GenericRemote(self.options)
+            if self.options.worker_limit == 0:
+                self.options.worker_limit = self.get_worker_limit()
+
+            self.remote = GenericRemote(access_token=self.options.access_token,
+                                        worker_limit=self.options.worker_limit)
 
             # validate remote paths
             for path in self.remote_paths:
@@ -490,11 +499,12 @@ class PapyrusProject(ProjectBase):
         if self.options.force_overwrite or not os.path.exists(temp_path):
             try:
                 for message in self.remote.fetch_contents(node.text, temp_path):
-                    if not message.startswith('Failed to load'):
-                        PapyrusProject.log.info(message)
-                    else:
-                        PapyrusProject.log.error(message)
-                        sys.exit(1)
+                    if message:
+                        if not startswith(message, 'Failed to load'):
+                            PapyrusProject.log.info(message)
+                        else:
+                            PapyrusProject.log.error(message)
+                            sys.exit(1)
             except PermissionError as e:
                 PapyrusProject.log.error(e.strerror)
                 sys.exit(1)
@@ -540,8 +550,14 @@ class PapyrusProject(ProjectBase):
             # try to add project-relative folder path
             test_path = os.path.join(self.project_path, folder_path)
             if os.path.isdir(test_path):
-                yield from PathHelper.find_script_paths_from_folder(test_path, no_recurse)
-                continue
+                # count scripts to avoid issue where an errant `test_path` may exist and contain no sources
+                # this can be a problem if that folder contains sources but user error is hard to fix
+                search_path: str = os.path.join(test_path, '*' if no_recurse else r'**\*')
+                script_count: int = sum(1 for f in glob.iglob(search_path, recursive=not no_recurse)
+                                        if endswith(f, '.psc', ignorecase=True))
+                if script_count > 0:
+                    yield from PathHelper.find_script_paths_from_folder(test_path, no_recurse)
+                    continue
 
             # try to add import-relative folder path
             for import_path in self.import_paths:

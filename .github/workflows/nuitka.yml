@@ -21,11 +21,11 @@ jobs:
    - name: Set up Visual Studio environment
      if: success()
      uses: seanmiddleditch/gha-setup-vsdevenv@master
-   - name: Set up Python 3.8.6 (x64)
+   - name: Set up Python 3.9.4 (x64)
      if: success()
      uses: actions/setup-python@v2
      with:
-      python-version: 3.8.6
+      python-version: 3.9.4
       architecture: x64
    - name: Create virtual environment
      if: success()

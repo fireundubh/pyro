@@ -56,7 +56,17 @@ class Application:
         return input_path
 
     def _validate_project(self, ppj: PapyrusProject) -> None:
-        if not ppj.options.game_path:
+        compiler_path = ppj.get_compiler_path()
+        if not compiler_path or not os.path.exists(compiler_path):
+            Application.log.error('Cannot proceed without compiler path')
+            self._print_help_and_exit()
+
+        flags_path = ppj.get_flags_path()
+        if not flags_path:
+            Application.log.error('Cannot proceed without flags path')
+            self._print_help_and_exit()
+
+        if not ppj.options.game_type:
             Application.log.error('Cannot determine game type from arguments or Papyrus Project')
             self._print_help_and_exit()
 
