@@ -35,7 +35,7 @@
         </xs:complexType>
     </xs:element>
     <xs:element name="Folder" type="pyro:recursablePath"/>
-    <xs:element name="Include" type="pyro:recursablePath"/>
+    <xs:element name="Include" type="pyro:recursablePathInclude"/>
     <xs:element name="Package" type="pyro:includeBase"/>
     <xs:element name="ZipFile" type="pyro:includeZip"/>
 
@@ -87,6 +87,10 @@
     </xs:complexType>
     <xs:complexType name="recursablePath" mixed="true">
         <xs:attribute name="NoRecurse" type="pyro:bool" default="false"/>
+    </xs:complexType>
+    <xs:complexType name="recursablePathInclude" mixed="true">
+        <xs:attribute name="NoRecurse" type="pyro:bool" default="false"/>
+        <xs:attribute name="Path" type="xs:string" default=""/>
     </xs:complexType>
     <xs:complexType name="includeBase">
         <xs:sequence>

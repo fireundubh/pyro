@@ -30,11 +30,11 @@ class PathHelper:
         return file_name
 
     @staticmethod
-    def find_include_paths(search_path: str, no_recurse: bool) -> Generator:
+    def find_include_paths(search_path: str, no_recurse: bool, user_path: str = '') -> Generator:
         """Yields existing file paths from absolute search path"""
         for include_path in glob.iglob(search_path, recursive=not no_recurse):
             if os.path.isfile(include_path):
-                yield include_path
+                yield include_path, user_path
 
     @staticmethod
     def find_script_paths_from_folder(folder_path: str, no_recurse: bool) -> Generator:

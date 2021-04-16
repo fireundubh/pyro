@@ -312,6 +312,8 @@ class PapyrusProject(ProjectBase):
             elif tag in (XmlTagName.FOLDER, XmlTagName.INCLUDE):
                 if XmlAttributeName.NO_RECURSE not in node.attrib:
                     node.set(XmlAttributeName.NO_RECURSE, 'False')
+                if tag == XmlTagName.INCLUDE and XmlAttributeName.PATH not in node.attrib:
+                    node.set(XmlAttributeName.PATH, '')
 
             elif tag == XmlTagName.ZIP_FILES:
                 if XmlAttributeName.OUTPUT not in node.attrib:
