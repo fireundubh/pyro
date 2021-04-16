@@ -55,6 +55,8 @@ class PackageManager:
             no_recurse: bool = include_node.get(XmlAttributeName.NO_RECURSE) == 'True'
             wildcard_pattern: str = '*' if no_recurse else r'**\*'
 
+            user_path: str = (include_node.get(XmlAttributeName.PATH) or '').strip()
+
             if include_node.text.startswith(os.pardir):
                 PackageManager.log.warning(f'Include paths cannot start with "{os.pardir}"')
                 continue
@@ -77,7 +79,7 @@ class PackageManager:
 
                 for include_path in glob.iglob(search_path, recursive=not no_recurse):
                     if os.path.isfile(include_path) and fnmatch.fnmatch(include_path, path_or_pattern):
-                        yield include_path
+                        yield include_path, user_path
 
             # populate files list using absolute paths
             elif os.path.isabs(path_or_pattern):
@@ -86,21 +88,21 @@ class PackageManager:
                     continue
 
                 if os.path.isfile(path_or_pattern):
-                    yield path_or_pattern
+                    yield path_or_pattern, user_path
                 else:
                     search_path = os.path.join(path_or_pattern, wildcard_pattern)
-                    yield from PathHelper.find_include_paths(search_path, no_recurse)
+                    yield from PathHelper.find_include_paths(search_path, no_recurse, user_path)
 
             else:
                 # populate files list using relative file path
                 test_path = os.path.join(root_path, path_or_pattern)
                 if not os.path.isdir(test_path):
-                    yield test_path
+                    yield test_path, user_path
 
                 # populate files list using relative folder path
                 else:
                     search_path = os.path.join(root_path, path_or_pattern, wildcard_pattern)
-                    yield from PathHelper.find_include_paths(search_path, no_recurse)
+                    yield from PathHelper.find_include_paths(search_path, no_recurse, user_path)
 
     def _fix_package_extension(self, package_name: str) -> str:
         if not endswith(package_name, ('.ba2', '.bsa'), ignorecase=True):
@@ -188,7 +190,7 @@ class PackageManager:
 
             PackageManager.log.info(f'Creating "{file_name}"...')
 
-            for source_path in self._generate_include_paths(package_node, root_dir):
+            for source_path, _ in self._generate_include_paths(package_node, root_dir):
                 PackageManager.log.info(f'+ "{source_path}"')
 
                 relpath = os.path.relpath(source_path, root_dir)
@@ -248,14 +250,18 @@ class PackageManager:
 
                 try:
                     with zipfile.ZipFile(file_path, mode='w', compression=compress_type.value) as z:
-                        for include_path in self._generate_include_paths(zip_node, zip_root_path):
-                            PackageManager.log.info(f'+ "{include_path}"')
-
+                        for include_path, user_path in self._generate_include_paths(zip_node, zip_root_path):
                             if zip_root_path not in include_path:
                                 PackageManager.log.warning(f'Cannot add file to ZIP outside RootDir: "{include_path}"')
                                 continue
 
-                            arcname: str = os.path.relpath(include_path, zip_root_path)
+                            if not user_path:
+                                arcname: str = os.path.relpath(include_path, zip_root_path)
+                            else:
+                                _, file_name = os.path.split(include_path)
+                                arcname: str = os.path.join(user_path, file_name)
+
+                            PackageManager.log.info(f'+ "{arcname}"')
                             z.write(include_path, arcname, compress_type=compress_type.value)
 
                     PackageManager.log.info(f'Wrote ZIP file: "{file_path}"')

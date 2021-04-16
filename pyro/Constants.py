@@ -34,6 +34,7 @@ class XmlAttributeName:
     OPTIMIZE: str = 'Optimize'
     OUTPUT: str = 'Output'
     PACKAGE: str = 'Package'
+    PATH: str = 'Path'
     RELEASE: str = 'Release'
     ROOT_DIR: str = 'RootDir'
     USE_IN_BUILD: str = 'UseInBuild'
