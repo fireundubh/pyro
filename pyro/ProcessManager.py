@@ -156,7 +156,7 @@ class ProcessManager:
             'Starting'
         )
 
-        line_error = re.compile(r'(.*)(\(\d+,\d+\)):\s+(.*)')
+        line_error = re.compile(r'(.*)(\(-?\d*\.?\d+,-?\d*\.?\d+\)):\s+(.*)')
 
         error_count = 0
 
