@@ -508,7 +508,7 @@ class PapyrusProject(ProjectBase):
                             PapyrusProject.log.error(message)
                             sys.exit(1)
             except PermissionError as e:
-                PapyrusProject.log.error(e.strerror)
+                PapyrusProject.log.error(e)
                 sys.exit(1)
 
         url_path = self.remote.create_local_path(node.text)
