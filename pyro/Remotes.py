@@ -89,8 +89,10 @@ class RemoteBase:
     def find_access_token(self, schemeless_url: str) -> Optional[str]:
         if self.config:
             for section_url in self.config.sections():
-                if startswith(schemeless_url, section_url, ignorecase=True):
-                    return self.config.get(section_url, 'access_token', fallback=None)
+                if section_url.casefold() in schemeless_url.casefold():
+                    token = self.config.get(section_url, 'access_token', fallback=None)
+                    if token:
+                        return os.path.expanduser(os.path.expandvars(token))
         return None
 
     def fetch_contents(self, url: str, output_path: str) -> Generator:
