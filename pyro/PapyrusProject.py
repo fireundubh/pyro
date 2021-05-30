@@ -147,6 +147,9 @@ class PapyrusProject(ProjectBase):
             if self.options.worker_limit == 0:
                 self.options.worker_limit = self.get_worker_limit()
 
+            self.remote = GenericRemote(access_token=self.options.access_token,
+                                        worker_limit=self.options.worker_limit)
+
             if not self.options.access_token:
                 cfg_parser = configparser.ConfigParser()
                 cfg_path = os.path.join(self.program_path, '.secrets')
@@ -163,9 +166,6 @@ class PapyrusProject(ProjectBase):
                 if cfg_path in parsed_files:
                     self.remote = GenericRemote(config=cfg_parser,
                                                 worker_limit=self.options.worker_limit)
-            else:
-                self.remote = GenericRemote(access_token=self.options.access_token,
-                                            worker_limit=self.options.worker_limit)
 
             # validate remote paths
             for path in self.remote_paths:
