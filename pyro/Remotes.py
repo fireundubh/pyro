@@ -87,9 +87,10 @@ class RemoteBase:
             return all([result.scheme, result.netloc, result.path])
 
     def find_access_token(self, schemeless_url: str) -> Optional[str]:
-        for section_url in self.config.sections():
-            if startswith(schemeless_url, section_url, ignorecase=True):
-                return self.config.get(section_url, 'access_token', fallback=None)
+        if self.config:
+            for section_url in self.config.sections():
+                if startswith(schemeless_url, section_url, ignorecase=True):
+                    return self.config.get(section_url, 'access_token', fallback=None)
         return None
 
     def fetch_contents(self, url: str, output_path: str) -> Generator:
