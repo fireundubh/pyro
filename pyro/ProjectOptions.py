@@ -2,6 +2,7 @@ import os
 
 from dataclasses import dataclass, field
 
+from pyro.Comparators import endswith
 
 @dataclass
 class ProjectOptions:
@@ -59,7 +60,7 @@ class ProjectOptions:
     def __setattr__(self, key: str, value: object) -> None:
         if value and isinstance(value, str):
             # sanitize paths
-            if key.endswith('path') and os.altsep in value:
+            if endswith(key, 'path', ignorecase=True) and os.altsep in value:
                 value = os.path.normpath(value)
             if key in ('game_type', 'zip_compression'):
                 value = value.casefold()

@@ -6,6 +6,7 @@ import string
 from pyro.PexHeader import PexHeader
 from pyro.PexReader import PexReader
 
+from pyro.Comparators import endswith
 
 class Anonymizer:
     log: logging.Logger = logging.getLogger('pyro')
@@ -34,7 +35,7 @@ class Anonymizer:
             Anonymizer.log.warning(f'Cannot anonymize script again: "{path}"')
             return
 
-        if not file_path.casefold().endswith('.psc'):
+        if not endswith(file_path, '.psc', ignorecase=True):
             Anonymizer.log.warning(f'Cannot anonymize script due to invalid file extension: "{path}"')
             return
 

@@ -44,32 +44,32 @@ def endswith(a_source: str, a_suffix: Union[str, tuple],
 
 
 def is_command_node(node: etree.ElementBase) -> bool:
-    return node is not None and node.tag.endswith('Command') and node.text is not None
+    return node is not None and endswith(node.tag, 'Command') and node.text is not None
 
 
 def is_folder_node(node: etree.ElementBase) -> bool:
-    return node is not None and node.tag.endswith('Folder') and node.text is not None
+    return node is not None and endswith(node.tag, 'Folder') and node.text is not None
 
 
 def is_import_node(node: etree.ElementBase) -> bool:
-    return node is not None and node.tag.endswith('Import') and node.text is not None
+    return node is not None and endswith(node.tag, 'Import') and node.text is not None
 
 
 def is_include_node(node: etree.ElementBase) -> bool:
-    return node is not None and node.tag.endswith('Include') and node.text is not None
+    return node is not None and endswith(node.tag, 'Include') and node.text is not None
 
 
 def is_package_node(node: etree.ElementBase) -> bool:
-    return node is not None and node.tag.endswith('Package')
+    return node is not None and endswith(node.tag, 'Package')
 
 
 def is_script_node(node: etree.ElementBase) -> bool:
-    return node is not None and node.tag.endswith('Script') and node.text is not None
+    return node is not None and endswith(node.tag, 'Script') and node.text is not None
 
 
 def is_variable_node(node: etree.ElementBase) -> bool:
-    return node is not None and node.tag.endswith('Variable')
+    return node is not None and endswith(node.tag, 'Variable')
 
 
 def is_zipfile_node(node: etree.ElementBase) -> bool:
-    return node is not None and node.tag.endswith('ZipFile')
+    return node is not None and endswith(node.tag, 'ZipFile')

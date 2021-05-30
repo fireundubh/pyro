@@ -57,11 +57,11 @@ class PackageManager:
 
             user_path: str = (include_node.get(XmlAttributeName.PATH) or '').strip()
 
-            if include_node.text.startswith(os.pardir):
+            if startswith(include_node.text, os.pardir):
                 PackageManager.log.warning(f'Include paths cannot start with "{os.pardir}"')
                 continue
 
-            if include_node.text == os.curdir or include_node.text.startswith(os.curdir):
+            if startswith(include_node.text, os.curdir):
                 include_node.text = include_node.text.replace(os.curdir, root_path, 1)
 
             # normalize path

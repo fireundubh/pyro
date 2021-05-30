@@ -6,6 +6,8 @@ from decimal import Decimal
 
 from pyro.Enums.ProcessState import ProcessState
 
+from pyro.Comparators import startswith
+
 
 class ProcessManager:
     log: logging.Logger = logging.getLogger('pyro')
@@ -88,20 +90,20 @@ class ProcessManager:
             while process.poll() is None:
                 line = process.stdout.readline().strip()
 
-                if line.startswith(exclusions):
+                if startswith(line, exclusions):
                     continue
 
-                if line.startswith('Packing'):
+                if startswith(line, 'Packing'):
                     package_path = line.split(':', 1)[1].strip()
                     ProcessManager.log.info(f'Packaging folder "{package_path}"...')
                     continue
 
-                if line.startswith('Archive Name'):
+                if startswith(line, 'Archive Name'):
                     archive_path = line.split(':', 1)[1].strip()
                     ProcessManager.log.info(f'Building "{archive_path}"...')
                     continue
 
-                if line.startswith('Done'):
+                if startswith(line, 'Done'):
                     archive_time = line.split('in')[1].strip()[:-1]
                     hours, minutes, seconds = [round(Decimal(n), 3) for n in archive_time.split(':')]
 
@@ -164,7 +166,7 @@ class ProcessManager:
             while process.poll() is None:
                 line = process.stdout.readline().strip()
 
-                if not line or line.startswith(exclusions):
+                if not line or startswith(line, exclusions):
                     continue
 
                 match = line_error.search(line)

@@ -1,3 +1,4 @@
+import configparser
 import json
 import multiprocessing
 import os
@@ -6,13 +7,14 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-from pyro.Comparators import endswith
+from pyro.Comparators import endswith, startswith
 
 
 class RemoteBase:
     access_token: str = ''
 
-    def __init__(self, *, access_token: str = '', worker_limit: int = -1) -> None:
+    def __init__(self, *, config: configparser.ConfigParser = None, access_token: str = '', worker_limit: int = -1) -> None:
+        self.config = config
         self.access_token = access_token
         self.worker_limit = worker_limit
 
@@ -84,6 +86,12 @@ class RemoteBase:
         else:
             return all([result.scheme, result.netloc, result.path])
 
+    def find_access_token(self, schemeless_url: str) -> Optional[str]:
+        for section_url in self.config.sections():
+            if startswith(schemeless_url, section_url, ignorecase=True):
+                return self.config.get(section_url, 'access_token', fallback=None)
+        return None
+
     def fetch_contents(self, url: str, output_path: str) -> Generator:
         """
         Downloads files from URL to output path
@@ -98,13 +106,17 @@ class GenericRemote(RemoteBase):
         """
         parsed_url = urlparse(url)
 
-        if parsed_url.netloc.endswith('github.com'):
+        schemeless_url = url.removeprefix(f'{parsed_url.scheme}://')
+
+        if endswith(parsed_url.netloc, 'github.com', ignorecase=True):
             if not self.access_token:
-                raise PermissionError('Cannot download from GitHub remote without access token')
+                self.access_token = self.find_access_token(schemeless_url)
+                if not self.access_token:
+                    raise PermissionError('Cannot download from GitHub remote without access token')
             github = GitHubRemote(access_token=self.access_token,
                                   worker_limit=self.worker_limit)
             yield from github.fetch_contents(url, output_path)
-        elif parsed_url.netloc.endswith('bitbucket.org'):
+        elif endswith(parsed_url.netloc, 'bitbucket.org', ignorecase=True):
             bitbucket = BitbucketRemote()
             yield from bitbucket.fetch_contents(url, output_path)
         else:

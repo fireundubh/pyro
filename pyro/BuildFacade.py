@@ -20,7 +20,7 @@ from pyro.ProcessManager import ProcessManager
 from pyro.Enums.ProcessState import ProcessState
 from pyro.TimeElapsed import TimeElapsed
 
-from pyro.Comparators import endswith
+from pyro.Comparators import endswith, startswith
 
 
 class BuildFacade:
@@ -60,9 +60,9 @@ class BuildFacade:
         for key in options:
             if key in ('args', 'input_path', 'anonymize', 'package', 'zip', 'zip_compression'):
                 continue
-            if key.startswith(('ignore_', 'no_', 'force_', 'resolve_')):
+            if startswith(key, ('ignore_', 'no_', 'force_', 'resolve_'), ignorecase=True):
                 continue
-            if key.endswith('_token'):
+            if endswith(key, '_token', ignorecase=True):
                 continue
             setattr(self.ppj.options, key, getattr(self.ppj, f'get_{key}')())
 
