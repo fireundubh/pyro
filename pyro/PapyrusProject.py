@@ -1,3 +1,4 @@
+import configparser
 import glob
 import hashlib
 import io
@@ -146,8 +147,25 @@ class PapyrusProject(ProjectBase):
             if self.options.worker_limit == 0:
                 self.options.worker_limit = self.get_worker_limit()
 
-            self.remote = GenericRemote(access_token=self.options.access_token,
-                                        worker_limit=self.options.worker_limit)
+            if not self.options.access_token:
+                cfg_parser = configparser.ConfigParser()
+                cfg_path = os.path.join(self.program_path, '.secrets')
+
+                try:
+                    parsed_files = cfg_parser.read(cfg_path)
+                except configparser.DuplicateSectionError:
+                    PapyrusProject.log.error('Cannot proceed while ".secrets" contains duplicate sections')
+                    sys.exit(1)
+                except configparser.MissingSectionHeaderError:
+                    PapyrusProject.log.error('Cannot proceed while ".secrets" contains no sections')
+                    sys.exit(1)
+
+                if cfg_path in parsed_files:
+                    self.remote = GenericRemote(config=cfg_parser,
+                                                worker_limit=self.options.worker_limit)
+            else:
+                self.remote = GenericRemote(access_token=self.options.access_token,
+                                            worker_limit=self.options.worker_limit)
 
             # validate remote paths
             for path in self.remote_paths:
@@ -251,6 +269,19 @@ class PapyrusProject(ProjectBase):
             if any(c in reserved_characters for c in value):
                 PapyrusProject.log.error(f'The value of the variable "{key}" contains a reserved character.')
                 sys.exit(1)
+
+            self.variables.update({key: value})
+
+        # handle . and ..
+        for key, value in self.variables.items():
+            if value == os.pardir:
+                value = os.path.normpath(os.path.join(self.project_path, os.pardir))
+            elif value == os.curdir:
+                value = self.project_path
+            elif startswith(value, os.pardir) and os.path.sep in os.path.normpath(value):
+                value = value.replace(os.pardir, os.path.normpath(os.path.join(self.project_path, os.pardir)), 1)
+            elif startswith(value, os.curdir) and os.path.sep in os.path.normpath(value):
+                value = value.replace(os.curdir, self.project_path, 1)
 
             self.variables.update({key: value})
 
@@ -526,7 +557,7 @@ class PapyrusProject(ProjectBase):
 
             no_recurse: bool = folder_node.get(XmlAttributeName.NO_RECURSE) == 'True'
 
-            if ':' in folder_node.text:
+            if not os.path.isabs(folder_node.text) and ':' in folder_node.text:
                 folder_node.text = folder_node.text.replace(':', os.sep)
 
             # try to add project path
@@ -570,7 +601,7 @@ class PapyrusProject(ProjectBase):
     def _get_script_paths_from_scripts_node(self) -> typing.Generator:
         """Returns script paths from the Scripts node"""
         for script_node in filter(is_script_node, self.scripts_node):
-            if ':' in script_node.text:
+            if not os.path.isabs(script_node.text) and ':' in script_node.text:
                 script_node.text = script_node.text.replace(':', os.sep)
 
             yield os.path.normpath(script_node.text)
