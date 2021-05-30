@@ -13,4 +13,7 @@ pyro.build/
 pyro.dist/
 test_data/
 *.bat
+*.flg
+*.pex
 *.psc
+.secrets
