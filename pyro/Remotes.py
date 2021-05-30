@@ -108,7 +108,7 @@ class GenericRemote(RemoteBase):
 
         schemeless_url = url.removeprefix(f'{parsed_url.scheme}://')
 
-        if parsed_url.netloc.endswith('github.com'):
+        if endswith(parsed_url.netloc, 'github.com', ignorecase=True):
             if not self.access_token:
                 self.access_token = self.find_access_token(schemeless_url)
                 if not self.access_token:
@@ -116,7 +116,7 @@ class GenericRemote(RemoteBase):
             github = GitHubRemote(access_token=self.access_token,
                                   worker_limit=self.worker_limit)
             yield from github.fetch_contents(url, output_path)
-        elif parsed_url.netloc.endswith('bitbucket.org'):
+        elif endswith(parsed_url.netloc, 'bitbucket.org', ignorecase=True):
             bitbucket = BitbucketRemote()
             yield from bitbucket.fetch_contents(url, output_path)
         else:

@@ -89,10 +89,10 @@ class PathHelper:
         netloc: str = url.netloc
         path: str = url.path
 
-        if netloc and netloc.startswith('/'):
+        if netloc and startswith(netloc, '/'):
             netloc = netloc[1:]
 
-        if path and path.startswith('/'):
+        if path and startswith(path, '/'):
             path = path[1:]
 
         return os.path.normpath(unquote_plus(os.path.join(netloc, path)))

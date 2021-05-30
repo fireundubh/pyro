@@ -615,7 +615,7 @@ class PapyrusProject(ProjectBase):
             # if pex exists, compare time_t in pex header with psc's last modified timestamp
             matching_path: str = ''
             for pex_path in self.pex_paths:
-                if pex_path.endswith(f'{script_name}.pex'):
+                if endswith(pex_path, f'{script_name}.pex', ignorecase=True):
                     matching_path = pex_path
                     break
 
