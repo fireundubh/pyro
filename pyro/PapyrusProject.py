@@ -272,19 +272,6 @@ class PapyrusProject(ProjectBase):
 
             self.variables.update({key: value})
 
-        # handle . and ..
-        for key, value in self.variables.items():
-            if value == os.pardir:
-                value = os.path.normpath(os.path.join(self.project_path, os.pardir))
-            elif value == os.curdir:
-                value = self.project_path
-            elif startswith(value, os.pardir) and os.path.sep in os.path.normpath(value):
-                value = value.replace(os.pardir, os.path.normpath(os.path.join(self.project_path, os.pardir)), 1)
-            elif startswith(value, os.curdir) and os.path.sep in os.path.normpath(value):
-                value = value.replace(os.curdir, self.project_path, 1)
-
-            self.variables.update({key: value})
-
         # allow variables to reference other variables
         for key, value in self.variables.items():
             self.variables.update({key: self.parse(value)})
@@ -551,8 +538,8 @@ class PapyrusProject(ProjectBase):
     def _get_script_paths_from_folders_node(self) -> typing.Generator:
         """Returns script paths from the Folders element array"""
         for folder_node in filter(is_folder_node, self.folders_node):
-            if folder_node.text == os.pardir:
-                PapyrusProject.log.warning(f'Folder paths cannot be equal to "{os.pardir}"')
+            if startswith(folder_node.text, os.pardir):
+                PapyrusProject.log.warning(f'Folder paths cannot be equal to or start with "{os.pardir}"')
                 continue
 
             no_recurse: bool = folder_node.get(XmlAttributeName.NO_RECURSE) == 'True'
@@ -603,6 +590,13 @@ class PapyrusProject(ProjectBase):
         for script_node in filter(is_script_node, self.scripts_node):
             if not os.path.isabs(script_node.text) and ':' in script_node.text:
                 script_node.text = script_node.text.replace(':', os.sep)
+
+            # handle . and .. in path
+            if os.path.sep in os.path.normpath(script_node.text):
+                if startswith(script_node.text, os.pardir):
+                    script_node.text = script_node.text.replace(os.pardir, os.path.normpath(os.path.join(self.project_path, os.pardir)), 1)
+                elif startswith(script_node.text, os.curdir):
+                    script_node.text = script_node.text.replace(os.curdir, self.project_path, 1)
 
             yield os.path.normpath(script_node.text)
 
