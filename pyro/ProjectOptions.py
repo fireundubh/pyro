@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from pyro.Comparators import endswith
 
+
 @dataclass
 class ProjectOptions:
     args: dict = field(repr=False, default_factory=dict)

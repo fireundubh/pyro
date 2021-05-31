@@ -1,7 +1,6 @@
 import logging
 import multiprocessing
 import os
-import re
 import sys
 import time
 from copy import deepcopy
@@ -9,9 +8,6 @@ from copy import deepcopy
 import psutil
 
 from pyro.Anonymizer import Anonymizer
-from pyro.Enums.BuildEvent import BuildEvent
-from pyro.Comparators import is_command_node
-from pyro.Constants import XmlAttributeName
 from pyro.PackageManager import PackageManager
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
@@ -100,27 +96,6 @@ class BuildFacade:
     def _limit_priority() -> None:
         process = psutil.Process(os.getpid())
         process.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS if sys.platform == 'win32' else 19)
-
-    def try_build_event(self, event: BuildEvent) -> None:
-        if event == BuildEvent.PRE:
-            has_event_node, event_node = self.ppj.has_pre_build_node, self.ppj.pre_build_node
-        elif event == BuildEvent.POST:
-            has_event_node, event_node = self.ppj.has_post_build_node, self.ppj.post_build_node
-        else:
-            raise NotImplementedError
-
-        if has_event_node:
-            BuildFacade.log.info(event_node.get(XmlAttributeName.DESCRIPTION))
-
-            ws: re.Pattern = re.compile('[ \t\n\r]+')
-
-            environ: dict = os.environ.copy()
-            command: str = ' && '.join(
-                ws.sub(' ', node.text.strip())
-                for node in filter(is_command_node, event_node)
-            )
-
-            ProcessManager.run_command(command, self.ppj.project_path, environ)
 
     def try_compile(self) -> None:
         """Builds and passes commands to Papyrus Compiler"""
