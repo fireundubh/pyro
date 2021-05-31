@@ -20,6 +20,8 @@
                     <xs:element minOccurs="0" name="ZipFiles" type="pyro:zipList"/>
                     <xs:element minOccurs="0" name="PreBuildEvent" type="pyro:commandList"/>
                     <xs:element minOccurs="0" name="PostBuildEvent" type="pyro:commandList"/>
+                    <xs:element minOccurs="0" name="PreImportEvent" type="pyro:commandList"/>
+                    <xs:element minOccurs="0" name="PostImportEvent" type="pyro:commandList"/>
                 </xs:choice>
             </xs:sequence>
             <xs:attribute name="Game" type="pyro:gameType"/>

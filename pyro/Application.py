@@ -4,6 +4,7 @@ import os
 import sys
 
 from pyro.Enums.BuildEvent import BuildEvent
+from pyro.Enums.ImportEvent import ImportEvent
 from pyro.BuildFacade import BuildFacade
 from pyro.Comparators import startswith
 from pyro.PapyrusProject import PapyrusProject
@@ -102,6 +103,15 @@ class Application:
 
         options = ProjectOptions(self.args.__dict__)
         ppj = PapyrusProject(options)
+        ppj.try_initialize_remotes()
+
+        ppj.try_import_event(ImportEvent.PRE)
+        ppj.try_populate_imports()
+        ppj.try_import_event(ImportEvent.POST)
+
+        ppj.try_set_game_type()
+        ppj.find_missing_scripts()
+        ppj.try_set_game_path()
 
         self._validate_project(ppj)
 
@@ -120,7 +130,7 @@ class Application:
             Application.log.error('Cannot proceed with Package enabled without valid BSArch path')
             self._print_help_and_exit()
 
-        build.try_build_event(BuildEvent.PRE)
+        ppj.try_build_event(BuildEvent.PRE)
 
         build.try_compile()
 
@@ -153,6 +163,6 @@ class Application:
         Application.log.info('DONE!')
 
         if build.failed_count == 0:
-            build.try_build_event(BuildEvent.POST)
+            ppj.try_build_event(BuildEvent.POST)
 
         return 0

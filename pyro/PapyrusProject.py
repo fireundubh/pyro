@@ -9,6 +9,8 @@ from copy import deepcopy
 
 from lxml import etree
 
+from pyro.Enums.BuildEvent import BuildEvent
+from pyro.Enums.ImportEvent import ImportEvent
 from pyro.CommandArguments import CommandArguments
 from pyro.Comparators import (endswith,
                               is_folder_node,
@@ -22,6 +24,7 @@ from pyro.Constants import (GameName,
                             XmlTagName)
 from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
+from pyro.ProcessManager import ProcessManager
 from pyro.ProjectBase import ProjectBase
 from pyro.ProjectOptions import ProjectOptions
 from pyro.Remotes import (GenericRemote,
@@ -131,6 +134,12 @@ class PapyrusProject(ProjectBase):
         self.post_build_node = self.ppj_root.find(XmlTagName.POST_BUILD_EVENT)
         self.has_post_build_node = self.post_build_node is not None
 
+        self.pre_import_node = self.ppj_root.find(XmlTagName.PRE_IMPORT_EVENT)
+        self.has_pre_import_node = self.pre_import_node is not None
+
+        self.post_import_node = self.ppj_root.find(XmlTagName.POST_IMPORT_EVENT)
+        self.has_post_import_node = self.post_import_node is not None
+
         if self.options.package and self.has_packages_node:
             if not self.options.package_path:
                 self.options.package_path = self.packages_node.get(XmlAttributeName.OUTPUT)
@@ -139,6 +148,7 @@ class PapyrusProject(ProjectBase):
             if not self.options.zip_output_path:
                 self.options.zip_output_path = self.zip_files_node.get(XmlAttributeName.OUTPUT)
 
+    def try_initialize_remotes(self):
         # initialize remote if needed
         if self.remote_paths:
             if not self.options.remote_temp_path:
@@ -173,6 +183,7 @@ class PapyrusProject(ProjectBase):
                     PapyrusProject.log.error(f'Cannot proceed while node contains invalid URL: "{path}"')
                     sys.exit(1)
 
+    def try_populate_imports(self):
         # we need to populate the list of import paths before we try to determine the game type
         # because the game type can be determined from import paths
         self.import_paths = self._get_import_paths()
@@ -210,6 +221,7 @@ class PapyrusProject(ProjectBase):
 
                 PathHelper.merge_implicit_import_paths(implicit_script_paths, self.import_paths)
 
+    def try_set_game_type(self):
         # we need to set the game type after imports are populated but before pex paths are populated
         # allow xml to set game type but defer to passed argument
         if self.options.game_type not in GameType.values():
@@ -226,12 +238,14 @@ class PapyrusProject(ProjectBase):
             PapyrusProject.log.error('Cannot determine game type from arguments or Papyrus Project')
             sys.exit(1)
 
+    def find_missing_scripts(self):
         # get expected pex paths - these paths may not exist and that is okay!
         self.pex_paths = self._get_pex_paths()
 
         # these are relative paths to psc scripts whose pex counterparts are missing
         self.missing_scripts: dict = self._find_missing_script_paths()
 
+    def try_set_game_path(self):
         # game type must be set before we call this
         if not self.options.game_path:
             self.options.game_path = self.get_game_path(self.options.game_type)
@@ -693,3 +707,25 @@ class PapyrusProject(ProjectBase):
         self.import_paths = source_import_paths
 
         return commands
+
+    def try_build_event(self, event: BuildEvent) -> None:
+        if event == BuildEvent.PRE:
+            has_event_node, event_node = self.has_pre_build_node, self.pre_build_node
+        elif event == BuildEvent.POST:
+            has_event_node, event_node = self.has_post_build_node, self.post_build_node
+        else:
+            raise NotImplementedError
+
+        if has_event_node:
+            ProcessManager.run_event(event_node, self.project_path)
+
+    def try_import_event(self, event: ImportEvent) -> None:
+        if event == ImportEvent.PRE:
+            has_event_node, event_node = self.has_pre_import_node, self.pre_import_node
+        elif event == ImportEvent.POST:
+            has_event_node, event_node = self.has_post_import_node, self.post_import_node
+        else:
+            raise NotImplementedError
+
+        if has_event_node:
+            ProcessManager.run_event(event_node, self.project_path)

@@ -4,9 +4,13 @@ import re
 import subprocess
 from decimal import Decimal
 
+from lxml import etree
+
 from pyro.Enums.ProcessState import ProcessState
 
-from pyro.Comparators import startswith
+from pyro.Comparators import (is_command_node,
+                              startswith)
+from pyro.Constants import XmlAttributeName
 
 
 class ProcessManager:
@@ -21,6 +25,20 @@ class ProcessManager:
         if hours.compare(0) == 0 and minutes.compare(0) == 0 and seconds.compare(0) == 1:
             return f'{seconds}s'
         return f'{hours}h {minutes}m {seconds}s'
+
+    @staticmethod
+    def run_event(event_node: etree.ElementBase, project_path: str):
+        ProcessManager.log.info(event_node.get(XmlAttributeName.DESCRIPTION))
+
+        ws: re.Pattern = re.compile('[ \t\n\r]+')
+
+        environ: dict = os.environ.copy()
+        command: str = ' && '.join(
+            ws.sub(' ', node.text.strip())
+            for node in filter(is_command_node, event_node)
+        )
+
+        ProcessManager.run_command(command, project_path, environ)
 
     @staticmethod
     def run_command(command: str, cwd: str, env: dict) -> ProcessState:
