@@ -32,17 +32,15 @@ class BitbucketRemote(RemoteBase):
         """
         Downloads files from URL to output path
         """
-        owner, repo, request_url = self.extract_request_args(url)
-
-        yield f'Downloading scripts from "{request_url}"... Please wait.'
+        request_url = self.extract_request_args(url)
 
         script_count: int = 0
 
-        for payload in self._fetch_payloads(request_url):
+        for payload in self._fetch_payloads(request_url.url):
             for payload_object in payload['values']:
                 payload_object_type = payload_object['type']
 
-                target_path = os.path.normpath(os.path.join(output_path, owner, repo, payload_object['path']))
+                target_path = os.path.normpath(os.path.join(output_path, request_url.owner, request_url.repo, payload_object['path']))
 
                 download_url = payload_object['links']['self']['href']
 
@@ -68,4 +66,4 @@ class BitbucketRemote(RemoteBase):
                     yield from self.fetch_contents(download_url, output_path)
 
         if script_count > 0:
-            yield f'Downloaded {script_count} scripts from "{request_url}"'
+            yield f'Downloaded {script_count} scripts from "{request_url.url}"'

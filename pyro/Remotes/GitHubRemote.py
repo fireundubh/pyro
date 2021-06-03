@@ -1,8 +1,10 @@
+import hashlib
 import json
 import multiprocessing
 import os
 from typing import (Generator,
-                    Optional)
+                    Optional,
+                    Union)
 from urllib.request import (Request,
                             urlopen)
 
@@ -22,32 +24,44 @@ class GitHubRemote(RemoteBase):
 
         os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
-        with open(target_path, mode='w+b') as f:
+        with open(target_path, mode='wb') as f:
             f.write(file_response.read())
 
     def fetch_contents(self, url: str, output_path: str) -> Generator:
         """
         Downloads files from URL to output path
         """
-        owner, repo, request_url = self.extract_request_args(url)
+        request_url = self.extract_request_args(url)
 
-        request = Request(request_url)
+        request = Request(request_url.url)
         request.add_header('Authorization', f'token {self.access_token}')
 
         response = urlopen(request, timeout=30)
 
         if response.status != 200:
-            yield 'Failed to load URL (%s): "%s"' % (response.status, request_url)
+            yield 'Failed to load URL (%s): "%s"' % (response.status, request_url.url)
             return
 
-        payload_objects: list = json.loads(response.read().decode('utf-8'))
+        payload_objects: Union[dict, list] = json.loads(response.read().decode('utf-8'))
 
-        yield f'Downloading scripts from "{request_url}"... Please wait.'
+        if 'contents_url' in payload_objects:
+            branch = payload_objects['default_branch']
+            contents_url = payload_objects['contents_url'].replace('{+path}', f'?ref={branch}')
+            yield from self.fetch_contents(contents_url, output_path)
+            return
 
         scripts: list = []
 
         for payload_object in payload_objects:
-            target_path = os.path.normpath(os.path.join(output_path, owner, repo, payload_object['path']))
+            target_path = os.path.normpath(os.path.join(output_path, request_url.owner, request_url.repo, payload_object['path']))
+
+            if not self.force_overwrite and os.path.isfile(target_path):
+                with open(target_path, mode='rb') as f:
+                    data = f.read()
+                    sha1 = hashlib.sha1(b'blob %s\x00%s' % (len(data), data.decode()))
+
+                    if sha1.hexdigest() == payload_object['sha']:
+                        continue
 
             download_url = payload_object['download_url']
 
@@ -57,12 +71,15 @@ class GitHubRemote(RemoteBase):
                 continue
 
             # we only care about scripts
-            if payload_object['type'] != 'file' and not endswith(payload_object['name'], '.psc', ignorecase=True):
+            if payload_object['type'] != 'file' or (payload_object['type'] == 'file' and not endswith(payload_object['name'], '.psc', ignorecase=True)):
                 continue
 
             scripts.append((download_url, target_path))
 
         script_count: int = len(scripts)
+
+        if script_count == 0:
+            return
 
         multiprocessing.freeze_support()
         worker_limit: int = min(script_count, self.worker_limit)
@@ -73,4 +90,4 @@ class GitHubRemote(RemoteBase):
             pool.join()
 
         if script_count > 0:
-            yield f'Downloaded {script_count} scripts from "{request_url}"'
+            yield f'Downloaded {script_count} scripts from "{request_url.url}"'

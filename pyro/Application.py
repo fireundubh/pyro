@@ -165,4 +165,4 @@ class Application:
         if build.failed_count == 0:
             ppj.try_build_event(BuildEvent.POST)
 
-        return 0
+        return build.failed_count

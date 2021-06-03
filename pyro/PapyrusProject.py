@@ -27,8 +27,8 @@ from pyro.PexReader import PexReader
 from pyro.ProcessManager import ProcessManager
 from pyro.ProjectBase import ProjectBase
 from pyro.ProjectOptions import ProjectOptions
-from pyro.Remotes import GenericRemote
 from pyro.Remotes.RemoteBase import RemoteBase
+from pyro.Remotes.GenericRemote import GenericRemote
 from pyro.XmlHelper import XmlHelper
 from pyro.XmlRoot import XmlRoot
 
@@ -148,7 +148,7 @@ class PapyrusProject(ProjectBase):
             if not self.options.zip_output_path:
                 self.options.zip_output_path = self.zip_files_node.get(XmlAttributeName.OUTPUT)
 
-    def try_initialize_remotes(self):
+    def try_initialize_remotes(self) -> None:
         # initialize remote if needed
         if self.remote_paths:
             if not self.options.remote_temp_path:
@@ -158,7 +158,8 @@ class PapyrusProject(ProjectBase):
                 self.options.worker_limit = self.get_worker_limit()
 
             self.remote = GenericRemote(access_token=self.options.access_token,
-                                        worker_limit=self.options.worker_limit)
+                                        worker_limit=self.options.worker_limit,
+                                        force_overwrite=self.options.force_overwrite)
 
             if not self.options.access_token:
                 cfg_parser = configparser.ConfigParser()
@@ -175,7 +176,8 @@ class PapyrusProject(ProjectBase):
 
                 if cfg_path in parsed_files:
                     self.remote = GenericRemote(config=cfg_parser,
-                                                worker_limit=self.options.worker_limit)
+                                                worker_limit=self.options.worker_limit,
+                                                force_overwrite=self.options.force_overwrite)
 
             # validate remote paths
             for path in self.remote_paths:
@@ -183,7 +185,7 @@ class PapyrusProject(ProjectBase):
                     PapyrusProject.log.error(f'Cannot proceed while node contains invalid URL: "{path}"')
                     sys.exit(1)
 
-    def try_populate_imports(self):
+    def try_populate_imports(self) -> None:
         # we need to populate the list of import paths before we try to determine the game type
         # because the game type can be determined from import paths
         self.import_paths = self._get_import_paths()
@@ -221,7 +223,7 @@ class PapyrusProject(ProjectBase):
 
                 PathHelper.merge_implicit_import_paths(implicit_script_paths, self.import_paths)
 
-    def try_set_game_type(self):
+    def try_set_game_type(self) -> None:
         # we need to set the game type after imports are populated but before pex paths are populated
         # allow xml to set game type but defer to passed argument
         if self.options.game_type not in GameType.values():
@@ -238,14 +240,14 @@ class PapyrusProject(ProjectBase):
             PapyrusProject.log.error('Cannot determine game type from arguments or Papyrus Project')
             sys.exit(1)
 
-    def find_missing_scripts(self):
+    def find_missing_scripts(self) -> None:
         # get expected pex paths - these paths may not exist and that is okay!
         self.pex_paths = self._get_pex_paths()
 
         # these are relative paths to psc scripts whose pex counterparts are missing
         self.missing_scripts: dict = self._find_missing_script_paths()
 
-    def try_set_game_path(self):
+    def try_set_game_path(self) -> None:
         # game type must be set before we call this
         if not self.options.game_path:
             self.options.game_path = self.get_game_path(self.options.game_type)
@@ -543,9 +545,15 @@ class PapyrusProject(ProjectBase):
                 PapyrusProject.log.error(e)
                 sys.exit(1)
 
-        url_path = self.remote.create_local_path(node.text)
+        if endswith(node.text, '.git', ignorecase=True):
+            url_path = self.remote.create_local_path(node.text[:-4])
+        else:
+            url_path = self.remote.create_local_path(node.text)
 
         local_path = os.path.join(temp_path, url_path)
+
+        for f in glob.iglob(os.path.join(local_path, r'**/*.psc'), recursive=True):
+            return os.path.dirname(f)
 
         return local_path
 
