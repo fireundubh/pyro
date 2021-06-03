@@ -7,7 +7,7 @@ from urllib.request import (Request,
                             urlopen)
 
 from pyro.Comparators import endswith
-from pyro.Remotes.Remotes import RemoteBase
+from pyro.Remotes.RemoteBase import RemoteBase
 
 
 class GitHubRemote(RemoteBase):

@@ -2,7 +2,7 @@ from typing import Generator
 from urllib.parse import urlparse
 
 from pyro.Comparators import endswith
-from pyro.Remotes.Remotes import RemoteBase
+from pyro.Remotes.RemoteBase import RemoteBase
 from pyro.Remotes.BitbucketRemote import BitbucketRemote
 from pyro.Remotes.GitHubRemote import GitHubRemote
 

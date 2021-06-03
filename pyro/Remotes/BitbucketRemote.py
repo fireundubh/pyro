@@ -5,7 +5,7 @@ from urllib.request import Request
 from urllib.request import urlopen
 
 from pyro.Comparators import endswith
-from pyro.Remotes.Remotes import RemoteBase
+from pyro.Remotes.RemoteBase import RemoteBase
 
 
 class BitbucketRemote(RemoteBase):

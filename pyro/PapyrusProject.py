@@ -28,7 +28,7 @@ from pyro.ProcessManager import ProcessManager
 from pyro.ProjectBase import ProjectBase
 from pyro.ProjectOptions import ProjectOptions
 from pyro.Remotes import GenericRemote
-from pyro.Remotes.Remotes import RemoteBase
+from pyro.Remotes.RemoteBase import RemoteBase
 from pyro.XmlHelper import XmlHelper
 from pyro.XmlRoot import XmlRoot
 
