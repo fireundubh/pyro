@@ -17,6 +17,7 @@ from pyro.Comparators import (endswith,
                               is_import_node,
                               is_script_node,
                               is_variable_node,
+                              is_namespace_path,
                               startswith)
 from pyro.Constants import (GameName,
                             GameType,
@@ -557,22 +558,32 @@ class PapyrusProject(ProjectBase):
 
         return local_path
 
+    @staticmethod
+    def try_fix_namespace_path(node: etree.ElementBase):
+        if is_namespace_path(node):
+            node.text = node.text.replace(':', os.sep)
+
+    # noinspection DuplicatedCode
     def _get_script_paths_from_folders_node(self) -> typing.Generator:
         """Returns script paths from the Folders element array"""
         for folder_node in filter(is_folder_node, self.folders_node):
-            if startswith(folder_node.text, os.pardir):
-                PapyrusProject.log.warning(f'Folder paths cannot be equal to or start with "{os.pardir}"')
-                continue
+            self.try_fix_namespace_path(folder_node)
 
             no_recurse: bool = folder_node.get(XmlAttributeName.NO_RECURSE) == 'True'
-
-            if not os.path.isabs(folder_node.text) and ':' in folder_node.text:
-                folder_node.text = folder_node.text.replace(':', os.sep)
 
             # try to add project path
             if folder_node.text == os.curdir:
                 yield from PathHelper.find_script_paths_from_folder(self.project_path, no_recurse)
                 continue
+
+            # handle . and .. in path
+            if folder_node.text == os.pardir:
+                folder_node.text = folder_node.text.replace(os.pardir, os.path.normpath(os.path.join(self.project_path, os.pardir)), 1)
+            elif os.path.sep in os.path.normpath(folder_node.text):
+                if startswith(folder_node.text, os.pardir):
+                    folder_node.text = folder_node.text.replace(os.pardir, os.path.normpath(os.path.join(self.project_path, os.pardir)), 1)
+                elif startswith(folder_node.text, os.curdir):
+                    folder_node.text = folder_node.text.replace(os.curdir, self.project_path, 1)
 
             if startswith(folder_node.text, self.remote_schemas, ignorecase=True):
                 local_path = self._get_remote_path(folder_node)
@@ -607,11 +618,11 @@ class PapyrusProject(ProjectBase):
                 if os.path.isdir(test_path):
                     yield from PathHelper.find_script_paths_from_folder(test_path, no_recurse)
 
+    # noinspection DuplicatedCode
     def _get_script_paths_from_scripts_node(self) -> typing.Generator:
         """Returns script paths from the Scripts node"""
         for script_node in filter(is_script_node, self.scripts_node):
-            if not os.path.isabs(script_node.text) and ':' in script_node.text:
-                script_node.text = script_node.text.replace(':', os.sep)
+            self.try_fix_namespace_path(script_node)
 
             # handle . and .. in path
             if os.path.sep in os.path.normpath(script_node.text):

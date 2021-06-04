@@ -1,3 +1,4 @@
+import os
 from typing import Union
 
 from lxml import etree
@@ -73,3 +74,7 @@ def is_variable_node(node: etree.ElementBase) -> bool:
 
 def is_zipfile_node(node: etree.ElementBase) -> bool:
     return node is not None and endswith(node.tag, 'ZipFile')
+
+
+def is_namespace_path(node: etree.ElementBase) -> bool:
+    return not os.path.isabs(node.text) and ':' in node.text
