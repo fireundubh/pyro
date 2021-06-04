@@ -106,7 +106,7 @@ if __name__ == '__main__':
     _remote_arguments.add_argument('--force-overwrite',
                                    action='store_true',
                                    help='download remote files and overwrite existing files\n'
-                                        '(default: skip download when remote folder exists)')
+                                        '(default: do not redownload unchanged files)')
     _remote_arguments.add_argument('--remote-temp-path',
                                    action='store', type=str,
                                    help='relative or absolute path to temp folder for remote files\n'
