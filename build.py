@@ -34,7 +34,7 @@ class Application:
             '--assume-yes-for-downloads',
             '--plugin-enable=multiprocessing',
             '--show-progress',
-            '--file-reference-choice=runtime'
+            '--plugin-enable=pkg-resources'
         ]
 
     def __setattr__(self, key: str, value: object) -> None:
@@ -58,6 +58,7 @@ class Application:
             'python38.dll',
             'python39.dll',
             '_elementpath.pyd',
+            '_hashlib.pyd',
             '_multiprocessing.pyd',
             '_psutil_windows.pyd',
             '_queue.pyd',
