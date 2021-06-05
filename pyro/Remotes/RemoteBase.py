@@ -127,5 +127,3 @@ class RemoteBase:
         Downloads files from URL to output path
         """
         pass
-
-

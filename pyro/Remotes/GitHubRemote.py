@@ -27,6 +27,8 @@ class GitHubRemote(RemoteBase):
         with open(target_path, mode='wb') as f:
             f.write(file_response.read())
 
+        return None
+
     def fetch_contents(self, url: str, output_path: str) -> Generator:
         """
         Downloads files from URL to output path

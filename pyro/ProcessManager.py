@@ -27,7 +27,7 @@ class ProcessManager:
         return f'{hours}h {minutes}m {seconds}s'
 
     @staticmethod
-    def run_event(event_node: etree.ElementBase, project_path: str):
+    def run_event(event_node: etree.ElementBase, project_path: str) -> None:
         ProcessManager.log.info(event_node.get(XmlAttributeName.DESCRIPTION))
 
         ws: re.Pattern = re.compile('[ \t\n\r]+')
