@@ -191,7 +191,7 @@ class ProjectBase:
             sys.exit(1)
 
         # noinspection PyUnboundLocalVariable
-        if not os.path.exists(reg_value):
+        if not os.path.isdir(reg_value):
             ProjectBase.log.error(f'Installed Path for {game_type} does not exist: {reg_value}')
             sys.exit(1)
 

@@ -533,7 +533,7 @@ class PapyrusProject(ProjectBase):
         url_hash = hashlib.sha1(node.text.encode()).hexdigest()[:8]
         temp_path = os.path.join(self.options.remote_temp_path, url_hash)
 
-        if self.options.force_overwrite or not os.path.exists(temp_path):
+        if self.options.force_overwrite or not os.path.isdir(temp_path):
             try:
                 for message in self.remote.fetch_contents(node.text, temp_path):
                     if message:
