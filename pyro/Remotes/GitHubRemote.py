@@ -70,8 +70,8 @@ class GitHubRemote(RemoteBase):
                 yield from self.fetch_contents(payload_object['url'], output_path)
                 continue
 
-            # we only care about scripts
-            if payload_object['type'] != 'file' or (payload_object['type'] == 'file' and not endswith(payload_object['name'], '.psc', ignorecase=True)):
+            # we only care about scripts and flags files
+            if not (payload_object['type'] == 'file' and endswith(payload_object['name'], ('.flg', '.psc'), ignorecase=True)):
                 continue
 
             scripts.append((download_url, target_path))
