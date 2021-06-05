@@ -25,22 +25,20 @@ class Application:
         self.args = self.parser.parse_args()
 
         if self.args.show_help:
-            self._print_help_and_exit()
+            self.parser.print_help()
+            sys.exit(1)
 
         self.args.input_path = self._try_fix_input_path(self.args.input_path or self.args.input_path_deprecated)
 
         if not os.path.isfile(self.args.input_path):
             Application.log.error(f'Cannot load nonexistent PPJ at given path: "{self.args.input_path}"')
-            self._print_help_and_exit()
+            sys.exit(1)
 
-    def _print_help_and_exit(self) -> None:
-        self.parser.print_help()
-        sys.exit(1)
-
-    def _try_fix_input_path(self, input_path: str) -> str:
+    @staticmethod
+    def _try_fix_input_path(input_path: str) -> str:
         if not input_path:
             Application.log.error('required argument missing: -i INPUT.ppj')
-            self._print_help_and_exit()
+            sys.exit(1)
 
         if startswith(input_path, 'file:', ignorecase=True):
             full_path = PathHelper.url2pathname(input_path)
@@ -56,36 +54,42 @@ class Application:
 
         return input_path
 
-    def _validate_project(self, ppj: PapyrusProject) -> None:
+    @staticmethod
+    def _validate_project(ppj: PapyrusProject) -> None:
         compiler_path = ppj.get_compiler_path()
-        if not compiler_path or not os.path.exists(compiler_path):
+        if not compiler_path or not os.path.isfile(compiler_path):
             Application.log.error('Cannot proceed without compiler path')
-            self._print_help_and_exit()
+            sys.exit(1)
 
         flags_path = ppj.get_flags_path()
         if not flags_path:
             Application.log.error('Cannot proceed without flags path')
-            self._print_help_and_exit()
+            sys.exit(1)
 
         if not ppj.options.game_type:
             Application.log.error('Cannot determine game type from arguments or Papyrus Project')
-            self._print_help_and_exit()
+            sys.exit(1)
 
         if not ppj.has_imports_node:
             Application.log.error('Cannot proceed without imports defined in project')
-            self._print_help_and_exit()
+            sys.exit(1)
 
         if not ppj.has_scripts_node and not ppj.has_folders_node:
             Application.log.error('Cannot proceed without Scripts or Folders defined in project')
-            self._print_help_and_exit()
+            sys.exit(1)
 
         if ppj.options.package and not ppj.has_packages_node:
             Application.log.error('Cannot proceed with Package enabled without Packages defined in project')
-            self._print_help_and_exit()
+            sys.exit(1)
 
         if ppj.options.zip and not ppj.has_zip_files_node:
             Application.log.error('Cannot proceed with Zip enabled without ZipFile defined in project')
-            self._print_help_and_exit()
+            sys.exit(1)
+
+        if not os.path.isabs(flags_path) and \
+                not any([os.path.isfile(os.path.join(import_path, flags_path)) for import_path in ppj.import_paths]):
+            Application.log.error('Cannot proceed without flags file in any import folder')
+            sys.exit(1)
 
     def run(self) -> int:
         """
@@ -99,7 +103,7 @@ class Application:
             sys.exit(0)
         elif extension not in ('.ppj', '.pyroproject'):
             Application.log.error('Cannot proceed without PPJ file path')
-            self._print_help_and_exit()
+            sys.exit(1)
 
         options = ProjectOptions(self.args.__dict__)
         ppj = PapyrusProject(options)
@@ -128,7 +132,7 @@ class Application:
         # bsarch path is not set until BuildFacade initializes
         if ppj.options.package and not os.path.isfile(ppj.options.bsarch_path):
             Application.log.error('Cannot proceed with Package enabled without valid BSArch path')
-            self._print_help_and_exit()
+            sys.exit(1)
 
         ppj.try_build_event(BuildEvent.PRE)
 
