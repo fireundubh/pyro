@@ -1,5 +1,8 @@
 import json
 import os
+import sys
+import urllib.error
+from http import HTTPStatus
 from typing import Generator
 from urllib.request import Request
 from urllib.request import urlopen
@@ -15,11 +18,17 @@ class BitbucketRemote(RemoteBase):
         """
         request = Request(request_url)
 
-        response = urlopen(request, timeout=30)
+        try:
+            response = urlopen(request, timeout=30)
+        except urllib.error.HTTPError as e:
+            status: HTTPStatus = HTTPStatus(e.code)
+            yield 'Failed to load remote: "%s" (%s %s)' % (request_url, e.code, status.phrase)
+            sys.exit(1)
 
         if response.status != 200:
-            yield 'Failed to load URL (%s): "%s"' % (response.status, request_url)
-            return
+            status: HTTPStatus = HTTPStatus(response.status)
+            yield 'Failed to load remote: "%s" (%s %s)' % (request_url, response.status, status.phrase)
+            sys.exit(1)
 
         payload: dict = json.loads(response.read().decode('utf-8'))
 

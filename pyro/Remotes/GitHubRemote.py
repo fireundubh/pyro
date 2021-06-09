@@ -2,6 +2,9 @@ import hashlib
 import json
 import multiprocessing
 import os
+import sys
+import urllib.error
+from http import HTTPStatus
 from typing import (Generator,
                     Optional,
                     Union)
@@ -38,11 +41,17 @@ class GitHubRemote(RemoteBase):
         request = Request(request_url.url)
         request.add_header('Authorization', f'token {self.access_token}')
 
-        response = urlopen(request, timeout=30)
+        try:
+            response = urlopen(request, timeout=30)
+        except urllib.error.HTTPError as e:
+            status: HTTPStatus = HTTPStatus(e.code)
+            yield 'Failed to load remote: "%s" (%s %s)' % (request_url.url, e.code, status.phrase)
+            sys.exit(1)
 
         if response.status != 200:
-            yield 'Failed to load URL (%s): "%s"' % (response.status, request_url.url)
-            return
+            status: HTTPStatus = HTTPStatus(response.status)
+            yield 'Failed to load remote: "%s" (%s %s)' % (request_url.url, response.status, status.phrase)
+            sys.exit(1)
 
         payload_objects: Union[dict, list] = json.loads(response.read().decode('utf-8'))
 

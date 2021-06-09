@@ -69,12 +69,24 @@ class Application:
             'unicodedata.pyd'
         )
 
-        files: list = [f for f in glob.glob(os.path.join(self.dist_path, r'**\*'), recursive=True)
-                       if os.path.isfile(f) and not f.endswith(files_to_keep)]
+        for f in glob.iglob(os.path.join(self.dist_path, r'**\*'), recursive=True):
+            if not os.path.isfile(f):
+                continue
 
-        for f in files:
+            _, file_name = os.path.split(f)
+            if file_name.casefold() in files_to_keep:
+                continue
+
             Application.log.warning(f'Deleting: "{f}"')
             os.remove(f)
+
+        for f in glob.iglob(os.path.join(self.dist_path, r'**\*'), recursive=True):
+            if not os.path.isdir(f):
+                continue
+
+            if not os.listdir(f):
+                Application.log.warning(f'Deleting empty folder: "{f}"')
+                shutil.rmtree(f, ignore_errors=True)
 
         site_dir: str = os.path.join(self.dist_path, 'site')
         if os.path.exists(site_dir):
