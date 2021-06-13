@@ -228,11 +228,11 @@ class PapyrusProject(ProjectBase):
         # we need to set the game type after imports are populated but before pex paths are populated
         # allow xml to set game type but defer to passed argument
         if self.options.game_type not in GameType.values():
-            game_type: str = self.ppj_root.get(XmlAttributeName.GAME, default='')
-            self.options.game_type = GameType.get(game_type)
+            attr_game_type: str = self.ppj_root.get(XmlAttributeName.GAME, default='')
+            self.options.game_type = GameType.get(attr_game_type)
 
             if self.options.game_type:
-                PapyrusProject.log.info(f'Using game type: {GameName.get(game_type)} (determined from Papyrus Project)')
+                PapyrusProject.log.info(f'Using game type: {GameName.get(attr_game_type)} (determined from Papyrus Project)')
 
         if not self.options.game_type:
             self.options.game_type = self.get_game_type()
@@ -577,11 +577,11 @@ class PapyrusProject(ProjectBase):
         for folder_node in filter(is_folder_node, self.folders_node):
             self.try_fix_namespace_path(folder_node)
 
-            no_recurse: bool = folder_node.get(XmlAttributeName.NO_RECURSE) == 'True'
+            attr_no_recurse: bool = folder_node.get(XmlAttributeName.NO_RECURSE) == 'True'
 
             # try to add project path
             if folder_node.text == os.curdir:
-                yield from PathHelper.find_script_paths_from_folder(self.project_path, no_recurse)
+                yield from PathHelper.find_script_paths_from_folder(self.project_path, attr_no_recurse)
                 continue
 
             # handle . and .. in path
@@ -598,14 +598,14 @@ class PapyrusProject(ProjectBase):
                 PapyrusProject.log.info(f'Adding import path from remote: "{local_path}"...')
                 self.import_paths.insert(0, local_path)
                 PapyrusProject.log.info(f'Adding folder path from remote: "{local_path}"...')
-                yield from PathHelper.find_script_paths_from_folder(local_path, no_recurse)
+                yield from PathHelper.find_script_paths_from_folder(local_path, attr_no_recurse)
                 continue
 
             folder_path: str = os.path.normpath(folder_node.text)
 
             # try to add absolute path
             if os.path.isabs(folder_path) and os.path.isdir(folder_path):
-                yield from PathHelper.find_script_paths_from_folder(folder_path, no_recurse)
+                yield from PathHelper.find_script_paths_from_folder(folder_path, attr_no_recurse)
                 continue
 
             # try to add project-relative folder path
@@ -615,21 +615,21 @@ class PapyrusProject(ProjectBase):
                 # this can be a problem if that folder contains sources but user error is hard to fix
                 test_passed = False
 
-                user_flags = wcmatch.RECURSIVE if not no_recurse else 0x0
+                user_flags = wcmatch.RECURSIVE if not attr_no_recurse else 0x0
                 matcher = wcmatch.WcMatch(test_path, '*.psc', flags=wcmatch.IGNORECASE | user_flags)
                 for _ in matcher.imatch():
                     test_passed = True
                     break
 
                 if test_passed:
-                    yield from PathHelper.find_script_paths_from_folder(test_path, no_recurse, matcher)
+                    yield from PathHelper.find_script_paths_from_folder(test_path, attr_no_recurse, matcher)
                     continue
 
             # try to add import-relative folder path
             for import_path in self.import_paths:
                 test_path = os.path.join(import_path, folder_path)
                 if os.path.isdir(test_path):
-                    yield from PathHelper.find_script_paths_from_folder(test_path, no_recurse)
+                    yield from PathHelper.find_script_paths_from_folder(test_path, attr_no_recurse)
 
     # noinspection DuplicatedCode
     def _get_script_paths_from_scripts_node(self) -> typing.Generator:

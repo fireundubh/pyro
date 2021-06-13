@@ -201,27 +201,27 @@ class PackageManager:
         file_names = CaseInsensitiveList()
 
         for i, package_node in enumerate(filter(is_package_node, self.ppj.packages_node)):
-            file_name: str = package_node.get(XmlAttributeName.NAME)
+            attr_file_name: str = package_node.get(XmlAttributeName.NAME)
 
             # noinspection PyProtectedMember
             root_dir = self.ppj._get_path(package_node.get(XmlAttributeName.ROOT_DIR),
                                           relative_root_path=self.ppj.project_path,
-                                          fallback_path=[self.ppj.project_path, os.path.basename(file_name)])
+                                          fallback_path=[self.ppj.project_path, os.path.basename(attr_file_name)])
 
             # prevent clobbering files previously created in this session
-            if file_name in file_names:
-                file_name = f'{self.ppj.project_name} ({i})'
+            if attr_file_name in file_names:
+                attr_file_name = f'{self.ppj.project_name} ({i})'
 
-            if file_name not in file_names:
-                file_names.append(file_name)
+            if attr_file_name not in file_names:
+                file_names.append(attr_file_name)
 
-            file_name = self._fix_package_extension(file_name)
+            attr_file_name = self._fix_package_extension(attr_file_name)
 
-            file_path: str = os.path.join(self.options.package_path, file_name)
+            file_path: str = os.path.join(self.options.package_path, attr_file_name)
 
             self._check_write_permission(file_path)
 
-            PackageManager.log.info(f'Creating "{file_name}"...')
+            PackageManager.log.info(f'Creating "{attr_file_name}"...')
 
             for source_path, _ in self._generate_include_paths(package_node, root_dir):
                 if os.path.isabs(source_path):
@@ -257,18 +257,18 @@ class PackageManager:
         file_names = CaseInsensitiveList()
 
         for i, zip_node in enumerate(filter(is_zipfile_node, self.ppj.zip_files_node)):
-            file_name: str = zip_node.get(XmlAttributeName.NAME)
+            attr_file_name: str = zip_node.get(XmlAttributeName.NAME)
 
             # prevent clobbering files previously created in this session
-            if file_name in file_names:
-                file_name = f'{file_name} ({i})'
+            if attr_file_name in file_names:
+                attr_file_name = f'{attr_file_name} ({i})'
 
-            if file_name not in file_names:
-                file_names.append(file_name)
+            if attr_file_name not in file_names:
+                file_names.append(attr_file_name)
 
-            file_name = self._fix_zip_extension(file_name)
+            attr_file_name = self._fix_zip_extension(attr_file_name)
 
-            file_path: str = os.path.join(self.options.zip_output_path, file_name)
+            file_path: str = os.path.join(self.options.zip_output_path, attr_file_name)
 
             self._check_write_permission(file_path)
 
@@ -280,11 +280,11 @@ class PackageManager:
             except KeyError:
                 compress_type = ZipCompression.STORE
 
-            root_dir: str = zip_node.get(XmlAttributeName.ROOT_DIR)
-            zip_root_path: str = self._try_resolve_project_relative_path(root_dir)
+            attr_root_dir: str = zip_node.get(XmlAttributeName.ROOT_DIR)
+            zip_root_path: str = self._try_resolve_project_relative_path(attr_root_dir)
 
             if zip_root_path:
-                PackageManager.log.info(f'Creating "{file_name}"...')
+                PackageManager.log.info(f'Creating "{attr_file_name}"...')
 
                 try:
                     with zipfile.ZipFile(file_path, mode='w', compression=compress_type.value) as z:
@@ -296,8 +296,8 @@ class PackageManager:
                                     # just add file to zip root
                                     arcname = os.path.basename(include_path)
                             else:
-                                _, file_name = os.path.split(include_path)
-                                arcname = file_name if user_path == os.curdir else os.path.join(user_path, file_name)
+                                _, attr_file_name = os.path.split(include_path)
+                                arcname = attr_file_name if user_path == os.curdir else os.path.join(user_path, attr_file_name)
 
                             PackageManager.log.info('+ "{}"'.format(arcname))
                             z.write(include_path, arcname, compress_type=compress_type.value)
@@ -307,5 +307,5 @@ class PackageManager:
                     PackageManager.log.error(f'Cannot open ZIP file for writing: "{file_path}"')
                     sys.exit(1)
             else:
-                PackageManager.log.error(f'Cannot resolve RootDir path to existing folder: "{root_dir}"')
+                PackageManager.log.error(f'Cannot resolve RootDir path to existing folder: "{attr_root_dir}"')
                 sys.exit(1)
