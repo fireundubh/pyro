@@ -228,6 +228,7 @@ class PackageManager:
                     relpath = os.path.relpath(source_path, root_dir)
                 else:
                     relpath = source_path
+                    source_path = os.path.join(self.ppj.project_path, source_path)
 
                 target_path = os.path.join(self.options.temp_path, relpath)
 
