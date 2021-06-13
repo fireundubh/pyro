@@ -53,6 +53,18 @@ class PackageManager:
                 sys.exit(1)
 
     @staticmethod
+    def _match(root_dir: str, file_pattern: str, *, exclude_pattern: str = '', user_path: str = '', no_recurse: bool = False) -> typing.Generator:
+        user_flags = wcmatch.RECURSIVE if not no_recurse else 0x0
+        matcher = wcmatch.WcMatch(root_dir, file_pattern,
+                                  exclude_pattern=exclude_pattern,
+                                  flags=PackageManager.DEFAULT_WCFLAGS | user_flags)
+
+        matcher.on_reset()
+        matcher._skipped = 0
+        for file_path in matcher._walk():
+            yield file_path, user_path
+
+    @staticmethod
     def _generate_include_paths(includes_node: etree.ElementBase, root_path: str, zip_mode: bool = False) -> typing.Generator:
         for include_node in filter(is_include_node, includes_node):
             attr_no_recurse: bool = include_node.get(XmlAttributeName.NO_RECURSE) == 'True'
@@ -89,13 +101,9 @@ class PackageManager:
                 if os.path.isfile(test_path):
                     yield test_path, attr_path
                 elif os.path.isdir(test_path):
-                    user_flags = wcmatch.RECURSIVE if not attr_no_recurse else 0x0
-                    matcher = wcmatch.WcMatch(test_path, '*.*', flags=wcmatch.IGNORECASE | user_flags)
-
-                    matcher.on_reset()
-                    matcher._skipped = 0
-                    for f in matcher._walk():
-                        yield f, attr_path
+                    yield from PackageManager._match(test_path, '*.*',
+                                                     user_path=attr_path,
+                                                     no_recurse=attr_no_recurse)
                 else:
                     for include_path in glob.iglob(search_path,
                                                    root_dir=root_path,
@@ -113,15 +121,9 @@ class PackageManager:
                 if os.path.isfile(search_path):
                     yield search_path, attr_path
                 else:
-                    user_flags = wcmatch.RECURSIVE if not attr_no_recurse else 0x0
-
-                    matcher = wcmatch.WcMatch(search_path, '*.*',
-                                              flags=PackageManager.DEFAULT_WCFLAGS | user_flags)
-
-                    matcher.on_reset()
-                    matcher._skipped = 0
-                    for f in matcher._walk():
-                        yield f, attr_path
+                    yield from PackageManager._match(search_path, '*.*',
+                                                     user_path=attr_path,
+                                                     no_recurse=attr_no_recurse)
 
         for match_node in filter(is_match_node, includes_node):
             attr_in: str = match_node.get(XmlAttributeName.IN).strip()
@@ -154,16 +156,10 @@ class PackageManager:
                 PackageManager.log.error(f'Cannot match path that does not exist or is not a directory: "{in_path}"')
                 sys.exit(1)
 
-            user_flags = wcmatch.RECURSIVE if not attr_no_recurse else 0x0
-
-            matcher = wcmatch.WcMatch(in_path, match_node.text,
-                                      exclude_pattern=attr_exclude,
-                                      flags=PackageManager.DEFAULT_WCFLAGS | user_flags)
-
-            matcher.on_reset()
-            matcher._skipped = 0
-            for f in matcher._walk():
-                yield f, attr_in
+            yield from PackageManager._match(in_path, match_node.text,
+                                             exclude_pattern=attr_exclude,
+                                             user_path=attr_in,
+                                             no_recurse=attr_no_recurse)
 
     def _fix_package_extension(self, package_name: str) -> str:
         if not endswith(package_name, ('.ba2', '.bsa'), ignorecase=True):
@@ -225,9 +221,9 @@ class PackageManager:
             attr_file_name: str = package_node.get(XmlAttributeName.NAME)
 
             # noinspection PyProtectedMember
-            root_dir = self.ppj._get_path(package_node.get(XmlAttributeName.ROOT_DIR),
-                                          relative_root_path=self.ppj.project_path,
-                                          fallback_path=[self.ppj.project_path, os.path.basename(attr_file_name)])
+            root_dir: str = self.ppj._get_path(package_node.get(XmlAttributeName.ROOT_DIR),
+                                               relative_root_path=self.ppj.project_path,
+                                               fallback_path=[self.ppj.project_path, os.path.basename(attr_file_name)])
 
             # prevent clobbering files previously created in this session
             if attr_file_name in file_names:
@@ -244,16 +240,18 @@ class PackageManager:
 
             PackageManager.log.info(f'Creating "{attr_file_name}"...')
 
-            for source_path, _ in self._generate_include_paths(package_node, root_dir):
+            for source_path, attr_path in self._generate_include_paths(package_node, root_dir):
                 if os.path.isabs(source_path):
-                    relpath = os.path.relpath(source_path, root_dir)
+                    relpath: str = os.path.relpath(source_path, root_dir)
                 else:
-                    relpath = source_path
+                    relpath: str = source_path
                     source_path = os.path.join(self.ppj.project_path, source_path)
 
-                target_path = os.path.join(self.options.temp_path, relpath)
+                adj_relpath: str = os.path.normpath(os.path.join(attr_path, relpath))
 
-                PackageManager.log.info(f'+ "{relpath.casefold()}"')
+                PackageManager.log.info(f'+ "{adj_relpath.casefold()}"')
+
+                target_path: str = os.path.join(self.options.temp_path, adj_relpath)
 
                 # fix target path if user passes a deeper package root (RootDir)
                 if endswith(source_path, '.pex', ignorecase=True) and not startswith(relpath, 'scripts', ignorecase=True):
@@ -309,8 +307,8 @@ class PackageManager:
 
                 try:
                     with zipfile.ZipFile(file_path, mode='w', compression=compress_type.value) as z:
-                        for include_path, user_path in self._generate_include_paths(zip_node, zip_root_path, True):
-                            if not user_path:
+                        for include_path, attr_path in self._generate_include_paths(zip_node, zip_root_path, True):
+                            if not attr_path:
                                 if zip_root_path in include_path:
                                     arcname = os.path.relpath(include_path, zip_root_path)
                                 else:
@@ -318,7 +316,7 @@ class PackageManager:
                                     arcname = os.path.basename(include_path)
                             else:
                                 _, attr_file_name = os.path.split(include_path)
-                                arcname = attr_file_name if user_path == os.curdir else os.path.join(user_path, attr_file_name)
+                                arcname = attr_file_name if attr_path == os.curdir else os.path.join(attr_path, attr_file_name)
 
                             PackageManager.log.info('+ "{}"'.format(arcname))
                             z.write(include_path, arcname, compress_type=compress_type.value)
