@@ -136,15 +136,10 @@ class PackageManager:
 
             in_path: str = os.path.normpath(attr_in)
 
-            if in_path == os.curdir:
-                in_path = in_path.replace(os.curdir, root_path, 1)
-            elif in_path == os.pardir:
+            if in_path == os.pardir or startswith(in_path, os.pardir):
                 in_path = in_path.replace(os.pardir, os.path.normpath(os.path.join(root_path, os.pardir)), 1)
-            elif os.path.sep in os.path.normpath(in_path):
-                if startswith(in_path, os.pardir):
-                    in_path = in_path.replace(os.pardir, os.path.normpath(os.path.join(root_path, os.pardir)), 1)
-                elif startswith(in_path, os.curdir):
-                    in_path = in_path.replace(os.curdir, root_path, 1)
+            elif in_path == os.curdir or startswith(in_path, os.curdir):
+                in_path = in_path.replace(os.curdir, root_path, 1)
 
             if not os.path.isabs(in_path):
                 in_path = os.path.join(root_path, in_path)
@@ -299,18 +294,19 @@ class PackageManager:
             except KeyError:
                 compress_type = ZipCompression.STORE
 
-            attr_root_dir: str = zip_node.get(XmlAttributeName.ROOT_DIR)
-            zip_root_path: str = self._try_resolve_project_relative_path(attr_root_dir)
+            root_dir: str = self.ppj._get_path(zip_node.get(XmlAttributeName.ROOT_DIR),
+                                               relative_root_path=self.ppj.project_path,
+                                               fallback_path='')
 
-            if zip_root_path:
+            if root_dir:
                 PackageManager.log.info(f'Creating "{attr_file_name}"...')
 
                 try:
                     with zipfile.ZipFile(file_path, mode='w', compression=compress_type.value) as z:
-                        for include_path, attr_path in self._generate_include_paths(zip_node, zip_root_path, True):
+                        for include_path, attr_path in self._generate_include_paths(zip_node, root_dir, True):
                             if not attr_path:
-                                if zip_root_path in include_path:
-                                    arcname = os.path.relpath(include_path, zip_root_path)
+                                if root_dir in include_path:
+                                    arcname = os.path.relpath(include_path, root_dir)
                                 else:
                                     # just add file to zip root
                                     arcname = os.path.basename(include_path)
@@ -326,5 +322,5 @@ class PackageManager:
                     PackageManager.log.error(f'Cannot open ZIP file for writing: "{file_path}"')
                     sys.exit(1)
             else:
-                PackageManager.log.error(f'Cannot resolve RootDir path to existing folder: "{attr_root_dir}"')
+                PackageManager.log.error(f'Cannot resolve RootDir path to existing folder: "{root_dir}"')
                 sys.exit(1)
