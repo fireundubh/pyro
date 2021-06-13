@@ -131,7 +131,7 @@ class PackageManager:
             attr_exclude: str = (match_node.get(XmlAttributeName.EXCLUDE) or '').strip()
 
             if not attr_in:
-                PackageManager.log.error(f'Include path at line {match_node.sourceline} in project file is empty')
+                PackageManager.log.error(f'"In" attribute of "Match" tag at line {match_node.sourceline} in project file is empty')
                 sys.exit(1)
 
             in_path: str = os.path.normpath(attr_in)
@@ -151,7 +151,13 @@ class PackageManager:
                 PackageManager.log.error(f'Cannot match path that does not exist or is not a directory: "{in_path}"')
                 sys.exit(1)
 
-            yield from PackageManager._match(in_path, match_node.text,
+            match_text: str = match_node.text.strip()
+
+            if startswith(match_text, '.'):
+                PackageManager.log.error(f'Match pattern at line {match_node.sourceline} in project file is not a valid wildcard pattern')
+                sys.exit(1)
+
+            yield from PackageManager._match(in_path, match_text,
                                              exclude_pattern=attr_exclude,
                                              user_path=attr_in,
                                              no_recurse=attr_no_recurse)
