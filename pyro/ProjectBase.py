@@ -251,35 +251,35 @@ class ProjectBase:
         if self.options.game_path:
             for game_type, game_name in GameName.items():
                 if endswith(self.options.game_path, game_name, ignorecase=True):
-                    ProjectBase.log.warning(f'Using game type: {game_name} (determined from game path)')
+                    ProjectBase.log.info(f'Using game type: {game_name} (determined from game path)')
                     return GameType.get(game_type)
 
         if self.options.registry_path:
             game_type = self._get_game_type_from_path(self.options.registry_path)
             if game_type:
-                ProjectBase.log.warning(f'Using game type: {GameName.get(game_type)} (determined from registry path)')
+                ProjectBase.log.info(f'Using game type: {GameName.get(game_type)} (determined from registry path)')
                 return game_type
 
         if self.import_paths:
             for import_path in reversed(self.import_paths):
                 game_type = self._get_game_type_from_path(import_path)
                 if game_type:
-                    ProjectBase.log.warning(f'Using game type: {GameName.get(game_type)} (determined from import paths)')
+                    ProjectBase.log.info(f'Using game type: {GameName.get(game_type)} (determined from import paths)')
                     return game_type
 
         if self.options.flags_path:
             if endswith(self.options.flags_path, FlagsName.FO4, ignorecase=True):
-                ProjectBase.log.warning(f'Using game type: {GameName.FO4} (determined from flags path)')
+                ProjectBase.log.info(f'Using game type: {GameName.FO4} (determined from flags path)')
                 return GameType.FO4
 
             if endswith(self.options.flags_path, FlagsName.TES5, ignorecase=True):
                 try:
                     self.get_game_path('sse')
                 except FileNotFoundError:
-                    ProjectBase.log.warning(f'Using game type: {GameName.TES5} (determined from flags path)')
+                    ProjectBase.log.info(f'Using game type: {GameName.TES5} (determined from flags path)')
                     return GameType.TES5
                 else:
-                    ProjectBase.log.warning(f'Using game type: {GameName.SSE} (determined from flags path)')
+                    ProjectBase.log.info(f'Using game type: {GameName.SSE} (determined from flags path)')
                     return GameType.SSE
 
         raise AssertionError('Cannot determine game type from game path, registry path, import paths, or flags path')

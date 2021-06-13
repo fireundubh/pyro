@@ -1,5 +1,3 @@
-import fnmatch
-import glob
 import logging
 import os
 import shutil
@@ -8,10 +6,13 @@ import typing
 import zipfile
 
 from lxml import etree
+from wcmatch import (glob,
+                     wcmatch)
 
 from pyro.CommandArguments import CommandArguments
 from pyro.Comparators import (endswith,
                               is_include_node,
+                              is_match_node,
                               is_package_node,
                               is_zipfile_node,
                               startswith)
@@ -20,7 +21,6 @@ from pyro.Constants import (GameType,
                             XmlAttributeName)
 from pyro.Enums.ZipCompression import ZipCompression
 from pyro.PapyrusProject import PapyrusProject
-from pyro.PathHelper import PathHelper
 from pyro.ProcessManager import ProcessManager
 from pyro.ProjectOptions import ProjectOptions
 
@@ -32,6 +32,9 @@ class PackageManager:
     options: ProjectOptions = None
     pak_extension: str = ''
     zip_extension: str = ''
+
+    DEFAULT_GLFLAGS = glob.NODIR | glob.MATCHBASE | glob.SPLIT | glob.REALPATH | glob.GLOBSTAR | glob.FOLLOW | glob.IGNORECASE | glob.MINUSNEGATE
+    DEFAULT_WCFLAGS = wcmatch.SYMLINKS | wcmatch.IGNORECASE | wcmatch.MINUSNEGATE
 
     def __init__(self, ppj: PapyrusProject) -> None:
         self.ppj = ppj
@@ -50,59 +53,96 @@ class PackageManager:
                 sys.exit(1)
 
     @staticmethod
-    def _generate_include_paths(includes_node: etree.ElementBase, root_path: str) -> typing.Generator:
+    def _generate_include_paths(includes_node: etree.ElementBase, root_path: str, zip_mode: bool = False) -> typing.Generator:
         for include_node in filter(is_include_node, includes_node):
-            no_recurse: bool = include_node.get(XmlAttributeName.NO_RECURSE) == 'True'
-            wildcard_pattern: str = '*' if no_recurse else r'**\*'
+            attr_no_recurse: bool = include_node.get(XmlAttributeName.NO_RECURSE) == 'True'
+            attr_path: str = (include_node.get(XmlAttributeName.PATH) or '').strip()
+            search_path: str = include_node.text.strip()
 
-            user_path: str = (include_node.get(XmlAttributeName.PATH) or '').strip()
+            if not search_path:
+                PackageManager.log.error(f'Include path at line {include_node.sourceline} in project file is empty')
+                sys.exit(1)
 
-            if startswith(include_node.text, os.pardir):
-                PackageManager.log.warning(f'Include paths cannot start with "{os.pardir}"')
-                continue
+            if not zip_mode and startswith(search_path, os.pardir):
+                PackageManager.log.error(f'Include paths cannot start with "{os.pardir}"')
+                sys.exit(1)
 
-            if startswith(include_node.text, os.curdir):
-                include_node.text = include_node.text.replace(os.curdir, root_path, 1)
+            if startswith(search_path, os.curdir):
+                search_path = search_path.replace(os.curdir, root_path, 1)
 
-            # normalize path
-            path_or_pattern = os.path.normpath(include_node.text)
+            # fix invalid pattern with leading separator
+            if not zip_mode and startswith(search_path, (os.path.sep, os.path.altsep)):
+                search_path = '**' + search_path
 
-            # populate files list using simple glob patterns
-            if '*' in path_or_pattern:
-                if not os.path.isabs(path_or_pattern):
-                    search_path = os.path.join(root_path, wildcard_pattern)
-                elif root_path in path_or_pattern:
-                    search_path = path_or_pattern
-                else:
-                    PackageManager.log.warning(f'Cannot include path outside RootDir: "{path_or_pattern}"')
-                    continue
-
-                for include_path in glob.iglob(search_path, recursive=not no_recurse):
-                    if os.path.isfile(include_path) and fnmatch.fnmatch(include_path, path_or_pattern):
-                        yield include_path, user_path
+            # populate files list using glob patterns or relative paths
+            if '*' in search_path or not os.path.isabs(search_path):
+                for include_path in glob.iglob(search_path,
+                                               root_dir=root_path,
+                                               flags=PackageManager.DEFAULT_GLFLAGS):
+                    yield include_path, attr_path
 
             # populate files list using absolute paths
-            elif os.path.isabs(path_or_pattern):
-                if root_path not in path_or_pattern:
-                    PackageManager.log.warning(f'Cannot include path outside RootDir: "{path_or_pattern}"')
-                    continue
-
-                if os.path.isfile(path_or_pattern):
-                    yield path_or_pattern, user_path
-                else:
-                    search_path = os.path.join(path_or_pattern, wildcard_pattern)
-                    yield from PathHelper.find_include_paths(search_path, no_recurse, user_path)
-
             else:
-                # populate files list using relative file path
-                test_path = os.path.join(root_path, path_or_pattern)
-                if not os.path.isdir(test_path):
-                    yield test_path, user_path
+                if not zip_mode and root_path not in search_path:
+                    PackageManager.log.error(f'Cannot include path outside RootDir: "{search_path}"')
+                    sys.exit(1)
 
-                # populate files list using relative folder path
+                search_path = os.path.abspath(os.path.normpath(search_path))
+
+                if os.path.isfile(search_path):
+                    yield search_path, attr_path
                 else:
-                    search_path = os.path.join(root_path, path_or_pattern, wildcard_pattern)
-                    yield from PathHelper.find_include_paths(search_path, no_recurse, user_path)
+                    user_flags = wcmatch.RECURSIVE if not attr_no_recurse else 0x0
+
+                    matcher = wcmatch.WcMatch(search_path, '*.*',
+                                              flags=PackageManager.DEFAULT_WCFLAGS | user_flags)
+
+                    matcher.on_reset()
+                    matcher._skipped = 0
+                    for f in matcher._walk():
+                        yield f, attr_path
+
+        for match_node in filter(is_match_node, includes_node):
+            attr_in: str = match_node.get(XmlAttributeName.IN).strip()
+            attr_no_recurse: bool = match_node.get(XmlAttributeName.NO_RECURSE) == 'True'
+            attr_exclude: str = (match_node.get(XmlAttributeName.EXCLUDE) or '').strip()
+
+            if not attr_in:
+                PackageManager.log.error(f'Include path at line {match_node.sourceline} in project file is empty')
+                sys.exit(1)
+
+            in_path: str = os.path.normpath(attr_in)
+
+            if in_path == os.curdir:
+                in_path = in_path.replace(os.curdir, root_path, 1)
+            elif in_path == os.pardir:
+                in_path = in_path.replace(os.pardir, os.path.normpath(os.path.join(root_path, os.pardir)), 1)
+            elif os.path.sep in os.path.normpath(in_path):
+                if startswith(in_path, os.pardir):
+                    in_path = in_path.replace(os.pardir, os.path.normpath(os.path.join(root_path, os.pardir)), 1)
+                elif startswith(in_path, os.curdir):
+                    in_path = in_path.replace(os.curdir, root_path, 1)
+
+            if not os.path.isabs(in_path):
+                in_path = os.path.join(root_path, in_path)
+            elif zip_mode and root_path not in in_path:
+                PackageManager.log.error(f'Cannot match path outside RootDir: "{in_path}"')
+                sys.exit(1)
+
+            if not os.path.isdir(in_path):
+                PackageManager.log.error(f'Cannot match path that does not exist or is not a directory: "{in_path}"')
+                sys.exit(1)
+
+            user_flags = wcmatch.RECURSIVE if not attr_no_recurse else 0x0
+
+            matcher = wcmatch.WcMatch(in_path, match_node.text,
+                                      exclude_pattern=attr_exclude,
+                                      flags=PackageManager.DEFAULT_WCFLAGS | user_flags)
+
+            matcher.on_reset()
+            matcher._skipped = 0
+            for f in matcher._walk():
+                yield f, attr_in
 
     def _fix_package_extension(self, package_name: str) -> str:
         if not endswith(package_name, ('.ba2', '.bsa'), ignorecase=True):
@@ -140,17 +180,10 @@ class PackageManager:
 
             # SSE has an ctd bug with uncompressed textures in a bsa that
             # has an Embed Filenames flag on it, so force it to false.
-            has_textures = False
-
-            for f in glob.iglob(os.path.join(containing_folder, r'**/*'), recursive=True):
-                if not os.path.isfile(f):
-                    continue
-                if endswith(f, '.dds', ignorecase=True):
-                    has_textures = True
-                    break
-
-            if has_textures:
+            for _ in wcmatch.WcMatch(containing_folder, '*.dds',
+                                     flags=wcmatch.RECURSIVE | wcmatch.IGNORECASE).imatch():
                 arguments.append('-af:0x3')
+                break
         else:
             arguments.append('-tes5')
 
@@ -168,33 +201,38 @@ class PackageManager:
         file_names = CaseInsensitiveList()
 
         for i, package_node in enumerate(filter(is_package_node, self.ppj.packages_node)):
-            file_name: str = package_node.get(XmlAttributeName.NAME)
+            attr_file_name: str = package_node.get(XmlAttributeName.NAME)
 
             # noinspection PyProtectedMember
             root_dir = self.ppj._get_path(package_node.get(XmlAttributeName.ROOT_DIR),
                                           relative_root_path=self.ppj.project_path,
-                                          fallback_path=[self.ppj.project_path, os.path.basename(file_name)])
+                                          fallback_path=[self.ppj.project_path, os.path.basename(attr_file_name)])
 
             # prevent clobbering files previously created in this session
-            if file_name in file_names:
-                file_name = f'{self.ppj.project_name} ({i})'
+            if attr_file_name in file_names:
+                attr_file_name = f'{self.ppj.project_name} ({i})'
 
-            if file_name not in file_names:
-                file_names.append(file_name)
+            if attr_file_name not in file_names:
+                file_names.append(attr_file_name)
 
-            file_name = self._fix_package_extension(file_name)
+            attr_file_name = self._fix_package_extension(attr_file_name)
 
-            file_path: str = os.path.join(self.options.package_path, file_name)
+            file_path: str = os.path.join(self.options.package_path, attr_file_name)
 
             self._check_write_permission(file_path)
 
-            PackageManager.log.info(f'Creating "{file_name}"...')
+            PackageManager.log.info(f'Creating "{attr_file_name}"...')
 
             for source_path, _ in self._generate_include_paths(package_node, root_dir):
-                PackageManager.log.info(f'+ "{source_path}"')
+                if os.path.isabs(source_path):
+                    relpath = os.path.relpath(source_path, root_dir)
+                else:
+                    relpath = source_path
+                    source_path = os.path.join(self.ppj.project_path, source_path)
 
-                relpath = os.path.relpath(source_path, root_dir)
                 target_path = os.path.join(self.options.temp_path, relpath)
+
+                PackageManager.log.info(f'+ "{relpath.casefold()}"')
 
                 # fix target path if user passes a deeper package root (RootDir)
                 if endswith(source_path, '.pex', ignorecase=True) and not startswith(relpath, 'scripts', ignorecase=True):
@@ -219,18 +257,18 @@ class PackageManager:
         file_names = CaseInsensitiveList()
 
         for i, zip_node in enumerate(filter(is_zipfile_node, self.ppj.zip_files_node)):
-            file_name: str = zip_node.get(XmlAttributeName.NAME)
+            attr_file_name: str = zip_node.get(XmlAttributeName.NAME)
 
             # prevent clobbering files previously created in this session
-            if file_name in file_names:
-                file_name = f'{file_name} ({i})'
+            if attr_file_name in file_names:
+                attr_file_name = f'{attr_file_name} ({i})'
 
-            if file_name not in file_names:
-                file_names.append(file_name)
+            if attr_file_name not in file_names:
+                file_names.append(attr_file_name)
 
-            file_name = self._fix_zip_extension(file_name)
+            attr_file_name = self._fix_zip_extension(attr_file_name)
 
-            file_path: str = os.path.join(self.options.zip_output_path, file_name)
+            file_path: str = os.path.join(self.options.zip_output_path, attr_file_name)
 
             self._check_write_permission(file_path)
 
@@ -242,26 +280,26 @@ class PackageManager:
             except KeyError:
                 compress_type = ZipCompression.STORE
 
-            root_dir: str = zip_node.get(XmlAttributeName.ROOT_DIR)
-            zip_root_path: str = self._try_resolve_project_relative_path(root_dir)
+            attr_root_dir: str = zip_node.get(XmlAttributeName.ROOT_DIR)
+            zip_root_path: str = self._try_resolve_project_relative_path(attr_root_dir)
 
             if zip_root_path:
-                PackageManager.log.info(f'Creating "{file_name}"...')
+                PackageManager.log.info(f'Creating "{attr_file_name}"...')
 
                 try:
                     with zipfile.ZipFile(file_path, mode='w', compression=compress_type.value) as z:
-                        for include_path, user_path in self._generate_include_paths(zip_node, zip_root_path):
-                            if zip_root_path not in include_path:
-                                PackageManager.log.warning(f'Cannot add file to ZIP outside RootDir: "{include_path}"')
-                                continue
-
+                        for include_path, user_path in self._generate_include_paths(zip_node, zip_root_path, True):
                             if not user_path:
-                                arcname: str = os.path.relpath(include_path, zip_root_path)
+                                if zip_root_path in include_path:
+                                    arcname = os.path.relpath(include_path, zip_root_path)
+                                else:
+                                    # just add file to zip root
+                                    arcname = os.path.basename(include_path)
                             else:
-                                _, file_name = os.path.split(include_path)
-                                arcname: str = os.path.join(user_path, file_name)
+                                _, attr_file_name = os.path.split(include_path)
+                                arcname = attr_file_name if user_path == os.curdir else os.path.join(user_path, attr_file_name)
 
-                            PackageManager.log.info(f'+ "{arcname}"')
+                            PackageManager.log.info('+ "{}"'.format(arcname))
                             z.write(include_path, arcname, compress_type=compress_type.value)
 
                     PackageManager.log.info(f'Wrote ZIP file: "{file_path}"')
@@ -269,5 +307,5 @@ class PackageManager:
                     PackageManager.log.error(f'Cannot open ZIP file for writing: "{file_path}"')
                     sys.exit(1)
             else:
-                PackageManager.log.error(f'Cannot resolve RootDir path to existing folder: "{root_dir}"')
+                PackageManager.log.error(f'Cannot resolve RootDir path to existing folder: "{attr_root_dir}"')
                 sys.exit(1)

@@ -60,6 +60,10 @@ def is_include_node(node: etree.ElementBase) -> bool:
     return node is not None and endswith(node.tag, 'Include') and node.text is not None
 
 
+def is_match_node(node: etree.ElementBase) -> bool:
+    return node is not None and endswith(node.tag, 'Match') and node.text is not None
+
+
 def is_package_node(node: etree.ElementBase) -> bool:
     return node is not None and endswith(node.tag, 'Package')
 
