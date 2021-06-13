@@ -74,12 +74,33 @@ class PackageManager:
             if not zip_mode and startswith(search_path, (os.path.sep, os.path.altsep)):
                 search_path = '**' + search_path
 
+            if '\\' in search_path:
+                search_path = search_path.replace('\\', '/')
+
             # populate files list using glob patterns or relative paths
-            if '*' in search_path or not os.path.isabs(search_path):
+            if '*' in search_path:
                 for include_path in glob.iglob(search_path,
                                                root_dir=root_path,
                                                flags=PackageManager.DEFAULT_GLFLAGS):
                     yield include_path, attr_path
+
+            elif not os.path.isabs(search_path):
+                test_path = os.path.normpath(os.path.join(root_path, search_path))
+                if os.path.isfile(test_path):
+                    yield test_path, attr_path
+                elif os.path.isdir(test_path):
+                    user_flags = wcmatch.RECURSIVE if not attr_no_recurse else 0x0
+                    matcher = wcmatch.WcMatch(test_path, '*.*', flags=wcmatch.IGNORECASE | user_flags)
+
+                    matcher.on_reset()
+                    matcher._skipped = 0
+                    for f in matcher._walk():
+                        yield f, attr_path
+                else:
+                    for include_path in glob.iglob(search_path,
+                                                   root_dir=root_path,
+                                                   flags=PackageManager.DEFAULT_GLFLAGS):
+                        yield include_path, attr_path
 
             # populate files list using absolute paths
             else:
