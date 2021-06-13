@@ -37,7 +37,8 @@
         </xs:complexType>
     </xs:element>
     <xs:element name="Folder" type="pyro:recursablePath"/>
-    <xs:element name="Include" type="pyro:recursablePathInclude"/>
+    <xs:element name="Include" type="pyro:includePattern"/>
+    <xs:element name="Match" type="pyro:matchPattern"/>
     <xs:element name="Package" type="pyro:includeBase"/>
     <xs:element name="ZipFile" type="pyro:includeZip"/>
 
@@ -90,13 +91,27 @@
     <xs:complexType name="recursablePath" mixed="true">
         <xs:attribute name="NoRecurse" type="pyro:bool" default="false"/>
     </xs:complexType>
-    <xs:complexType name="recursablePathInclude" mixed="true">
-        <xs:attribute name="NoRecurse" type="pyro:bool" default="false"/>
-        <xs:attribute name="Path" type="xs:string" default=""/>
+    <xs:complexType name="includePattern" mixed="true">
+        <xs:complexContent>
+            <xs:extension base="recursablePath">
+                <xs:attribute name="Path" type="xs:string" default=""/>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+    <xs:complexType name="matchPattern" mixed="true">
+        <xs:complexContent>
+            <xs:extension base="recursablePath">
+                <xs:attribute name="In" type="xs:string" default=""/>
+                <xs:attribute name="Exclude" type="xs:string" default=""/>
+            </xs:extension>
+        </xs:complexContent>
     </xs:complexType>
     <xs:complexType name="includeBase">
         <xs:sequence>
-            <xs:element maxOccurs="unbounded" ref="pyro:Include"/>
+            <xs:choice minOccurs="0" maxOccurs="unbounded">
+                <xs:element maxOccurs="unbounded" ref="pyro:Include"/>
+                <xs:element maxOccurs="unbounded" ref="pyro:Match"/>
+            </xs:choice>
         </xs:sequence>
         <xs:attribute name="Name" type="xs:string"/>
         <xs:attribute name="RootDir" type="xs:string" use="required"/>

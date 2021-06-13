@@ -80,8 +80,8 @@ class BuildFacade:
             try:
                 header = PexReader.get_header(pex_path)
             except ValueError:
-                BuildFacade.log.warning(f'Cannot determine compilation time due to unknown magic: "{pex_path}"')
-                continue
+                BuildFacade.log.error(f'Cannot determine compilation time due to unknown magic: "{pex_path}"')
+                sys.exit(1)
 
             psc_last_modified: float = os.path.getmtime(script_path)
             pex_last_compiled: float = float(header.compilation_time.value)
@@ -132,8 +132,8 @@ class BuildFacade:
             # these are absolute paths. there's no reason to manipulate them.
             for pex_path in self.ppj.pex_paths:
                 if not os.path.isfile(pex_path):
-                    BuildFacade.log.warning(f'Cannot locate file to anonymize: "{pex_path}"')
-                    continue
+                    BuildFacade.log.error(f'Cannot locate file to anonymize: "{pex_path}"')
+                    sys.exit(1)
 
                 Anonymizer.anonymize_script(pex_path)
 

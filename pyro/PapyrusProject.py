@@ -1,5 +1,4 @@
 import configparser
-import glob
 import hashlib
 import io
 import os
@@ -8,6 +7,7 @@ import typing
 from copy import deepcopy
 
 from lxml import etree
+from wcmatch import wcmatch
 
 from pyro.Enums.BuildEvent import BuildEvent
 from pyro.Enums.ImportEvent import ImportEvent
@@ -232,7 +232,7 @@ class PapyrusProject(ProjectBase):
             self.options.game_type = GameType.get(game_type)
 
             if self.options.game_type:
-                PapyrusProject.log.warning(f'Using game type: {GameName.get(game_type)} (determined from Papyrus Project)')
+                PapyrusProject.log.info(f'Using game type: {GameName.get(game_type)} (determined from Papyrus Project)')
 
         if not self.options.game_type:
             self.options.game_type = self.get_game_type()
@@ -344,11 +344,17 @@ class PapyrusProject(ProjectBase):
                 if XmlAttributeName.ROOT_DIR not in node.attrib:
                     node.set(XmlAttributeName.ROOT_DIR, self.project_path)
 
-            elif tag in (XmlTagName.FOLDER, XmlTagName.INCLUDE):
+            elif tag in (XmlTagName.FOLDER, XmlTagName.INCLUDE, XmlTagName.MATCH):
                 if XmlAttributeName.NO_RECURSE not in node.attrib:
                     node.set(XmlAttributeName.NO_RECURSE, 'False')
-                if tag == XmlTagName.INCLUDE and XmlAttributeName.PATH not in node.attrib:
-                    node.set(XmlAttributeName.PATH, '')
+                if tag == XmlTagName.INCLUDE:
+                    if XmlAttributeName.PATH not in node.attrib:
+                        node.set(XmlAttributeName.PATH, '')
+                elif tag == XmlTagName.MATCH:
+                    if XmlAttributeName.IN not in node.attrib:
+                        node.set(XmlAttributeName.IN, os.curdir)
+                    if XmlAttributeName.EXCLUDE not in node.attrib:
+                        node.set(XmlAttributeName.EXCLUDE, '')
 
             elif tag == XmlTagName.ZIP_FILES:
                 if XmlAttributeName.OUTPUT not in node.attrib:
@@ -415,8 +421,8 @@ class PapyrusProject(ProjectBase):
             import_path = os.path.normpath(import_node.text)
 
             if import_path == os.pardir:
-                self.log.warning(f'Import paths cannot be equal to "{os.pardir}"')
-                continue
+                PapyrusProject.log.error(f'Import paths cannot be equal to "{os.pardir}"')
+                sys.exit(1)
 
             if import_path == os.curdir:
                 import_path = self.project_path
@@ -427,7 +433,7 @@ class PapyrusProject(ProjectBase):
             if os.path.isdir(import_path):
                 results.append(import_path)
             else:
-                self.log.error(f'Import path does not exist: "{import_path}"')
+                PapyrusProject.log.error(f'Import path does not exist: "{import_path}"')
                 sys.exit(1)
 
         return PathHelper.uniqify(results)
@@ -553,7 +559,9 @@ class PapyrusProject(ProjectBase):
 
         local_path = os.path.join(temp_path, url_path)
 
-        for f in glob.iglob(os.path.join(local_path, r'**/*.psc'), recursive=True):
+        matcher = wcmatch.WcMatch(local_path, '*.psc', flags=wcmatch.IGNORECASE | wcmatch.RECURSIVE)
+
+        for f in matcher.imatch():
             return os.path.dirname(f)
 
         return local_path
@@ -605,11 +613,16 @@ class PapyrusProject(ProjectBase):
             if os.path.isdir(test_path):
                 # count scripts to avoid issue where an errant `test_path` may exist and contain no sources
                 # this can be a problem if that folder contains sources but user error is hard to fix
-                search_path: str = os.path.join(test_path, '*' if no_recurse else r'**\*')
-                script_count: int = sum(1 for f in glob.iglob(search_path, recursive=not no_recurse)
-                                        if endswith(f, '.psc', ignorecase=True))
-                if script_count > 0:
-                    yield from PathHelper.find_script_paths_from_folder(test_path, no_recurse)
+                test_passed = False
+
+                user_flags = wcmatch.RECURSIVE if not no_recurse else 0x0
+                matcher = wcmatch.WcMatch(test_path, '*.psc', flags=wcmatch.IGNORECASE | user_flags)
+                for _ in matcher.imatch():
+                    test_passed = True
+                    break
+
+                if test_passed:
+                    yield from PathHelper.find_script_paths_from_folder(test_path, no_recurse, matcher)
                     continue
 
             # try to add import-relative folder path
@@ -652,8 +665,8 @@ class PapyrusProject(ProjectBase):
             try:
                 header = PexReader.get_header(matching_path)
             except ValueError:
-                PapyrusProject.log.warning(f'Cannot determine compilation time due to unknown magic: "{matching_path}"')
-                continue
+                PapyrusProject.log.error(f'Cannot determine compilation time due to unknown magic: "{matching_path}"')
+                sys.exit(1)
 
             compiled_time: int = header.compilation_time.value
             if os.path.getmtime(script_path) < compiled_time:

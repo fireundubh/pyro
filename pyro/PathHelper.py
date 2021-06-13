@@ -1,8 +1,9 @@
-import glob
 import os
 from collections import OrderedDict
 from typing import Generator, Iterable
 from urllib.parse import unquote_plus, urlparse
+
+from wcmatch import wcmatch
 
 from pyro.Comparators import endswith, startswith
 
@@ -30,19 +31,13 @@ class PathHelper:
         return file_name
 
     @staticmethod
-    def find_include_paths(search_path: str, no_recurse: bool, user_path: str = '') -> Generator:
-        """Yields existing file paths from absolute search path"""
-        for include_path in glob.iglob(search_path, recursive=not no_recurse):
-            if os.path.isfile(include_path):
-                yield include_path, user_path
-
-    @staticmethod
-    def find_script_paths_from_folder(folder_path: str, no_recurse: bool) -> Generator:
+    def find_script_paths_from_folder(folder_path: str, no_recurse: bool, matcher: wcmatch.WcMatch = None) -> Generator:
         """Yields existing script paths starting from absolute folder path"""
-        search_path: str = os.path.join(folder_path, '*' if no_recurse else r'**\*')
-        for script_path in glob.iglob(search_path, recursive=not no_recurse):
-            if os.path.isfile(script_path) and endswith(script_path, '.psc', ignorecase=True):
-                yield script_path
+        if not matcher:
+            user_flags = wcmatch.RECURSIVE if not no_recurse else 0x0
+            matcher = wcmatch.WcMatch(folder_path, '*.psc', flags=wcmatch.IGNORECASE | user_flags)
+        for script_path in matcher.imatch():
+            yield script_path
 
     @staticmethod
     def uniqify(items: Iterable) -> list:

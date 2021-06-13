@@ -46,30 +46,16 @@ class Application:
 
         if not os.path.isabs(input_path):
             cwd = os.getcwd()
-            Application.log.warning(f'Using working directory: "{cwd}"')
+            Application.log.info(f'Using working directory: "{cwd}"')
 
             input_path = os.path.join(cwd, input_path)
 
-        Application.log.warning(f'Using input path: "{input_path}"')
+        Application.log.info(f'Using input path: "{input_path}"')
 
         return input_path
 
     @staticmethod
-    def _validate_project(ppj: PapyrusProject) -> None:
-        compiler_path = ppj.get_compiler_path()
-        if not compiler_path or not os.path.isfile(compiler_path):
-            Application.log.error('Cannot proceed without compiler path')
-            sys.exit(1)
-
-        flags_path = ppj.get_flags_path()
-        if not flags_path:
-            Application.log.error('Cannot proceed without flags path')
-            sys.exit(1)
-
-        if not ppj.options.game_type:
-            Application.log.error('Cannot determine game type from arguments or Papyrus Project')
-            sys.exit(1)
-
+    def _validate_project_file(ppj: PapyrusProject):
         if not ppj.has_imports_node:
             Application.log.error('Cannot proceed without imports defined in project')
             sys.exit(1)
@@ -84,6 +70,22 @@ class Application:
 
         if ppj.options.zip and not ppj.has_zip_files_node:
             Application.log.error('Cannot proceed with Zip enabled without ZipFile defined in project')
+            sys.exit(1)
+
+    @staticmethod
+    def _validate_project_paths(ppj: PapyrusProject) -> None:
+        compiler_path = ppj.get_compiler_path()
+        if not compiler_path or not os.path.isfile(compiler_path):
+            Application.log.error('Cannot proceed without compiler path')
+            sys.exit(1)
+
+        flags_path = ppj.get_flags_path()
+        if not flags_path:
+            Application.log.error('Cannot proceed without flags path')
+            sys.exit(1)
+
+        if not ppj.options.game_type:
+            Application.log.error('Cannot determine game type from arguments or Papyrus Project')
             sys.exit(1)
 
         if not os.path.isabs(flags_path) and \
@@ -107,6 +109,9 @@ class Application:
 
         options = ProjectOptions(self.args.__dict__)
         ppj = PapyrusProject(options)
+
+        self._validate_project_file(ppj)
+
         ppj.try_initialize_remotes()
 
         ppj.try_import_event(ImportEvent.PRE)
@@ -117,7 +122,7 @@ class Application:
         ppj.find_missing_scripts()
         ppj.try_set_game_path()
 
-        self._validate_project(ppj)
+        self._validate_project_paths(ppj)
 
         Application.log.info('Imports found:')
         for path in ppj.import_paths:
@@ -142,25 +147,28 @@ class Application:
             if build.failed_count == 0 or ppj.options.ignore_errors:
                 build.try_anonymize()
             else:
-                Application.log.warning(f'Cannot anonymize scripts because {build.failed_count} scripts failed to compile')
+                Application.log.error(f'Cannot anonymize scripts because {build.failed_count} scripts failed to compile')
+                sys.exit(build.failed_count)
         else:
-            Application.log.warning('Cannot anonymize scripts because Anonymize is disabled in project')
+            Application.log.info('Cannot anonymize scripts because Anonymize is disabled in project')
 
         if ppj.options.package:
             if build.failed_count == 0 or ppj.options.ignore_errors:
                 build.try_pack()
             else:
-                Application.log.warning(f'Cannot create Packages because {build.failed_count} scripts failed to compile')
+                Application.log.error(f'Cannot create Packages because {build.failed_count} scripts failed to compile')
+                sys.exit(build.failed_count)
         else:
-            Application.log.warning('Cannot create Packages because Package is disabled in project')
+            Application.log.info('Cannot create Packages because Package is disabled in project')
 
         if ppj.options.zip:
             if build.failed_count == 0 or ppj.options.ignore_errors:
                 build.try_zip()
             else:
-                Application.log.warning(f'Cannot create ZipFile because {build.failed_count} scripts failed to compile')
+                Application.log.error(f'Cannot create ZipFile because {build.failed_count} scripts failed to compile')
+                sys.exit(build.failed_count)
         else:
-            Application.log.warning('Cannot create ZipFile because Zip is disabled in project')
+            Application.log.info('Cannot create ZipFile because Zip is disabled in project')
 
         Application.log.info(build.build_time if build.success_count > 0 else 'No scripts were compiled.')
 
