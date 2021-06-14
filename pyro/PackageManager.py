@@ -159,7 +159,6 @@ class PackageManager:
 
             yield from PackageManager._match(in_path, match_text,
                                              exclude_pattern=attr_exclude,
-                                             user_path=attr_in,
                                              no_recurse=attr_no_recurse)
 
     def _fix_package_extension(self, package_name: str) -> str:
@@ -248,7 +247,7 @@ class PackageManager:
                     relpath: str = source_path
                     source_path = os.path.join(self.ppj.project_path, source_path)
 
-                adj_relpath: str = os.path.normpath(os.path.join(attr_path, relpath))
+                adj_relpath = os.path.normpath(os.path.join(attr_path, relpath))
 
                 PackageManager.log.info(f'+ "{adj_relpath.casefold()}"')
 
