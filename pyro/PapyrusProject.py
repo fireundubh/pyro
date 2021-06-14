@@ -370,7 +370,8 @@ class PapyrusProject(ProjectBase):
                 else:
                     node.set(XmlAttributeName.COMPRESSION, node.get(XmlAttributeName.COMPRESSION).casefold())
 
-            elif tag == XmlTagName.PRE_BUILD_EVENT or tag == XmlTagName.POST_BUILD_EVENT:
+            elif tag in (XmlTagName.PRE_BUILD_EVENT, XmlTagName.POST_BUILD_EVENT,
+                         XmlTagName.PRE_IMPORT_EVENT, XmlTagName.POST_IMPORT_EVENT):
                 if XmlAttributeName.DESCRIPTION not in node.attrib:
                     node.set(XmlAttributeName.DESCRIPTION, '')
                 if XmlAttributeName.USE_IN_BUILD not in node.attrib:
