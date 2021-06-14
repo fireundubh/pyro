@@ -1,11 +1,13 @@
 import os
-from collections import OrderedDict
-from typing import Generator, Iterable
-from urllib.parse import unquote_plus, urlparse
+from typing import (Generator,
+                    Iterable)
+from urllib.parse import (unquote_plus,
+                          urlparse)
 
 from wcmatch import wcmatch
 
-from pyro.Comparators import endswith, startswith
+from pyro.Comparators import (endswith,
+                              startswith)
 
 
 class PathHelper:
@@ -21,28 +23,27 @@ class PathHelper:
 
             import_path = os.path.normpath(import_path)
 
-            if len(script_path) > len(import_path):
-                if startswith(script_path, import_path, ignorecase=True):
-                    file_name = script_path[len(import_path):]
-                    if file_name[0] == '\\' or file_name[0] == '/':
-                        file_name = file_name[1:]
-                    break
+            if len(script_path) > len(import_path) and startswith(script_path, import_path, ignorecase=True):
+                file_name = script_path[len(import_path):]
+                if file_name[0] == '\\' or file_name[0] == '/':
+                    file_name = file_name[1:]
+                break
 
         return file_name
 
     @staticmethod
-    def find_script_paths_from_folder(folder_path: str, no_recurse: bool, matcher: wcmatch.WcMatch = None) -> Generator:
+    def find_script_paths_from_folder(root_dir: str, *, no_recurse: bool, matcher: wcmatch.WcMatch = None) -> Generator:
         """Yields existing script paths starting from absolute folder path"""
         if not matcher:
             user_flags = wcmatch.RECURSIVE if not no_recurse else 0x0
-            matcher = wcmatch.WcMatch(folder_path, '*.psc', flags=wcmatch.IGNORECASE | user_flags)
+            matcher = wcmatch.WcMatch(root_dir, '*.psc', flags=wcmatch.IGNORECASE | user_flags)
         for script_path in matcher.imatch():
             yield script_path
 
     @staticmethod
     def uniqify(items: Iterable) -> list:
         """Returns ordered list without duplicates"""
-        return list(OrderedDict.fromkeys(items))
+        return list(dict.fromkeys(items))
 
     @staticmethod
     def find_index_of_ancestor_import_path(implicit_path: str, import_paths: list) -> int:

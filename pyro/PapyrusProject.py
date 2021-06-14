@@ -370,7 +370,8 @@ class PapyrusProject(ProjectBase):
                 else:
                     node.set(XmlAttributeName.COMPRESSION, node.get(XmlAttributeName.COMPRESSION).casefold())
 
-            elif tag == XmlTagName.PRE_BUILD_EVENT or tag == XmlTagName.POST_BUILD_EVENT:
+            elif tag in (XmlTagName.PRE_BUILD_EVENT, XmlTagName.POST_BUILD_EVENT,
+                         XmlTagName.PRE_IMPORT_EVENT, XmlTagName.POST_IMPORT_EVENT):
                 if XmlAttributeName.DESCRIPTION not in node.attrib:
                     node.set(XmlAttributeName.DESCRIPTION, '')
                 if XmlAttributeName.USE_IN_BUILD not in node.attrib:
@@ -412,23 +413,24 @@ class PapyrusProject(ProjectBase):
             return []
 
         for import_node in filter(is_import_node, self.imports_node):
-            if startswith(import_node.text, self.remote_schemas, ignorecase=True):
+            import_path: str = import_node.text
+
+            if startswith(import_path, self.remote_schemas, ignorecase=True):
                 local_path = self._get_remote_path(import_node)
                 PapyrusProject.log.info(f'Adding import path from remote: "{local_path}"...')
                 results.append(local_path)
                 continue
 
-            import_path = os.path.normpath(import_node.text)
+            if import_path == os.pardir or startswith(import_path, os.pardir):
+                import_path = import_path.replace(os.pardir, os.path.normpath(os.path.join(self.project_path, os.pardir)), 1)
+            elif import_path == os.curdir or startswith(import_path, os.curdir):
+                import_path = import_path.replace(os.curdir, self.project_path, 1)
 
-            if import_path == os.pardir:
-                PapyrusProject.log.error(f'Import paths cannot be equal to "{os.pardir}"')
-                sys.exit(1)
+            # relative import paths should be relative to the project
+            if not os.path.isabs(import_path):
+                import_path = os.path.join(self.project_path, import_path)
 
-            if import_path == os.curdir:
-                import_path = self.project_path
-            elif not os.path.isabs(import_path):
-                # relative import paths should be relative to the project
-                import_path = os.path.normpath(os.path.join(self.project_path, import_path))
+            import_path = os.path.normpath(import_path)
 
             if os.path.isdir(import_path):
                 results.append(import_path)
@@ -445,16 +447,12 @@ class PapyrusProject(ProjectBase):
         if not self.has_folders_node:
             return []
 
+        try_append_path = lambda path: implicit_paths.append(path) \
+            if os.path.isdir(path) and path not in self.import_paths else None
+
         for folder_node in filter(is_folder_node, self.folders_node):
             folder_path: str = os.path.normpath(folder_node.text)
-
-            if os.path.isabs(folder_path):
-                if os.path.isdir(folder_path) and folder_path not in self.import_paths:
-                    implicit_paths.append(folder_path)
-            else:
-                test_path = os.path.join(self.project_path, folder_path)
-                if os.path.isdir(test_path) and test_path not in self.import_paths:
-                    implicit_paths.append(test_path)
+            try_append_path(folder_path if os.path.isabs(folder_path) else os.path.join(self.project_path, folder_path))
 
         return PathHelper.uniqify(implicit_paths)
 
@@ -498,16 +496,17 @@ class PapyrusProject(ProjectBase):
         """Returns script paths from Folders and Scripts nodes"""
         object_names: dict = {}
 
+        def add_object_name(p):
+            object_names[p if not os.path.isabs(p) else self._calculate_object_name(p)] = p
+
         # try to populate paths with scripts from Folders and Scripts nodes
         if self.has_folders_node:
-            for script_path in self._get_script_paths_from_folders_node():
-                object_name = script_path if not os.path.isabs(script_path) else self._calculate_object_name(script_path)
-                object_names[object_name] = script_path
+            for path in self._get_script_paths_from_folders_node():
+                add_object_name(path)
 
         if self.has_scripts_node:
-            for script_path in self._get_script_paths_from_scripts_node():
-                object_name = script_path if not os.path.isabs(script_path) else self._calculate_object_name(script_path)
-                object_names[object_name] = script_path
+            for path in self._get_script_paths_from_scripts_node():
+                add_object_name(path)
 
         # convert user paths to absolute paths
         for object_name, script_path in object_names.items():
@@ -536,12 +535,14 @@ class PapyrusProject(ProjectBase):
         return object_names
 
     def _get_remote_path(self, node: etree.ElementBase) -> str:
-        url_hash = hashlib.sha1(node.text.encode()).hexdigest()[:8]
+        import_path: str = node.text
+
+        url_hash = hashlib.sha1(import_path.encode()).hexdigest()[:8]
         temp_path = os.path.join(self.options.remote_temp_path, url_hash)
 
         if self.options.force_overwrite or not os.path.isdir(temp_path):
             try:
-                for message in self.remote.fetch_contents(node.text, temp_path):
+                for message in self.remote.fetch_contents(import_path, temp_path):
                     if message:
                         if not startswith(message, 'Failed to load'):
                             PapyrusProject.log.info(message)
@@ -552,10 +553,10 @@ class PapyrusProject(ProjectBase):
                 PapyrusProject.log.error(e)
                 sys.exit(1)
 
-        if endswith(node.text, '.git', ignorecase=True):
-            url_path = self.remote.create_local_path(node.text[:-4])
+        if endswith(import_path, '.git', ignorecase=True):
+            url_path = self.remote.create_local_path(import_path[:-4])
         else:
-            url_path = self.remote.create_local_path(node.text)
+            url_path = self.remote.create_local_path(import_path)
 
         local_path = os.path.join(temp_path, url_path)
 
@@ -579,33 +580,36 @@ class PapyrusProject(ProjectBase):
 
             attr_no_recurse: bool = folder_node.get(XmlAttributeName.NO_RECURSE) == 'True'
 
-            # try to add project path
-            if folder_node.text == os.curdir:
-                yield from PathHelper.find_script_paths_from_folder(self.project_path, attr_no_recurse)
-                continue
+            folder_path: str = folder_node.text
 
             # handle . and .. in path
-            if folder_node.text == os.pardir:
-                folder_node.text = folder_node.text.replace(os.pardir, os.path.normpath(os.path.join(self.project_path, os.pardir)), 1)
-            elif os.path.sep in os.path.normpath(folder_node.text):
-                if startswith(folder_node.text, os.pardir):
-                    folder_node.text = folder_node.text.replace(os.pardir, os.path.normpath(os.path.join(self.project_path, os.pardir)), 1)
-                elif startswith(folder_node.text, os.curdir):
-                    folder_node.text = folder_node.text.replace(os.curdir, self.project_path, 1)
+            if folder_path == os.pardir or startswith(folder_path, os.pardir):
+                folder_path = folder_path.replace(os.pardir, os.path.normpath(os.path.join(self.project_path, os.pardir)), 1)
+                yield from PathHelper.find_script_paths_from_folder(folder_path,
+                                                                    no_recurse=attr_no_recurse)
+                continue
 
-            if startswith(folder_node.text, self.remote_schemas, ignorecase=True):
+            if folder_path == os.curdir or startswith(folder_path, os.curdir):
+                folder_path = folder_path.replace(os.curdir, self.project_path, 1)
+                yield from PathHelper.find_script_paths_from_folder(folder_path,
+                                                                    no_recurse=attr_no_recurse)
+                continue
+
+            if startswith(folder_path, self.remote_schemas, ignorecase=True):
                 local_path = self._get_remote_path(folder_node)
                 PapyrusProject.log.info(f'Adding import path from remote: "{local_path}"...')
                 self.import_paths.insert(0, local_path)
                 PapyrusProject.log.info(f'Adding folder path from remote: "{local_path}"...')
-                yield from PathHelper.find_script_paths_from_folder(local_path, attr_no_recurse)
+                yield from PathHelper.find_script_paths_from_folder(local_path,
+                                                                    no_recurse=attr_no_recurse)
                 continue
 
-            folder_path: str = os.path.normpath(folder_node.text)
+            folder_path = os.path.normpath(folder_path)
 
             # try to add absolute path
             if os.path.isabs(folder_path) and os.path.isdir(folder_path):
-                yield from PathHelper.find_script_paths_from_folder(folder_path, attr_no_recurse)
+                yield from PathHelper.find_script_paths_from_folder(folder_path,
+                                                                    no_recurse=attr_no_recurse)
                 continue
 
             # try to add project-relative folder path
@@ -622,14 +626,17 @@ class PapyrusProject(ProjectBase):
                     break
 
                 if test_passed:
-                    yield from PathHelper.find_script_paths_from_folder(test_path, attr_no_recurse, matcher)
+                    yield from PathHelper.find_script_paths_from_folder(test_path,
+                                                                        no_recurse=attr_no_recurse,
+                                                                        matcher=matcher)
                     continue
 
             # try to add import-relative folder path
             for import_path in self.import_paths:
                 test_path = os.path.join(import_path, folder_path)
                 if os.path.isdir(test_path):
-                    yield from PathHelper.find_script_paths_from_folder(test_path, attr_no_recurse)
+                    yield from PathHelper.find_script_paths_from_folder(test_path,
+                                                                        no_recurse=attr_no_recurse)
 
     # noinspection DuplicatedCode
     def _get_script_paths_from_scripts_node(self) -> typing.Generator:
@@ -637,14 +644,23 @@ class PapyrusProject(ProjectBase):
         for script_node in filter(is_script_node, self.scripts_node):
             self.try_fix_namespace_path(script_node)
 
-            # handle . and .. in path
-            if os.path.sep in os.path.normpath(script_node.text):
-                if startswith(script_node.text, os.pardir):
-                    script_node.text = script_node.text.replace(os.pardir, os.path.normpath(os.path.join(self.project_path, os.pardir)), 1)
-                elif startswith(script_node.text, os.curdir):
-                    script_node.text = script_node.text.replace(os.curdir, self.project_path, 1)
+            script_path: str = script_node.text
 
-            yield os.path.normpath(script_node.text)
+            if script_path == os.pardir or script_path == os.curdir:
+                PapyrusProject.log.error(f'Script path at line {script_node.sourceline} in project file is not a file path')
+                sys.exit(1)
+
+            # handle . and .. in path
+            if startswith(script_path, os.pardir):
+                script_path = script_path.replace(os.pardir, os.path.normpath(os.path.join(self.project_path, os.pardir)), 1)
+            elif startswith(script_path, os.curdir):
+                script_path = script_path.replace(os.curdir, self.project_path, 1)
+
+            if os.path.isdir(script_path):
+                PapyrusProject.log.error(f'Script path at line {script_node.sourceline} in project file is not a file path')
+                sys.exit(1)
+
+            yield os.path.normpath(script_path)
 
     def _try_exclude_unmodified_scripts(self) -> dict:
         psc_paths: dict = {}

@@ -11,7 +11,4 @@ class CaseInsensitiveList(UserList):
         return item in self.data
 
     def append(self, item: object) -> None:
-        if isinstance(item, str):
-            self.data.append(item.casefold())
-        else:
-            self.data.append(item)
+        self.data.append(item.casefold() if isinstance(item, str) else item)
