@@ -9,8 +9,9 @@ from copy import deepcopy
 from lxml import etree
 from wcmatch import wcmatch
 
-from pyro.Enums.BuildEvent import BuildEvent
-from pyro.Enums.ImportEvent import ImportEvent
+from pyro.Enums.Event import (Event,
+                              BuildEvent,
+                              ImportEvent)
 from pyro.CommandArguments import CommandArguments
 from pyro.Comparators import (endswith,
                               is_folder_node,
@@ -43,14 +44,6 @@ class PapyrusProject(ProjectBase):
     zip_files_node: etree.ElementBase = None
     pre_build_node: etree.ElementBase = None
     post_build_node: etree.ElementBase = None
-
-    has_folders_node: bool = False
-    has_imports_node: bool = False
-    has_packages_node: bool = False
-    has_scripts_node: bool = False
-    has_zip_files_node: bool = False
-    has_pre_build_node: bool = False
-    has_post_build_node: bool = False
 
     remote: RemoteBase = None
     remote_schemas: tuple = ('https:', 'http:')
@@ -106,46 +99,39 @@ class PapyrusProject(ProjectBase):
         if self.options.output_path and not os.path.isabs(self.options.output_path):
             self.options.output_path = self.get_output_path()
 
-        self.optimize = self.ppj_root.get(XmlAttributeName.OPTIMIZE) == 'True'
-        self.release = self.ppj_root.get(XmlAttributeName.RELEASE) == 'True'
-        self.final = self.ppj_root.get(XmlAttributeName.FINAL) == 'True'
+        bool_attr = lambda element, attr_name: element is not None and element.get(attr_name) == 'True'
 
-        self.options.anonymize = self.ppj_root.get(XmlAttributeName.ANONYMIZE) == 'True'
-        self.options.package = self.ppj_root.get(XmlAttributeName.PACKAGE) == 'True'
-        self.options.zip = self.ppj_root.get(XmlAttributeName.ZIP) == 'True'
+        self.optimize = bool_attr(self.ppj_root, XmlAttributeName.OPTIMIZE)
+        self.release = bool_attr(self.ppj_root, XmlAttributeName.RELEASE)
+        self.final = bool_attr(self.ppj_root, XmlAttributeName.FINAL)
+
+        self.options.anonymize = bool_attr(self.ppj_root, XmlAttributeName.ANONYMIZE)
+        self.options.package = bool_attr(self.ppj_root, XmlAttributeName.PACKAGE)
+        self.options.zip = bool_attr(self.ppj_root, XmlAttributeName.ZIP)
 
         self.imports_node = self.ppj_root.find(XmlTagName.IMPORTS)
-        self.has_imports_node = self.imports_node is not None
-
         self.scripts_node = self.ppj_root.find(XmlTagName.SCRIPTS)
-        self.has_scripts_node = self.scripts_node is not None
-
         self.folders_node = self.ppj_root.find(XmlTagName.FOLDERS)
-        self.has_folders_node = self.folders_node is not None
-
         self.packages_node = self.ppj_root.find(XmlTagName.PACKAGES)
-        self.has_packages_node = self.packages_node is not None
-
         self.zip_files_node = self.ppj_root.find(XmlTagName.ZIP_FILES)
-        self.has_zip_files_node = self.zip_files_node is not None
 
         self.pre_build_node = self.ppj_root.find(XmlTagName.PRE_BUILD_EVENT)
-        self.has_pre_build_node = self.pre_build_node is not None
+        self.use_pre_build_event = bool_attr(self.pre_build_node, XmlAttributeName.USE_IN_BUILD)
 
         self.post_build_node = self.ppj_root.find(XmlTagName.POST_BUILD_EVENT)
-        self.has_post_build_node = self.post_build_node is not None
+        self.use_post_build_event = bool_attr(self.post_build_node, XmlAttributeName.USE_IN_BUILD)
 
         self.pre_import_node = self.ppj_root.find(XmlTagName.PRE_IMPORT_EVENT)
-        self.has_pre_import_node = self.pre_import_node is not None
+        self.use_pre_import_event = bool_attr(self.pre_import_node, XmlAttributeName.USE_IN_BUILD)
 
         self.post_import_node = self.ppj_root.find(XmlTagName.POST_IMPORT_EVENT)
-        self.has_post_import_node = self.post_import_node is not None
+        self.use_post_import_event = bool_attr(self.post_import_node, XmlAttributeName.USE_IN_BUILD)
 
-        if self.options.package and self.has_packages_node:
+        if self.options.package and self.packages_node is not None:
             if not self.options.package_path:
                 self.options.package_path = self.packages_node.get(XmlAttributeName.OUTPUT)
 
-        if self.options.zip and self.has_zip_files_node:
+        if self.options.zip and self.zip_files_node is not None:
             if not self.options.zip_output_path:
                 self.options.zip_output_path = self.zip_files_node.get(XmlAttributeName.OUTPUT)
 
@@ -260,11 +246,11 @@ class PapyrusProject(ProjectBase):
         """
         results: list = []
 
-        if self.has_imports_node:
+        if self.imports_node is not None:
             results.extend([node.text for node in filter(is_import_node, self.imports_node)
                             if startswith(node.text, self.remote_schemas, ignorecase=True)])
 
-        if self.has_folders_node:
+        if self.folders_node is not None:
             results.extend([node.text for node in filter(is_folder_node, self.folders_node)
                             if startswith(node.text, self.remote_schemas, ignorecase=True)])
 
@@ -409,7 +395,7 @@ class PapyrusProject(ProjectBase):
         """Returns absolute import paths from Papyrus Project"""
         results: list = []
 
-        if not self.has_imports_node:
+        if self.imports_node is None:
             return []
 
         for import_node in filter(is_import_node, self.imports_node):
@@ -444,7 +430,7 @@ class PapyrusProject(ProjectBase):
         """Returns absolute implicit import paths from Folder node paths"""
         implicit_paths: list = []
 
-        if not self.has_folders_node:
+        if self.folders_node is None:
             return []
 
         try_append_path = lambda path: implicit_paths.append(path) \
@@ -500,11 +486,11 @@ class PapyrusProject(ProjectBase):
             object_names[p if not os.path.isabs(p) else self._calculate_object_name(p)] = p
 
         # try to populate paths with scripts from Folders and Scripts nodes
-        if self.has_folders_node:
+        if self.folders_node is not None:
             for path in self._get_script_paths_from_folders_node():
                 add_object_name(path)
 
-        if self.has_scripts_node:
+        if self.scripts_node is not None:
             for path in self._get_script_paths_from_scripts_node():
                 add_object_name(path)
 
@@ -756,24 +742,14 @@ class PapyrusProject(ProjectBase):
 
         return commands
 
-    def try_build_event(self, event: BuildEvent) -> None:
-        if event == BuildEvent.PRE:
-            has_event_node, event_node = self.has_pre_build_node, self.pre_build_node
-        elif event == BuildEvent.POST:
-            has_event_node, event_node = self.has_post_build_node, self.post_build_node
-        else:
-            raise NotImplementedError
-
-        if has_event_node:
-            ProcessManager.run_event(event_node, self.project_path)
-
-    def try_import_event(self, event: ImportEvent) -> None:
+    def try_run_event(self, event: Event) -> None:
         if event == ImportEvent.PRE:
-            has_event_node, event_node = self.has_pre_import_node, self.pre_import_node
+            ProcessManager.run_event(self.pre_import_node, self.project_path)
         elif event == ImportEvent.POST:
-            has_event_node, event_node = self.has_post_import_node, self.post_import_node
+            ProcessManager.run_event(self.post_import_node, self.project_path)
+        elif event == BuildEvent.PRE:
+            ProcessManager.run_event(self.pre_build_node, self.project_path)
+        elif event == BuildEvent.POST:
+            ProcessManager.run_event(self.post_build_node, self.project_path)
         else:
             raise NotImplementedError
-
-        if has_event_node:
-            ProcessManager.run_event(event_node, self.project_path)
