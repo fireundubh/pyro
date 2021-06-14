@@ -69,7 +69,8 @@ class BuildFacade:
             script_name, _ = os.path.splitext(os.path.basename(script_path))
 
             # if pex exists, compare time_t in pex header with psc's last modified timestamp
-            pex_match: list = [pex_path for pex_path in self.ppj.pex_paths if endswith(pex_path, f'{script_name}.pex', ignorecase=True)]
+            pex_match: list = [pex_path for pex_path in self.ppj.pex_paths
+                               if endswith(pex_path, f'{script_name}.pex', ignorecase=True)]
             if not pex_match:
                 continue
 

@@ -585,12 +585,14 @@ class PapyrusProject(ProjectBase):
             # handle . and .. in path
             if folder_path == os.pardir or startswith(folder_path, os.pardir):
                 folder_path = folder_path.replace(os.pardir, os.path.normpath(os.path.join(self.project_path, os.pardir)), 1)
-                yield from PathHelper.find_script_paths_from_folder(folder_path, attr_no_recurse)
+                yield from PathHelper.find_script_paths_from_folder(folder_path,
+                                                                    no_recurse=attr_no_recurse)
                 continue
 
             if folder_path == os.curdir or startswith(folder_path, os.curdir):
                 folder_path = folder_path.replace(os.curdir, self.project_path, 1)
-                yield from PathHelper.find_script_paths_from_folder(folder_path, attr_no_recurse)
+                yield from PathHelper.find_script_paths_from_folder(folder_path,
+                                                                    no_recurse=attr_no_recurse)
                 continue
 
             if startswith(folder_path, self.remote_schemas, ignorecase=True):
@@ -598,14 +600,16 @@ class PapyrusProject(ProjectBase):
                 PapyrusProject.log.info(f'Adding import path from remote: "{local_path}"...')
                 self.import_paths.insert(0, local_path)
                 PapyrusProject.log.info(f'Adding folder path from remote: "{local_path}"...')
-                yield from PathHelper.find_script_paths_from_folder(local_path, attr_no_recurse)
+                yield from PathHelper.find_script_paths_from_folder(local_path,
+                                                                    no_recurse=attr_no_recurse)
                 continue
 
             folder_path = os.path.normpath(folder_path)
 
             # try to add absolute path
             if os.path.isabs(folder_path) and os.path.isdir(folder_path):
-                yield from PathHelper.find_script_paths_from_folder(folder_path, attr_no_recurse)
+                yield from PathHelper.find_script_paths_from_folder(folder_path,
+                                                                    no_recurse=attr_no_recurse)
                 continue
 
             # try to add project-relative folder path
@@ -622,14 +626,17 @@ class PapyrusProject(ProjectBase):
                     break
 
                 if test_passed:
-                    yield from PathHelper.find_script_paths_from_folder(test_path, attr_no_recurse, matcher)
+                    yield from PathHelper.find_script_paths_from_folder(test_path,
+                                                                        no_recurse=attr_no_recurse,
+                                                                        matcher=matcher)
                     continue
 
             # try to add import-relative folder path
             for import_path in self.import_paths:
                 test_path = os.path.join(import_path, folder_path)
                 if os.path.isdir(test_path):
-                    yield from PathHelper.find_script_paths_from_folder(test_path, attr_no_recurse)
+                    yield from PathHelper.find_script_paths_from_folder(test_path,
+                                                                        no_recurse=attr_no_recurse)
 
     # noinspection DuplicatedCode
     def _get_script_paths_from_scripts_node(self) -> typing.Generator:
