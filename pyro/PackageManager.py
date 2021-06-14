@@ -69,7 +69,7 @@ class PackageManager:
         for include_node in filter(is_include_node, includes_node):
             attr_no_recurse: bool = include_node.get(XmlAttributeName.NO_RECURSE) == 'True'
             attr_path: str = (include_node.get(XmlAttributeName.PATH) or '').strip()
-            search_path: str = include_node.text.strip()
+            search_path: str = include_node.text
 
             if not search_path:
                 PackageManager.log.error(f'Include path at line {include_node.sourceline} in project file is empty')
@@ -151,7 +151,7 @@ class PackageManager:
                 PackageManager.log.error(f'Cannot match path that does not exist or is not a directory: "{in_path}"')
                 sys.exit(1)
 
-            match_text: str = match_node.text.strip()
+            match_text: str = match_node.text
 
             if startswith(match_text, '.'):
                 PackageManager.log.error(f'Match pattern at line {match_node.sourceline} in project file is not a valid wildcard pattern')

@@ -34,7 +34,7 @@ class ProcessManager:
 
         environ: dict = os.environ.copy()
         command: str = ' && '.join(
-            ws.sub(' ', node.text.strip())
+            ws.sub(' ', node.text)
             for node in filter(is_command_node, event_node)
         )
 

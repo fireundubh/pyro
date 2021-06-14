@@ -446,16 +446,12 @@ class PapyrusProject(ProjectBase):
         if not self.has_folders_node:
             return []
 
+        try_append_path = lambda path: implicit_paths.append(path) \
+            if os.path.isdir(path) and path not in self.import_paths else None
+
         for folder_node in filter(is_folder_node, self.folders_node):
             folder_path: str = os.path.normpath(folder_node.text)
-
-            if os.path.isabs(folder_path):
-                if os.path.isdir(folder_path) and folder_path not in self.import_paths:
-                    implicit_paths.append(folder_path)
-            else:
-                test_path = os.path.join(self.project_path, folder_path)
-                if os.path.isdir(test_path) and test_path not in self.import_paths:
-                    implicit_paths.append(test_path)
+            try_append_path(folder_path if os.path.isabs(folder_path) else os.path.join(self.project_path, folder_path))
 
         return PathHelper.uniqify(implicit_paths)
 
@@ -499,16 +495,17 @@ class PapyrusProject(ProjectBase):
         """Returns script paths from Folders and Scripts nodes"""
         object_names: dict = {}
 
+        def add_object_name(p):
+            object_names[p if not os.path.isabs(p) else self._calculate_object_name(p)] = p
+
         # try to populate paths with scripts from Folders and Scripts nodes
         if self.has_folders_node:
-            for script_path in self._get_script_paths_from_folders_node():
-                object_name = script_path if not os.path.isabs(script_path) else self._calculate_object_name(script_path)
-                object_names[object_name] = script_path
+            for path in self._get_script_paths_from_folders_node():
+                add_object_name(path)
 
         if self.has_scripts_node:
-            for script_path in self._get_script_paths_from_scripts_node():
-                object_name = script_path if not os.path.isabs(script_path) else self._calculate_object_name(script_path)
-                object_names[object_name] = script_path
+            for path in self._get_script_paths_from_scripts_node():
+                add_object_name(path)
 
         # convert user paths to absolute paths
         for object_name, script_path in object_names.items():
@@ -537,12 +534,14 @@ class PapyrusProject(ProjectBase):
         return object_names
 
     def _get_remote_path(self, node: etree.ElementBase) -> str:
-        url_hash = hashlib.sha1(node.text.encode()).hexdigest()[:8]
+        import_path: str = node.text
+
+        url_hash = hashlib.sha1(import_path.encode()).hexdigest()[:8]
         temp_path = os.path.join(self.options.remote_temp_path, url_hash)
 
         if self.options.force_overwrite or not os.path.isdir(temp_path):
             try:
-                for message in self.remote.fetch_contents(node.text, temp_path):
+                for message in self.remote.fetch_contents(import_path, temp_path):
                     if message:
                         if not startswith(message, 'Failed to load'):
                             PapyrusProject.log.info(message)
@@ -553,10 +552,10 @@ class PapyrusProject(ProjectBase):
                 PapyrusProject.log.error(e)
                 sys.exit(1)
 
-        if endswith(node.text, '.git', ignorecase=True):
-            url_path = self.remote.create_local_path(node.text[:-4])
+        if endswith(import_path, '.git', ignorecase=True):
+            url_path = self.remote.create_local_path(import_path[:-4])
         else:
-            url_path = self.remote.create_local_path(node.text)
+            url_path = self.remote.create_local_path(import_path)
 
         local_path = os.path.join(temp_path, url_path)
 
@@ -644,7 +643,7 @@ class PapyrusProject(ProjectBase):
         for script_node in filter(is_script_node, self.scripts_node):
             self.try_fix_namespace_path(script_node)
 
-            script_path: str = script_node.text.strip()
+            script_path: str = script_node.text
 
             if script_path == os.pardir or script_path == os.curdir:
                 PapyrusProject.log.error(f'Script path at line {script_node.sourceline} in project file is not a file path')
