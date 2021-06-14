@@ -28,6 +28,9 @@ class ProcessManager:
 
     @staticmethod
     def run_event(event_node: etree.ElementBase, project_path: str) -> None:
+        if event_node is None:
+            return
+
         ProcessManager.log.info(event_node.get(XmlAttributeName.DESCRIPTION))
 
         ws: re.Pattern = re.compile('[ \t\n\r]+')

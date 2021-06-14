@@ -3,8 +3,8 @@ import logging
 import os
 import sys
 
-from pyro.Enums.BuildEvent import BuildEvent
-from pyro.Enums.ImportEvent import ImportEvent
+from pyro.Enums.Event import (BuildEvent,
+                              ImportEvent)
 from pyro.BuildFacade import BuildFacade
 from pyro.Comparators import startswith
 from pyro.PapyrusProject import PapyrusProject
@@ -56,19 +56,19 @@ class Application:
 
     @staticmethod
     def _validate_project_file(ppj: PapyrusProject):
-        if not ppj.has_imports_node:
+        if ppj.imports_node is None:
             Application.log.error('Cannot proceed without imports defined in project')
             sys.exit(1)
 
-        if not ppj.has_scripts_node and not ppj.has_folders_node:
+        if ppj.scripts_node is None and ppj.folders_node is None:
             Application.log.error('Cannot proceed without Scripts or Folders defined in project')
             sys.exit(1)
 
-        if ppj.options.package and not ppj.has_packages_node:
+        if ppj.options.package and ppj.packages_node is None:
             Application.log.error('Cannot proceed with Package enabled without Packages defined in project')
             sys.exit(1)
 
-        if ppj.options.zip and not ppj.has_zip_files_node:
+        if ppj.options.zip and ppj.zip_files_node is None:
             Application.log.error('Cannot proceed with Zip enabled without ZipFile defined in project')
             sys.exit(1)
 
@@ -114,9 +114,13 @@ class Application:
 
         ppj.try_initialize_remotes()
 
-        ppj.try_import_event(ImportEvent.PRE)
+        if ppj.use_pre_import_event:
+            ppj.try_run_event(ImportEvent.PRE)
+
         ppj.try_populate_imports()
-        ppj.try_import_event(ImportEvent.POST)
+
+        if ppj.use_post_import_event:
+            ppj.try_run_event(ImportEvent.POST)
 
         ppj.try_set_game_type()
         ppj.find_missing_scripts()
@@ -139,7 +143,8 @@ class Application:
             Application.log.error('Cannot proceed with Package enabled without valid BSArch path')
             sys.exit(1)
 
-        ppj.try_build_event(BuildEvent.PRE)
+        if ppj.use_pre_build_event:
+            ppj.try_run_event(BuildEvent.PRE)
 
         build.try_compile()
 
@@ -174,7 +179,7 @@ class Application:
 
         Application.log.info('DONE!')
 
-        if build.failed_count == 0:
-            ppj.try_build_event(BuildEvent.POST)
+        if ppj.use_post_build_event and build.failed_count == 0:
+            ppj.try_run_event(BuildEvent.POST)
 
         return build.failed_count
