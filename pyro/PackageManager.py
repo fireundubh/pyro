@@ -33,7 +33,7 @@ class PackageManager:
     pak_extension: str = ''
     zip_extension: str = ''
 
-    DEFAULT_GLFLAGS = glob.NODIR | glob.MATCHBASE | glob.SPLIT | glob.REALPATH | glob.GLOBSTAR | glob.FOLLOW | glob.IGNORECASE | glob.MINUSNEGATE
+    DEFAULT_GLFLAGS = glob.NODIR | glob.MATCHBASE | glob.SPLIT | glob.REALPATH | glob.FOLLOW | glob.IGNORECASE | glob.MINUSNEGATE
     DEFAULT_WCFLAGS = wcmatch.SYMLINKS | wcmatch.IGNORECASE | wcmatch.MINUSNEGATE
 
     def __init__(self, ppj: PapyrusProject) -> None:
@@ -93,8 +93,8 @@ class PackageManager:
             if '*' in search_path:
                 for include_path in glob.iglob(search_path,
                                                root_dir=root_path,
-                                               flags=PackageManager.DEFAULT_GLFLAGS):
-                    yield include_path, attr_path
+                                               flags=PackageManager.DEFAULT_GLFLAGS | glob.GLOBSTAR if not attr_no_recurse else 0x0):
+                    yield os.path.join(root_path, include_path), attr_path
 
             elif not os.path.isabs(search_path):
                 test_path = os.path.normpath(os.path.join(root_path, search_path))
@@ -107,8 +107,8 @@ class PackageManager:
                 else:
                     for include_path in glob.iglob(search_path,
                                                    root_dir=root_path,
-                                                   flags=PackageManager.DEFAULT_GLFLAGS):
-                        yield include_path, attr_path
+                                                   flags=PackageManager.DEFAULT_GLFLAGS | glob.GLOBSTAR if not attr_no_recurse else 0x0):
+                        yield os.path.join(root_path, include_path), attr_path
 
             # populate files list using absolute paths
             else:
