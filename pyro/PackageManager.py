@@ -68,7 +68,7 @@ class PackageManager:
     def _generate_include_paths(includes_node: etree.ElementBase, root_path: str, zip_mode: bool = False) -> typing.Generator:
         for include_node in filter(is_include_node, includes_node):
             attr_no_recurse: bool = include_node.get(XmlAttributeName.NO_RECURSE) == 'True'
-            attr_path: str = (include_node.get(XmlAttributeName.PATH) or '').strip()
+            attr_path: str = include_node.get(XmlAttributeName.PATH).strip()
             search_path: str = include_node.text
 
             if not search_path:
@@ -128,11 +128,7 @@ class PackageManager:
         for match_node in filter(is_match_node, includes_node):
             attr_in: str = match_node.get(XmlAttributeName.IN).strip()
             attr_no_recurse: bool = match_node.get(XmlAttributeName.NO_RECURSE) == 'True'
-            attr_exclude: str = (match_node.get(XmlAttributeName.EXCLUDE) or '').strip()
-
-            if not attr_in:
-                PackageManager.log.error(f'"In" attribute of "Match" tag at line {match_node.sourceline} in project file is empty')
-                sys.exit(1)
+            attr_exclude: str = match_node.get(XmlAttributeName.EXCLUDE).strip()
 
             in_path: str = os.path.normpath(attr_in)
 

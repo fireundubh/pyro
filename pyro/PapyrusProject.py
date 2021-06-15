@@ -304,9 +304,6 @@ class PapyrusProject(ProjectBase):
             if node.text:
                 node.text = self.parse(node.text.strip())
 
-            if not node.attrib:
-                continue
-
             tag = node.tag.replace('{%s}' % self.ppj_root.ns, '')
 
             if tag == XmlTagName.PAPYRUS_PROJECT:
