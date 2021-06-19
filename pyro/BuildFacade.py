@@ -4,8 +4,6 @@ import os
 import sys
 import time
 from copy import deepcopy
-from dataclasses import (dataclass,
-                         field)
 
 import psutil
 
@@ -13,70 +11,15 @@ from pyro.Anonymizer import Anonymizer
 from pyro.PackageManager import PackageManager
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
+from pyro.Performance.CompileData import CompileData
+from pyro.Performance.PackageData import PackageData
+from pyro.Performance.ZippingData import ZippingData
 from pyro.PexReader import PexReader
 from pyro.ProcessManager import ProcessManager
 from pyro.Enums.ProcessState import ProcessState
-from pyro.TimeElapsed import TimeElapsed
 
 from pyro.Comparators import (endswith,
                               startswith)
-
-
-@dataclass
-class CompileData:
-    time: TimeElapsed = field(init=False, default_factory=TimeElapsed)
-    scripts_count: int = field(init=False, default_factory=int)
-    success_count: int = field(init=False, default_factory=int)
-    command_count: int = field(init=False, default_factory=int)
-
-    def __post_init__(self):
-        self.time = TimeElapsed()
-
-    @property
-    def failed_count(self) -> int:
-        return self.command_count - self.success_count
-
-    def to_string(self):
-        raw_time, avg_time = ('{0:.3f}s'.format(t)
-                              for t in (self.time.value(), self.time.average(self.success_count)))
-
-        return f'Compile time: ' \
-               f'{raw_time} ({avg_time}/script) - ' \
-               f'{self.success_count} succeeded, ' \
-               f'{self.failed_count} failed ' \
-               f'({self.scripts_count} scripts)'
-
-
-@dataclass
-class PackageData:
-    time: TimeElapsed = field(init=False, default_factory=TimeElapsed)
-    file_count: int = field(init=False, default_factory=int)
-
-    def __post_init__(self):
-        self.time = TimeElapsed()
-
-    def to_string(self):
-        raw_time, avg_time = ('{0:.3f}s'.format(t)
-                              for t in (self.time.value(), self.time.average(self.file_count)))
-
-        return f'Package time: ' \
-               f'{raw_time} ({avg_time}/file, {self.file_count} files)'
-
-
-@dataclass
-class ZippingData:
-    time: TimeElapsed = field(init=False, default_factory=TimeElapsed)
-    file_count: int = field(init=False, default_factory=int)
-
-    def __post_init__(self):
-        self.time = TimeElapsed()
-
-    def to_string(self):
-        raw_time, avg_time = ('{0:.3f}s'.format(t)
-                              for t in (self.time.value(), self.time.average(self.file_count)))
-
-        return f'Zipping time: ' \
-               f'{raw_time} ({avg_time}/file, {self.file_count} files)'
 
 
 class BuildFacade:
