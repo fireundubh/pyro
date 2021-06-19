@@ -30,7 +30,7 @@ class Application:
 
         self.args.input_path = self._try_fix_input_path(self.args.input_path or self.args.input_path_deprecated)
 
-        if not os.path.isfile(self.args.input_path):
+        if not self.args.create_project and not os.path.isfile(self.args.input_path):
             Application.log.error(f'Cannot load nonexistent PPJ at given path: "{self.args.input_path}"')
             sys.exit(1)
 
@@ -149,37 +149,41 @@ class Application:
         build.try_compile()
 
         if ppj.options.anonymize:
-            if build.failed_count == 0 or ppj.options.ignore_errors:
+            if build.compile_data.failed_count == 0 or ppj.options.ignore_errors:
                 build.try_anonymize()
             else:
-                Application.log.error(f'Cannot anonymize scripts because {build.failed_count} scripts failed to compile')
-                sys.exit(build.failed_count)
+                Application.log.error(f'Cannot anonymize scripts because {build.compile_data.failed_count} scripts failed to compile')
+                sys.exit(build.compile_data.failed_count)
         else:
             Application.log.info('Cannot anonymize scripts because Anonymize is disabled in project')
 
         if ppj.options.package:
-            if build.failed_count == 0 or ppj.options.ignore_errors:
+            if build.compile_data.failed_count == 0 or ppj.options.ignore_errors:
                 build.try_pack()
             else:
-                Application.log.error(f'Cannot create Packages because {build.failed_count} scripts failed to compile')
-                sys.exit(build.failed_count)
+                Application.log.error(f'Cannot create Packages because {build.compile_data.failed_count} scripts failed to compile')
+                sys.exit(build.compile_data.failed_count)
         else:
             Application.log.info('Cannot create Packages because Package is disabled in project')
 
         if ppj.options.zip:
-            if build.failed_count == 0 or ppj.options.ignore_errors:
+            if build.compile_data.failed_count == 0 or ppj.options.ignore_errors:
                 build.try_zip()
             else:
-                Application.log.error(f'Cannot create ZipFile because {build.failed_count} scripts failed to compile')
-                sys.exit(build.failed_count)
+                Application.log.error(f'Cannot create ZipFile because {build.compile_data.failed_count} scripts failed to compile')
+                sys.exit(build.compile_data.failed_count)
         else:
             Application.log.info('Cannot create ZipFile because Zip is disabled in project')
 
-        Application.log.info(build.build_time if build.success_count > 0 else 'No scripts were compiled.')
+        Application.log.info(build.compile_data.to_string() if build.compile_data.success_count > 0 else 'No scripts were compiled.')
+
+        Application.log.info(build.package_data.to_string() if build.package_data.file_count > 0 else 'No files were packaged.')
+
+        Application.log.info(build.zipping_data.to_string() if build.zipping_data.file_count > 0 else 'No files were zipped.')
 
         Application.log.info('DONE!')
 
-        if ppj.use_post_build_event and build.failed_count == 0:
+        if ppj.use_post_build_event and build.compile_data.failed_count == 0:
             ppj.try_run_event(BuildEvent.POST)
 
-        return build.failed_count
+        return build.compile_data.failed_count

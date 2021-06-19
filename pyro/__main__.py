@@ -112,14 +112,13 @@ if __name__ == '__main__':
                                    help='relative or absolute path to temp folder for remote files\n'
                                         '(if relative, must be relative to project)')
 
-    _debug_arguments = _parser.add_argument_group('debugging arguments')
-    _debug_arguments.add_argument('--resolve-ppj',
-                                  action='store_true',
-                                  help='resolve variables and paths in ppj file')
-    # _debug_arguments.add_argument('--log-path',
-    #                               action='store', type=str,
-    #                               help='relative or absolute path to log folder\n'
-    #                                    '(if relative, must be relative to current working directory)')
+    _project_arguments = _parser.add_argument_group('project arguments')
+    _project_arguments.add_argument('--create-project',
+                                    action='store_true',
+                                    help='generate project from current directory')
+    _project_arguments.add_argument('--resolve-project',
+                                    action='store_true',
+                                    help='resolve variables and paths in project file')
 
     _program_arguments = _parser.add_argument_group('program arguments')
     _program_arguments.add_argument('--help', dest='show_help',
