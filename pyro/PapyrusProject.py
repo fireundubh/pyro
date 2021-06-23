@@ -60,6 +60,9 @@ class PapyrusProject(ProjectBase):
 
         xml_parser: etree.XMLParser = etree.XMLParser(remove_blank_text=True, remove_comments=True)
 
+        if self.options.create_project:
+            sys.exit(1)
+
         # strip comments from raw text because lxml.etree.XMLParser does not remove XML-unsupported comments
         # e.g., '<PapyrusProject <!-- xmlns="PapyrusProject.xsd" -->>'
         xml_document: io.StringIO = XmlHelper.strip_xml_comments(self.options.input_path)
@@ -88,7 +91,7 @@ class PapyrusProject(ProjectBase):
         # options can be overridden by arguments when the BuildFacade is initialized
         self._update_attributes(self.ppj_root.node)
 
-        if self.options.resolve_ppj:
+        if self.options.resolve_project:
             xml_output = etree.tostring(self.ppj_root.node, encoding='utf-8', xml_declaration=True, pretty_print=True)
             PapyrusProject.log.debug(f'Resolved PPJ. Text output:{os.linesep * 2}{xml_output.decode()}')
             sys.exit(1)
@@ -330,10 +333,10 @@ class PapyrusProject(ProjectBase):
             elif tag in (XmlTagName.FOLDER, XmlTagName.INCLUDE, XmlTagName.MATCH):
                 if XmlAttributeName.NO_RECURSE not in node.attrib:
                     node.set(XmlAttributeName.NO_RECURSE, 'False')
-                if tag == XmlTagName.INCLUDE:
+                if tag in (XmlTagName.INCLUDE, XmlTagName.MATCH):
                     if XmlAttributeName.PATH not in node.attrib:
                         node.set(XmlAttributeName.PATH, '')
-                elif tag == XmlTagName.MATCH:
+                if tag == XmlTagName.MATCH:
                     if XmlAttributeName.IN not in node.attrib:
                         node.set(XmlAttributeName.IN, os.curdir)
                     if XmlAttributeName.EXCLUDE not in node.attrib:

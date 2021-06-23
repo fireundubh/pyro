@@ -36,12 +36,32 @@ class PackageManager:
     DEFAULT_GLFLAGS = glob.NODIR | glob.MATCHBASE | glob.SPLIT | glob.REALPATH | glob.FOLLOW | glob.IGNORECASE | glob.MINUSNEGATE
     DEFAULT_WCFLAGS = wcmatch.SYMLINKS | wcmatch.IGNORECASE | wcmatch.MINUSNEGATE
 
+    includes: int = 0
+
     def __init__(self, ppj: PapyrusProject) -> None:
         self.ppj = ppj
         self.options = ppj.options
 
         self.pak_extension = '.ba2' if self.options.game_type == GameType.FO4 else '.bsa'
         self.zip_extension = '.zip'
+
+    @staticmethod
+    def _can_compress_package(containing_folder: str):
+        flags = wcmatch.RECURSIVE | wcmatch.IGNORECASE
+
+        # voices bad because bethesda no likey
+        for _ in wcmatch.WcMatch(containing_folder, '*.fuz', flags=flags).imatch():
+            return False
+
+        # sounds bad because bethesda no likey
+        for _ in wcmatch.WcMatch(containing_folder, '*.wav|*.xwm', flags=flags).imatch():
+            return False
+
+        # strings bad because wrye bash no likey
+        for _ in wcmatch.WcMatch(containing_folder, '*.*strings', flags=flags).imatch():
+            return False
+
+        return True
 
     @staticmethod
     def _check_write_permission(file_path: str) -> None:
@@ -129,6 +149,7 @@ class PackageManager:
             attr_in: str = match_node.get(XmlAttributeName.IN).strip()
             attr_no_recurse: bool = match_node.get(XmlAttributeName.NO_RECURSE) == 'True'
             attr_exclude: str = match_node.get(XmlAttributeName.EXCLUDE).strip()
+            attr_path: str = match_node.get(XmlAttributeName.PATH).strip()
 
             in_path: str = os.path.normpath(attr_in)
 
@@ -155,6 +176,7 @@ class PackageManager:
 
             yield from PackageManager._match(in_path, match_text,
                                              exclude_pattern=attr_exclude,
+                                             user_path=attr_path,
                                              no_recurse=attr_no_recurse)
 
     def _fix_package_extension(self, package_name: str) -> str:
@@ -186,19 +208,32 @@ class PackageManager:
         arguments.append(containing_folder, enquote_value=True)
         arguments.append(output_path, enquote_value=True)
 
+        compressed_package = PackageManager._can_compress_package(containing_folder)
+
+        flags = wcmatch.RECURSIVE | wcmatch.IGNORECASE
+
         if self.options.game_type == GameType.FO4:
-            arguments.append('-fo4')
+            for _ in wcmatch.WcMatch(containing_folder, '!*.dds', flags=flags).imatch():
+                arguments.append('-fo4')
+                break
+            else:
+                arguments.append('-fo4dds')
         elif self.options.game_type == GameType.SSE:
             arguments.append('-sse')
 
-            # SSE has an ctd bug with uncompressed textures in a bsa that
-            # has an Embed Filenames flag on it, so force it to false.
-            for _ in wcmatch.WcMatch(containing_folder, '*.dds',
-                                     flags=wcmatch.RECURSIVE | wcmatch.IGNORECASE).imatch():
-                arguments.append('-af:0x3')
-                break
+            if not compressed_package:
+                # SSE crashes when uncompressed BSA has Embed Filenames flag and contains textures
+                for _ in wcmatch.WcMatch(containing_folder, '*.dds', flags=flags).imatch():
+                    arguments.append('-af:0x3')
+                    break
         else:
             arguments.append('-tes5')
+
+        # binary identical files share same data to preserve space
+        arguments.append('-share')
+
+        if compressed_package:
+            arguments.append('-z')
 
         return arguments.join()
 
@@ -255,6 +290,8 @@ class PackageManager:
 
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
                 shutil.copy2(source_path, target_path)
+
+                self.includes += 1
 
             # run bsarch
             command: str = self.build_commands(self.options.temp_path, file_path)
@@ -317,6 +354,8 @@ class PackageManager:
 
                             PackageManager.log.info('+ "{}"'.format(arcname))
                             z.write(include_path, arcname, compress_type=compress_type.value)
+
+                            self.includes += 1
 
                     PackageManager.log.info(f'Wrote ZIP file: "{file_path}"')
                 except PermissionError:

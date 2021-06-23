@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 from pyro.Constant import Constant
 
 
@@ -21,8 +19,7 @@ class GameType(Constant):
     TES5: str = 'tes5'
 
 
-@dataclass
-class XmlAttributeName:
+class XmlAttributeName(Constant):
     ANONYMIZE: str = 'Anonymize'
     COMPRESSION: str = 'Compression'
     DESCRIPTION: str = 'Description'
@@ -44,8 +41,7 @@ class XmlAttributeName:
     ZIP: str = 'Zip'
 
 
-@dataclass
-class XmlTagName:
+class XmlTagName(Constant):
     FOLDER: str = 'Folder'
     FOLDERS: str = 'Folders'
     IMPORT: str = 'Import'

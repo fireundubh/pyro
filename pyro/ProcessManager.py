@@ -96,6 +96,7 @@ class ProcessManager:
             'Bit',
             'BSArch',
             'Compressed',
+            'Done',
             'Embed',
             'Files',
             'Format',
@@ -122,15 +123,6 @@ class ProcessManager:
                 if startswith(line, 'Archive Name'):
                     archive_path = line.split(':', 1)[1].strip()
                     ProcessManager.log.info(f'Building "{archive_path}"...')
-                    continue
-
-                if startswith(line, 'Done'):
-                    archive_time = line.split('in')[1].strip()[:-1]
-                    hours, minutes, seconds = [round(Decimal(n), 3) for n in archive_time.split(':')]
-
-                    timecode = ProcessManager._format_time(hours, minutes, seconds)
-
-                    ProcessManager.log.info(f'Packaging time: {timecode}')
                     continue
 
                 if line:

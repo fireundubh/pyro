@@ -48,7 +48,8 @@ class ProjectOptions:
 
     # program arguments
     log_path: str = field(init=False, default_factory=str)
-    resolve_ppj: bool = field(init=False, default_factory=bool)
+    create_project: bool = field(init=False, default_factory=bool)
+    resolve_project: bool = field(init=False, default_factory=bool)
 
     def __post_init__(self) -> None:
         for attr_key, attr_value in self.__dict__.items():
