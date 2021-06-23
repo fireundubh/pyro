@@ -149,6 +149,7 @@ class PackageManager:
             attr_in: str = match_node.get(XmlAttributeName.IN).strip()
             attr_no_recurse: bool = match_node.get(XmlAttributeName.NO_RECURSE) == 'True'
             attr_exclude: str = match_node.get(XmlAttributeName.EXCLUDE).strip()
+            attr_path: str = match_node.get(XmlAttributeName.PATH).strip()
 
             in_path: str = os.path.normpath(attr_in)
 
@@ -175,6 +176,7 @@ class PackageManager:
 
             yield from PackageManager._match(in_path, match_text,
                                              exclude_pattern=attr_exclude,
+                                             user_path=attr_path,
                                              no_recurse=attr_no_recurse)
 
     def _fix_package_extension(self, package_name: str) -> str:

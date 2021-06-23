@@ -333,10 +333,10 @@ class PapyrusProject(ProjectBase):
             elif tag in (XmlTagName.FOLDER, XmlTagName.INCLUDE, XmlTagName.MATCH):
                 if XmlAttributeName.NO_RECURSE not in node.attrib:
                     node.set(XmlAttributeName.NO_RECURSE, 'False')
-                if tag == XmlTagName.INCLUDE:
+                if tag in (XmlTagName.INCLUDE, XmlTagName.MATCH):
                     if XmlAttributeName.PATH not in node.attrib:
                         node.set(XmlAttributeName.PATH, '')
-                elif tag == XmlTagName.MATCH:
+                if tag == XmlTagName.MATCH:
                     if XmlAttributeName.IN not in node.attrib:
                         node.set(XmlAttributeName.IN, os.curdir)
                     if XmlAttributeName.EXCLUDE not in node.attrib:

@@ -103,6 +103,7 @@
             <xs:extension base="recursablePath">
                 <xs:attribute name="In" type="xs:string" default=""/>
                 <xs:attribute name="Exclude" type="xs:string" default=""/>
+                <xs:attribute name="Path" type="xs:string" default=""/>
             </xs:extension>
         </xs:complexContent>
     </xs:complexType>
