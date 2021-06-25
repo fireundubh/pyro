@@ -80,13 +80,13 @@ class RemoteBase:
 
         if netloc == 'github.com':
             if len(url_path_parts) == 2:
-                request_url = f'https://{netloc}/repos{path}'
+                request_url = f'https://api.{netloc}/repos{path}'
             elif 'tree/' in path:  # example: /fireundubh/LibFire/tree/master
                 result.branch = url_path_parts.pop(3)  # pop 'master' (or any other branch)
                 url_path_parts.pop(2) if url_path_parts[2] == 'tree' else None  # pop 'tree'
                 url_path_parts.insert(2, 'contents')
                 url_path = '/'.join(url_path_parts)
-                request_url = f'https://{netloc}/repos/{url_path}?ref={result.branch}'
+                request_url = f'https://api.{netloc}/repos/{url_path}?ref={result.branch}'
         elif netloc == 'api.github.com':
             if startswith(path, '/repos'):
                 url_path_parts.pop() if not url_path_parts[len(url_path_parts) - 1] else None  # pop empty space
@@ -99,7 +99,8 @@ class RemoteBase:
             request_url = url
         else:
             if 'contents' not in path:
-                request_url = f'https://{netloc}/api/v1/repos{path}/contents{query}'
+                q = f'?ref={result.branch}' if result.branch else ''
+                request_url = f'https://{netloc}/api/v1/repos{path}/contents{q}'
             else:
                 request_url = url
 
