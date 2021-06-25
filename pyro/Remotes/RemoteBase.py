@@ -32,16 +32,21 @@ class RemoteBase:
 
         netloc = parsed_url.netloc
 
-        url_path_parts = parsed_url.path.split('/')
-        url_path_parts.pop(0) if not url_path_parts[0] else None  # pop empty space
+        if netloc in self.url_patterns:
+            url_path_parts = parsed_url.path.split('/')
+            url_path_parts.pop(0) if not url_path_parts[0] else None  # pop empty space
 
-        if netloc == 'github.com' and len(url_path_parts) == 2:
-            return os.sep.join(url_path_parts)
+            if netloc == 'github.com' and len(url_path_parts) == 2:
+                return os.sep.join(url_path_parts)
 
-        for i in self.url_patterns[netloc]:
-            url_path_parts.pop(i)
+            for i in self.url_patterns[netloc]:
+                url_path_parts.pop(i)
 
-        url_path = os.sep.join(url_path_parts)
+            url_path = os.sep.join(url_path_parts)
+        else:
+            url_path_parts = parsed_url.path.split('/')
+            url_path_parts.pop(0) if not url_path_parts[0] else None  # pop empty space
+            url_path = os.sep.join(url_path_parts)
 
         return url_path
 
@@ -75,13 +80,13 @@ class RemoteBase:
 
         if netloc == 'github.com':
             if len(url_path_parts) == 2:
-                request_url = 'https://api.github.com/repos{}'.format(path)
+                request_url = f'https://{netloc}/repos{path}'
             elif 'tree/' in path:  # example: /fireundubh/LibFire/tree/master
                 result.branch = url_path_parts.pop(3)  # pop 'master' (or any other branch)
                 url_path_parts.pop(2) if url_path_parts[2] == 'tree' else None  # pop 'tree'
                 url_path_parts.insert(2, 'contents')
                 url_path = '/'.join(url_path_parts)
-                request_url = f'https://api.github.com/repos/{url_path}?ref={result.branch}'
+                request_url = f'https://{netloc}/repos/{url_path}?ref={result.branch}'
         elif netloc == 'api.github.com':
             if startswith(path, '/repos'):
                 url_path_parts.pop() if not url_path_parts[len(url_path_parts) - 1] else None  # pop empty space
@@ -93,10 +98,18 @@ class RemoteBase:
         elif netloc == 'api.bitbucket.org':
             request_url = url
         else:
-            raise NotImplementedError
+            if 'contents' not in path:
+                request_url = f'https://{netloc}/api/v1/repos{path}/contents{query}'
+            else:
+                request_url = url
 
-        result.owner = url_path_parts[0]
-        result.repo = url_path_parts[1]
+        if 'api/v1' not in path:
+            result.owner = url_path_parts[0]
+            result.repo = url_path_parts[1]
+        else:
+            result.owner = url_path_parts[3]
+            result.repo = url_path_parts[4]
+
         result.url = request_url
 
         return result

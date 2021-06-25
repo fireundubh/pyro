@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 from pyro.Comparators import endswith
 from pyro.Remotes.RemoteBase import RemoteBase
 from pyro.Remotes.BitbucketRemote import BitbucketRemote
+from pyro.Remotes.GiteaRemote import GiteaRemote
 from pyro.Remotes.GitHubRemote import GitHubRemote
 
 
@@ -17,7 +18,7 @@ class GenericRemote(RemoteBase):
         schemeless_url = url.removeprefix(f'{parsed_url.scheme}://')
 
         if endswith(parsed_url.netloc, 'github.com', ignorecase=True):
-            if not self.access_token:
+            if self.config or not self.access_token:
                 self.access_token = self.find_access_token(schemeless_url)
                 if not self.access_token:
                     raise PermissionError('Cannot download from GitHub remote without access token')
@@ -29,4 +30,11 @@ class GenericRemote(RemoteBase):
             bitbucket = BitbucketRemote()
             yield from bitbucket.fetch_contents(url, output_path)
         else:
-            raise NotImplementedError
+            if self.config or not self.access_token:
+                self.access_token = self.find_access_token(schemeless_url)
+                if not self.access_token:
+                    raise PermissionError('Cannot download from Gitea remote without access token')
+            gitea = GiteaRemote(access_token=self.access_token,
+                                worker_limit=self.worker_limit,
+                                force_overwrite=self.force_overwrite)
+            yield from gitea.fetch_contents(url, output_path)
