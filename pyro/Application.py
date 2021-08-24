@@ -60,10 +60,6 @@ class Application:
             Application.log.error('Cannot proceed without imports defined in project')
             sys.exit(1)
 
-        if ppj.scripts_node is None and ppj.folders_node is None:
-            Application.log.error('Cannot proceed without Scripts or Folders defined in project')
-            sys.exit(1)
-
         if ppj.options.package and ppj.packages_node is None:
             Application.log.error('Cannot proceed with Package enabled without Packages defined in project')
             sys.exit(1)
@@ -112,29 +108,30 @@ class Application:
 
         self._validate_project_file(ppj)
 
-        ppj.try_initialize_remotes()
+        if ppj.scripts_node or ppj.folders_node or ppj.remote_paths:
+            ppj.try_initialize_remotes()
 
-        if ppj.use_pre_import_event:
-            ppj.try_run_event(ImportEvent.PRE)
+            if ppj.use_pre_import_event:
+                ppj.try_run_event(ImportEvent.PRE)
 
-        ppj.try_populate_imports()
+            ppj.try_populate_imports()
 
-        if ppj.use_post_import_event:
-            ppj.try_run_event(ImportEvent.POST)
+            if ppj.use_post_import_event:
+                ppj.try_run_event(ImportEvent.POST)
 
-        ppj.try_set_game_type()
-        ppj.find_missing_scripts()
-        ppj.try_set_game_path()
+            ppj.try_set_game_type()
+            ppj.find_missing_scripts()
+            ppj.try_set_game_path()
 
-        self._validate_project_paths(ppj)
+            self._validate_project_paths(ppj)
 
-        Application.log.info('Imports found:')
-        for path in ppj.import_paths:
-            Application.log.info(f'+ "{path}"')
+            Application.log.info('Imports found:')
+            for path in ppj.import_paths:
+                Application.log.info(f'+ "{path}"')
 
-        Application.log.info('Scripts found:')
-        for _, path in ppj.psc_paths.items():
-            Application.log.info(f'+ "{path}"')
+            Application.log.info('Scripts found:')
+            for _, path in ppj.psc_paths.items():
+                Application.log.info(f'+ "{path}"')
 
         build = BuildFacade(ppj)
 
@@ -146,16 +143,17 @@ class Application:
         if ppj.use_pre_build_event:
             ppj.try_run_event(BuildEvent.PRE)
 
-        build.try_compile()
+        if build.scripts_count > 0:
+            build.try_compile()
 
-        if ppj.options.anonymize:
-            if build.compile_data.failed_count == 0 or ppj.options.ignore_errors:
-                build.try_anonymize()
+            if ppj.options.anonymize:
+                if build.compile_data.failed_count == 0 or ppj.options.ignore_errors:
+                    build.try_anonymize()
+                else:
+                    Application.log.error(f'Cannot anonymize scripts because {build.compile_data.failed_count} scripts failed to compile')
+                    sys.exit(build.compile_data.failed_count)
             else:
-                Application.log.error(f'Cannot anonymize scripts because {build.compile_data.failed_count} scripts failed to compile')
-                sys.exit(build.compile_data.failed_count)
-        else:
-            Application.log.info('Cannot anonymize scripts because Anonymize is disabled in project')
+                Application.log.info('Cannot anonymize scripts because Anonymize is disabled in project')
 
         if ppj.options.package:
             if build.compile_data.failed_count == 0 or ppj.options.ignore_errors:
@@ -175,7 +173,8 @@ class Application:
         else:
             Application.log.info('Cannot create ZipFile because Zip is disabled in project')
 
-        Application.log.info(build.compile_data.to_string() if build.compile_data.success_count > 0 else 'No scripts were compiled.')
+        if build.scripts_count > 0:
+            Application.log.info(build.compile_data.to_string() if build.compile_data.success_count > 0 else 'No scripts were compiled.')
 
         Application.log.info(build.package_data.to_string() if build.package_data.file_count > 0 else 'No files were packaged.')
 
