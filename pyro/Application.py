@@ -56,7 +56,8 @@ class Application:
 
     @staticmethod
     def _validate_project_file(ppj: PapyrusProject):
-        if ppj.imports_node is None:
+        if ppj.imports_node is None and \
+                (ppj.scripts_node is not None or ppj.folders_node is not None):
             Application.log.error('Cannot proceed without imports defined in project')
             sys.exit(1)
 
@@ -161,7 +162,7 @@ class Application:
             else:
                 Application.log.error(f'Cannot create Packages because {build.compile_data.failed_count} scripts failed to compile')
                 sys.exit(build.compile_data.failed_count)
-        else:
+        elif ppj.packages_node is not None:
             Application.log.info('Cannot create Packages because Package is disabled in project')
 
         if ppj.options.zip:
@@ -170,15 +171,17 @@ class Application:
             else:
                 Application.log.error(f'Cannot create ZipFile because {build.compile_data.failed_count} scripts failed to compile')
                 sys.exit(build.compile_data.failed_count)
-        else:
+        elif ppj.zip_files_node is not None:
             Application.log.info('Cannot create ZipFile because Zip is disabled in project')
 
         if build.scripts_count > 0:
             Application.log.info(build.compile_data.to_string() if build.compile_data.success_count > 0 else 'No scripts were compiled.')
 
-        Application.log.info(build.package_data.to_string() if build.package_data.file_count > 0 else 'No files were packaged.')
+        if ppj.packages_node is not None:
+            Application.log.info(build.package_data.to_string() if build.package_data.file_count > 0 else 'No files were packaged.')
 
-        Application.log.info(build.zipping_data.to_string() if build.zipping_data.file_count > 0 else 'No files were zipped.')
+        if ppj.zip_files_node is not None:
+            Application.log.info(build.zipping_data.to_string() if build.zipping_data.file_count > 0 else 'No files were zipped.')
 
         Application.log.info('DONE!')
 
