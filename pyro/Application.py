@@ -109,7 +109,7 @@ class Application:
 
         self._validate_project_file(ppj)
 
-        if ppj.scripts_node or ppj.folders_node or ppj.remote_paths:
+        if ppj.scripts_node is not None or ppj.folders_node is not None or ppj.remote_paths:
             ppj.try_initialize_remotes()
 
             if ppj.use_pre_import_event:
