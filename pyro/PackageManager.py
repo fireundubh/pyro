@@ -324,13 +324,11 @@ class PackageManager:
 
             self._check_write_permission(file_path)
 
-            try:
-                if self.options.zip_compression in ('store', 'deflate'):
-                    compress_type = ZipCompression[self.options.zip_compression]
-                else:
-                    compress_type = ZipCompression[zip_node.get(XmlAttributeName.COMPRESSION)]
-            except KeyError:
-                compress_type = ZipCompression.STORE
+            if self.options.zip_compression in ('store', 'deflate'):
+                compress_type = ZipCompression.get(self.options.zip_compression)
+            else:
+                compress_str = zip_node.get(XmlAttributeName.COMPRESSION)
+                compress_type = ZipCompression.get(compress_str)
 
             root_dir: str = self.ppj._get_path(zip_node.get(XmlAttributeName.ROOT_DIR),
                                                relative_root_path=self.ppj.project_path,
@@ -340,7 +338,7 @@ class PackageManager:
                 PackageManager.log.info(f'Creating "{attr_file_name}"...')
 
                 try:
-                    with zipfile.ZipFile(file_path, mode='w', compression=compress_type.value) as z:
+                    with zipfile.ZipFile(file_path, mode='w', compression=compress_type) as z:
                         for include_path, attr_path in self._generate_include_paths(zip_node, root_dir, True):
                             if not attr_path:
                                 if root_dir in include_path:
@@ -353,7 +351,7 @@ class PackageManager:
                                 arcname = attr_file_name if attr_path == os.curdir else os.path.join(attr_path, attr_file_name)
 
                             PackageManager.log.info('+ "{}"'.format(arcname))
-                            z.write(include_path, arcname, compress_type=compress_type.value)
+                            z.write(include_path, arcname, compress_type=compress_type)
 
                             self.includes += 1
 

@@ -1,15 +1,13 @@
-from enum import Enum
-
-
-class ZipCompression(Enum):
+class ZipCompression:
     STORE = 0
     DEFLATE = 8
+    MAP = {'STORE': 0, 'DEFLATE': 8}
 
-    @classmethod
-    def _missing_(cls, value):
+    @staticmethod
+    def get(value: str) -> int:
         try:
-            return cls[value.upper()]
+            return ZipCompression.MAP[value.upper()]
         except KeyError:
             pass
 
-        raise ValueError("%r is not a valid %s" % (value, cls.__name__))
+        raise ValueError("%s is not a valid key" % value.upper())
