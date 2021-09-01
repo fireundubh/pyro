@@ -19,7 +19,6 @@ from pyro.Comparators import (endswith,
 from pyro.CaseInsensitiveList import CaseInsensitiveList
 from pyro.Constants import (GameType,
                             XmlAttributeName)
-from pyro.Enums.ZipCompression import ZipCompression
 from pyro.PapyrusProject import PapyrusProject
 from pyro.ProcessManager import ProcessManager
 from pyro.ProjectOptions import ProjectOptions
@@ -35,6 +34,8 @@ class PackageManager:
 
     DEFAULT_GLFLAGS = glob.NODIR | glob.MATCHBASE | glob.SPLIT | glob.REALPATH | glob.FOLLOW | glob.IGNORECASE | glob.MINUSNEGATE
     DEFAULT_WCFLAGS = wcmatch.SYMLINKS | wcmatch.IGNORECASE | wcmatch.MINUSNEGATE
+
+    COMPRESS_TYPE = {'store': 0, 'deflate': 8}
 
     includes: int = 0
 
@@ -324,11 +325,13 @@ class PackageManager:
 
             self._check_write_permission(file_path)
 
-            if self.options.zip_compression in ('store', 'deflate'):
-                compress_type = ZipCompression.get(self.options.zip_compression)
-            else:
-                compress_str = zip_node.get(XmlAttributeName.COMPRESSION)
-                compress_type = ZipCompression.get(compress_str)
+            compress_str: str = self.options.zip_compression or zip_node.get(XmlAttributeName.COMPRESSION)
+
+            try:
+                compress_type = self.COMPRESS_TYPE[compress_str.casefold()]
+            except KeyError:
+                PackageManager.log.error(f'"{compress_str}" is not a valid compression type, defaulting to STORE')
+                compress_type = 0
 
             root_dir: str = self.ppj._get_path(zip_node.get(XmlAttributeName.ROOT_DIR),
                                                relative_root_path=self.ppj.project_path,
