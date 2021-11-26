@@ -18,7 +18,8 @@ from pyro.Comparators import (endswith,
                               startswith)
 from pyro.CaseInsensitiveList import CaseInsensitiveList
 from pyro.Constants import (GameType,
-                            XmlAttributeName)
+                            XmlAttributeName,
+                            XmlTagName)
 from pyro.Enums.ZipCompression import ZipCompression
 from pyro.PapyrusProject import PapyrusProject
 from pyro.ProcessManager import ProcessManager
@@ -73,7 +74,7 @@ class PackageManager:
                 sys.exit(1)
 
     @staticmethod
-    def _match(root_dir: str, file_pattern: str, *, exclude_pattern: str = '', user_path: str = '', no_recurse: bool = False) -> typing.Generator:
+    def _match(root_dir: str, file_pattern: str, *, exclude_pattern: str = '', user_path: str = '', no_recurse: bool = False, rewrite_to_path: bool = False) -> typing.Generator:
         user_flags = wcmatch.RECURSIVE if not no_recurse else 0x0
         matcher = wcmatch.WcMatch(root_dir, file_pattern,
                                   exclude_pattern=exclude_pattern,
@@ -82,13 +83,14 @@ class PackageManager:
         matcher.on_reset()
         matcher._skipped = 0
         for file_path in matcher._walk():
-            yield file_path, user_path
+            yield file_path, user_path, rewrite_to_path
 
     @staticmethod
     def _generate_include_paths(includes_node: etree.ElementBase, root_path: str, zip_mode: bool = False) -> typing.Generator:
         for include_node in filter(is_include_node, includes_node):
             attr_no_recurse: bool = include_node.get(XmlAttributeName.NO_RECURSE) == 'True'
             attr_path: str = include_node.get(XmlAttributeName.PATH).strip()
+            attr_rewrite_to_path: bool = include_node.get(XmlAttributeName.REWRITE_TO_PATH) == 'True'
             search_path: str = include_node.text
 
             if not search_path:
@@ -97,6 +99,14 @@ class PackageManager:
 
             if not zip_mode and startswith(search_path, os.pardir):
                 PackageManager.log.error(f'Include paths cannot start with "{os.pardir}"')
+                sys.exit(1)
+
+            if zip_mode and attr_rewrite_to_path:
+                PackageManager.log.error(f'{XmlAttributeName.REWRITE_TO_PATH} attribute is only available on {XmlTagName.PACKAGES}.{XmlTagName.PACKAGE}.{XmlTagName.INCLUDE} elements')
+                sys.exit(1)
+
+            if attr_rewrite_to_path and attr_path == '':
+                PackageManager.log.error(f'{XmlAttributeName.PATH} attribute must be defined and not be empty when using the {XmlAttributeName.REWRITE_TO_PATH} attribute')
                 sys.exit(1)
 
             if startswith(search_path, os.curdir):
@@ -114,7 +124,7 @@ class PackageManager:
                 for include_path in glob.iglob(search_path,
                                                root_dir=root_path,
                                                flags=PackageManager.DEFAULT_GLFLAGS | glob.GLOBSTAR if not attr_no_recurse else 0x0):
-                    yield os.path.join(root_path, include_path), attr_path
+                    yield os.path.join(root_path, include_path), attr_path, attr_rewrite_to_path
 
             elif not os.path.isabs(search_path):
                 test_path = os.path.normpath(os.path.join(root_path, search_path))
@@ -123,12 +133,13 @@ class PackageManager:
                 elif os.path.isdir(test_path):
                     yield from PackageManager._match(test_path, '*.*',
                                                      user_path=attr_path,
-                                                     no_recurse=attr_no_recurse)
+                                                     no_recurse=attr_no_recurse,
+                                                     rewrite_to_path=attr_rewrite_to_path)
                 else:
                     for include_path in glob.iglob(search_path,
                                                    root_dir=root_path,
                                                    flags=PackageManager.DEFAULT_GLFLAGS | glob.GLOBSTAR if not attr_no_recurse else 0x0):
-                        yield os.path.join(root_path, include_path), attr_path
+                        yield os.path.join(root_path, include_path), attr_path, attr_rewrite_to_path
 
             # populate files list using absolute paths
             else:
@@ -139,7 +150,7 @@ class PackageManager:
                 search_path = os.path.abspath(os.path.normpath(search_path))
 
                 if os.path.isfile(search_path):
-                    yield search_path, attr_path
+                    yield search_path, attr_path, attr_rewrite_to_path
                 else:
                     yield from PackageManager._match(search_path, '*.*',
                                                      user_path=attr_path,
@@ -271,21 +282,24 @@ class PackageManager:
 
             PackageManager.log.info(f'Creating "{attr_file_name}"...')
 
-            for source_path, attr_path in self._generate_include_paths(package_node, root_dir):
+            for source_path, attr_path, attr_rewrite_to_path in self._generate_include_paths(package_node, root_dir):
                 if os.path.isabs(source_path):
                     relpath: str = os.path.relpath(source_path, root_dir)
                 else:
                     relpath: str = source_path
                     source_path = os.path.join(self.ppj.project_path, source_path)
 
-                adj_relpath = os.path.normpath(os.path.join(attr_path, relpath))
-
-                PackageManager.log.info(f'+ "{adj_relpath.casefold()}"')
+                if attr_rewrite_to_path:
+                    adj_relpath = os.path.normpath(os.path.join(attr_path, os.path.basename(relpath)))
+                    PackageManager.log.info(f'+ "{relpath.casefold()}" -> "{adj_relpath.casefold()}"')
+                else:
+                    adj_relpath = os.path.normpath(os.path.join(attr_path, relpath))
+                    PackageManager.log.info(f'+ "{adj_relpath.casefold()}"')
 
                 target_path: str = os.path.join(self.options.temp_path, adj_relpath)
 
                 # fix target path if user passes a deeper package root (RootDir)
-                if endswith(source_path, '.pex', ignorecase=True) and not startswith(relpath, 'scripts', ignorecase=True):
+                if endswith(source_path, '.pex', ignorecase=True) and not startswith(relpath, 'scripts', ignorecase=True) and not attr_rewrite_to_path:
                     target_path = os.path.join(self.options.temp_path, 'Scripts', relpath)
 
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
@@ -339,7 +353,7 @@ class PackageManager:
 
                 try:
                     with zipfile.ZipFile(file_path, mode='w', compression=compress_type) as z:
-                        for include_path, attr_path in self._generate_include_paths(zip_node, root_dir, True):
+                        for include_path, attr_path, _ in self._generate_include_paths(zip_node, root_dir, True):
                             if not attr_path:
                                 if root_dir in include_path:
                                     arcname = os.path.relpath(include_path, root_dir)

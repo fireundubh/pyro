@@ -35,6 +35,7 @@ class XmlAttributeName(Constant):
     PACKAGE: str = 'Package'
     PATH: str = 'Path'
     RELEASE: str = 'Release'
+    REWRITE_TO_PATH: str = 'RewriteToPath'
     ROOT_DIR: str = 'RootDir'
     USE_IN_BUILD: str = 'UseInBuild'
     VALUE: str = 'Value'

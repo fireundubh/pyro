@@ -6,7 +6,7 @@
     xmlns="PapyrusProject.xsd"
     xmlns:pyro="PapyrusProject.xsd"
     xmlns:xs="http://www.w3.org/2001/XMLSchema">
-    
+
     <!-- Elements -->
     <xs:element name="PapyrusProject">
         <xs:complexType>
@@ -47,7 +47,7 @@
         <xs:sequence>
             <xs:element maxOccurs="unbounded" name="Variable" type="pyro:nameValuePair"/>
         </xs:sequence>
-    </xs:complexType>    
+    </xs:complexType>
     <xs:complexType name="importList">
         <xs:sequence>
             <xs:element maxOccurs="unbounded" name="Import" type="xs:string"/>
@@ -82,7 +82,7 @@
         <xs:attribute name="Description" type="xs:string"/>
         <xs:attribute name="UseInBuild" type="pyro:bool"/>
     </xs:complexType>
-    
+
     <!-- Reusable Complex Types -->
     <xs:complexType name="nameValuePair">
         <xs:attribute name="Name" type="xs:string" use="required"/>
@@ -95,6 +95,7 @@
         <xs:complexContent>
             <xs:extension base="recursablePath">
                 <xs:attribute name="Path" type="xs:string" default=""/>
+                <xs:attribute name="RewriteToPath" type="pyro:bool" default="false"/>
             </xs:extension>
         </xs:complexContent>
     </xs:complexType>
@@ -124,7 +125,7 @@
             </xs:extension>
         </xs:complexContent>
     </xs:complexType>
-    
+
     <!-- Simple Types -->
     <xs:simpleType name="asmType">
         <xs:restriction base="xs:string">
