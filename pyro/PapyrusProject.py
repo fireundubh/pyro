@@ -300,6 +300,7 @@ class PapyrusProject(ProjectBase):
 
         other_bool_keys = [
             XmlAttributeName.NO_RECURSE,
+            XmlAttributeName.REWRITE_TO_PATH,
             XmlAttributeName.USE_IN_BUILD
         ]
 
@@ -336,6 +337,9 @@ class PapyrusProject(ProjectBase):
                 if tag in (XmlTagName.INCLUDE, XmlTagName.MATCH):
                     if XmlAttributeName.PATH not in node.attrib:
                         node.set(XmlAttributeName.PATH, '')
+                if tag == XmlTagName.INCLUDE:
+                    if XmlAttributeName.REWRITE_TO_PATH not in node.attrib:
+                        node.set(XmlAttributeName.REWRITE_TO_PATH, 'False')
                 if tag == XmlTagName.MATCH:
                     if XmlAttributeName.IN not in node.attrib:
                         node.set(XmlAttributeName.IN, os.curdir)
