@@ -3,6 +3,7 @@ import hashlib
 import io
 import os
 import sys
+import time
 import typing
 from copy import deepcopy
 
@@ -286,6 +287,10 @@ class PapyrusProject(ProjectBase):
         for key in reversed(self.variables.keys()):
             value = self.variables[key]
             self.variables.update({key: self.parse(value)})
+
+        self.variables.update({
+            'UNIXTIME': str(int(time.time()))
+        })
 
     def _update_attributes(self, parent_node: etree.ElementBase) -> None:
         """Updates attributes of element tree with missing attributes and default values"""
