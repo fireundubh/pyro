@@ -49,7 +49,7 @@ class GiteaRemote(RemoteBase):
             sys.exit(1)
 
         if response.status != 200:
-            status: HTTPStatus = HTTPStatus(response.status)
+            status: HTTPStatus = HTTPStatus(response.status)  # type: ignore
             yield 'Failed to load remote: "%s" (%s %s)' % (request_url.url, response.status, status.phrase)
             sys.exit(1)
 
@@ -63,7 +63,7 @@ class GiteaRemote(RemoteBase):
             if not self.force_overwrite and os.path.isfile(target_path):
                 with open(target_path, mode='rb') as f:
                     data = f.read()
-                    sha1 = hashlib.sha1(b'blob %s\x00%s' % (len(data), data.decode()))
+                    sha1 = hashlib.sha1(b'blob %s\x00%s' % (len(data), data.decode()))  # type: ignore
 
                     if sha1.hexdigest() == payload_object['sha']:
                         continue

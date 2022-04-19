@@ -47,7 +47,7 @@ class PackageManager:
         self.zip_extension = '.zip'
 
     @staticmethod
-    def _can_compress_package(containing_folder: str):
+    def _can_compress_package(containing_folder: str) -> bool:
         flags = wcmatch.RECURSIVE | wcmatch.IGNORECASE
 
         # voices bad because bethesda no likey
@@ -148,9 +148,9 @@ class PackageManager:
 
         for match_node in filter(is_match_node, includes_node):
             attr_in: str = match_node.get(XmlAttributeName.IN).strip()
-            attr_no_recurse: bool = match_node.get(XmlAttributeName.NO_RECURSE) == 'True'
+            attr_no_recurse: bool = match_node.get(XmlAttributeName.NO_RECURSE) == 'True'  # type: ignore
             attr_exclude: str = match_node.get(XmlAttributeName.EXCLUDE).strip()
-            attr_path: str = match_node.get(XmlAttributeName.PATH).strip()
+            attr_path: str = match_node.get(XmlAttributeName.PATH).strip()  # type: ignore
 
             in_path: str = os.path.normpath(attr_in)
 
@@ -276,7 +276,7 @@ class PackageManager:
                 if os.path.isabs(source_path):
                     relpath: str = os.path.relpath(source_path, root_dir)
                 else:
-                    relpath: str = source_path
+                    relpath: str = source_path  # type: ignore
                     source_path = os.path.join(self.ppj.project_path, source_path)
 
                 adj_relpath = os.path.normpath(os.path.join(attr_path, relpath))
