@@ -55,7 +55,7 @@ class Application:
         return input_path
 
     @staticmethod
-    def _validate_project_file(ppj: PapyrusProject):
+    def _validate_project_file(ppj: PapyrusProject) -> None:
         if ppj.imports_node is None and \
                 (ppj.scripts_node is not None or ppj.folders_node is not None):
             Application.log.error('Cannot proceed without imports defined in project')

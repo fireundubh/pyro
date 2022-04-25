@@ -3,6 +3,7 @@ import hashlib
 import io
 import os
 import sys
+import time
 import typing
 from copy import deepcopy
 
@@ -102,7 +103,8 @@ class PapyrusProject(ProjectBase):
         if self.options.output_path and not os.path.isabs(self.options.output_path):
             self.options.output_path = self.get_output_path()
 
-        bool_attr = lambda element, attr_name: element is not None and element.get(attr_name) == 'True'
+        def bool_attr(element: etree.Element, attr_name: str) -> bool:
+            return element is not None and element.get(attr_name) == 'True'
 
         self.optimize = bool_attr(self.ppj_root, XmlAttributeName.OPTIMIZE)
         self.release = bool_attr(self.ppj_root, XmlAttributeName.RELEASE)
@@ -287,6 +289,10 @@ class PapyrusProject(ProjectBase):
             value = self.variables[key]
             self.variables.update({key: self.parse(value)})
 
+        self.variables.update({
+            'UNIXTIME': str(int(time.time()))
+        })
+
     def _update_attributes(self, parent_node: etree.ElementBase) -> None:
         """Updates attributes of element tree with missing attributes and default values"""
         ppj_bool_keys = [
@@ -433,8 +439,9 @@ class PapyrusProject(ProjectBase):
         if self.folders_node is None:
             return []
 
-        try_append_path = lambda path: implicit_paths.append(path) \
-            if os.path.isdir(path) and path not in self.import_paths else None
+        def try_append_path(path: str) -> None:
+            if os.path.isdir(path) and path not in self.import_paths:
+                implicit_paths.append(path)
 
         for folder_node in filter(is_folder_node, self.folders_node):
             folder_path: str = os.path.normpath(folder_node.text)
@@ -482,7 +489,7 @@ class PapyrusProject(ProjectBase):
         """Returns script paths from Folders and Scripts nodes"""
         object_names: dict = {}
 
-        def add_object_name(p):
+        def add_object_name(p: str) -> None:
             object_names[p if not os.path.isabs(p) else self._calculate_object_name(p)] = p
 
         # try to populate paths with scripts from Folders and Scripts nodes
@@ -554,7 +561,7 @@ class PapyrusProject(ProjectBase):
         return local_path
 
     @staticmethod
-    def try_fix_namespace_path(node: etree.ElementBase):
+    def try_fix_namespace_path(node: etree.ElementBase) -> None:
         if is_namespace_path(node):
             node.text = node.text.replace(':', os.sep)
 

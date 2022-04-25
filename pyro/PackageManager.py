@@ -19,7 +19,6 @@ from pyro.Comparators import (endswith,
 from pyro.CaseInsensitiveList import CaseInsensitiveList
 from pyro.Constants import (GameType,
                             XmlAttributeName)
-from pyro.Enums.ZipCompression import ZipCompression
 from pyro.PapyrusProject import PapyrusProject
 from pyro.ProcessManager import ProcessManager
 from pyro.ProjectOptions import ProjectOptions
@@ -36,6 +35,8 @@ class PackageManager:
     DEFAULT_GLFLAGS = glob.NODIR | glob.MATCHBASE | glob.SPLIT | glob.REALPATH | glob.FOLLOW | glob.IGNORECASE | glob.MINUSNEGATE
     DEFAULT_WCFLAGS = wcmatch.SYMLINKS | wcmatch.IGNORECASE | wcmatch.MINUSNEGATE
 
+    COMPRESS_TYPE = {'store': 0, 'deflate': 8}
+
     includes: int = 0
 
     def __init__(self, ppj: PapyrusProject) -> None:
@@ -46,7 +47,7 @@ class PackageManager:
         self.zip_extension = '.zip'
 
     @staticmethod
-    def _can_compress_package(containing_folder: str):
+    def _can_compress_package(containing_folder: str) -> bool:
         flags = wcmatch.RECURSIVE | wcmatch.IGNORECASE
 
         # voices bad because bethesda no likey
@@ -147,9 +148,9 @@ class PackageManager:
 
         for match_node in filter(is_match_node, includes_node):
             attr_in: str = match_node.get(XmlAttributeName.IN).strip()
-            attr_no_recurse: bool = match_node.get(XmlAttributeName.NO_RECURSE) == 'True'
+            attr_no_recurse: bool = match_node.get(XmlAttributeName.NO_RECURSE) == 'True'  # type: ignore
             attr_exclude: str = match_node.get(XmlAttributeName.EXCLUDE).strip()
-            attr_path: str = match_node.get(XmlAttributeName.PATH).strip()
+            attr_path: str = match_node.get(XmlAttributeName.PATH).strip()  # type: ignore
 
             in_path: str = os.path.normpath(attr_in)
 
@@ -275,7 +276,7 @@ class PackageManager:
                 if os.path.isabs(source_path):
                     relpath: str = os.path.relpath(source_path, root_dir)
                 else:
-                    relpath: str = source_path
+                    relpath: str = source_path  # type: ignore
                     source_path = os.path.join(self.ppj.project_path, source_path)
 
                 adj_relpath = os.path.normpath(os.path.join(attr_path, relpath))
@@ -324,11 +325,13 @@ class PackageManager:
 
             self._check_write_permission(file_path)
 
-            if self.options.zip_compression in ('store', 'deflate'):
-                compress_type = ZipCompression.get(self.options.zip_compression)
-            else:
-                compress_str = zip_node.get(XmlAttributeName.COMPRESSION)
-                compress_type = ZipCompression.get(compress_str)
+            compress_str: str = self.options.zip_compression or zip_node.get(XmlAttributeName.COMPRESSION)
+
+            try:
+                compress_type = self.COMPRESS_TYPE[compress_str.casefold()]
+            except KeyError:
+                PackageManager.log.error(f'"{compress_str}" is not a valid compression type, defaulting to STORE')
+                compress_type = 0
 
             root_dir: str = self.ppj._get_path(zip_node.get(XmlAttributeName.ROOT_DIR),
                                                relative_root_path=self.ppj.project_path,

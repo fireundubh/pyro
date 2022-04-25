@@ -15,10 +15,10 @@ class GenericRemote(RemoteBase):
         """
         parsed_url = urlparse(url)
 
-        schemeless_url = url.removeprefix(f'{parsed_url.scheme}://')
+        schemeless_url = url.removeprefix(f'{parsed_url.scheme}://')  # type: ignore
 
         if endswith(parsed_url.netloc, 'github.com', ignorecase=True):
-            if self.config or not self.access_token:
+            if self.config or not self.access_token:  # type: ignore
                 self.access_token = self.find_access_token(schemeless_url)
                 if not self.access_token:
                     raise PermissionError('Cannot download from GitHub remote without access token')

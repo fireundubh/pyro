@@ -11,14 +11,14 @@ class CompileData:
     success_count: int = field(init=False, default_factory=int)
     command_count: int = field(init=False, default_factory=int)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.time = TimeElapsed()
 
     @property
     def failed_count(self) -> int:
         return self.command_count - self.success_count
 
-    def to_string(self):
+    def to_string(self) -> str:
         raw_time, avg_time = ('{0:.3f}s'.format(t)
                               for t in (self.time.value(), self.time.average(self.success_count)))
 

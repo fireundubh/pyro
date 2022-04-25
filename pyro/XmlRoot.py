@@ -17,6 +17,5 @@ class XmlRoot:
         path = key if not self.ns else f'ns:{key}', {'ns': self.ns}
         return self.node.find(*path)
 
-    # noinspection Mypy
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: str, default: Any = None) -> Any:  # type: ignore
         return self.node.get(key, default)

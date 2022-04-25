@@ -49,15 +49,15 @@ class GitHubRemote(RemoteBase):
             sys.exit(1)
 
         if response.status != 200:
-            status: HTTPStatus = HTTPStatus(response.status)
+            status: HTTPStatus = HTTPStatus(response.status)  # type: ignore
             yield 'Failed to load remote: "%s" (%s %s)' % (request_url.url, response.status, status.phrase)
             sys.exit(1)
 
         payload_objects: Union[dict, list] = json.loads(response.read().decode('utf-8'))
 
         if 'contents_url' in payload_objects:
-            branch = payload_objects['default_branch']
-            contents_url = payload_objects['contents_url'].replace('{+path}', f'?ref={branch}')
+            branch = payload_objects['default_branch']  # type: ignore
+            contents_url = payload_objects['contents_url'].replace('{+path}', f'?ref={branch}')  # type: ignore
             yield from self.fetch_contents(contents_url, output_path)
             return
 
@@ -69,7 +69,7 @@ class GitHubRemote(RemoteBase):
             if not self.force_overwrite and os.path.isfile(target_path):
                 with open(target_path, mode='rb') as f:
                     data = f.read()
-                    sha1 = hashlib.sha1(b'blob %s\x00%s' % (len(data), data.decode()))
+                    sha1 = hashlib.sha1(b'blob %s\x00%s' % (len(data), data.decode()))  # type: ignore
 
                     if sha1.hexdigest() == payload_object['sha']:
                         continue

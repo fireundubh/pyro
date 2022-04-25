@@ -57,6 +57,7 @@ class ProjectBase:
         :param fallback_path: Absolute path to return if path empty or unset
         """
         if path or startswith(path, (os.curdir, os.pardir)):
+            path = os.path.expanduser(os.path.expandvars(path))
             return path if os.path.isabs(path) else os.path.normpath(os.path.join(relative_root_path, path))
         if isinstance(fallback_path, list):
             return os.path.abspath(os.path.join(*fallback_path))

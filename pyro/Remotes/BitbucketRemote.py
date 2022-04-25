@@ -26,7 +26,7 @@ class BitbucketRemote(RemoteBase):
             sys.exit(1)
 
         if response.status != 200:
-            status: HTTPStatus = HTTPStatus(response.status)
+            status: HTTPStatus = HTTPStatus(response.status)  # type: ignore
             yield 'Failed to load remote: "%s" (%s %s)' % (request_url, response.status, status.phrase)
             sys.exit(1)
 

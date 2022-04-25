@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
-from typing import IO
+from typing import (IO,  # type: ignore
+                    Literal)
 
 from pyro.PexTypes import PexInt
 from pyro.PexTypes import PexStr
@@ -8,7 +9,7 @@ from pyro.PexTypes import PexStr
 @dataclass
 class PexHeader:
     size: int = field(init=False, default=0)
-    endianness: str = field(init=False, default='little')
+    endianness: Literal['little', 'big'] = field(init=False, default='little')
 
     magic: PexInt = field(init=False, default_factory=PexInt)
     major_version: PexInt = field(init=False, default_factory=PexInt)
@@ -35,4 +36,7 @@ class PexHeader:
             if isinstance(obj, PexInt):
                 obj.value = int.from_bytes(obj.data, self.endianness, signed=False)
             elif isinstance(obj, PexStr):
-                obj.value = obj.data.decode('ascii')
+                try:
+                    obj.value = obj.data.decode('ascii')
+                except UnicodeDecodeError:
+                    obj.value = obj.data.decode('utf-8')
