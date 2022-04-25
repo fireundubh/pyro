@@ -36,4 +36,7 @@ class PexHeader:
             if isinstance(obj, PexInt):
                 obj.value = int.from_bytes(obj.data, self.endianness, signed=False)
             elif isinstance(obj, PexStr):
-                obj.value = obj.data.decode('ascii')
+                try:
+                    obj.value = obj.data.decode('ascii')
+                except UnicodeDecodeError:
+                    obj.value = obj.data.decode('utf-8')
