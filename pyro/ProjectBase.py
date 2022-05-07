@@ -58,7 +58,7 @@ class ProjectBase:
         """
         if path or startswith(path, (os.curdir, os.pardir)):
             path = os.path.expanduser(os.path.expandvars(path))
-            return path if os.path.isabs(path) else os.path.normpath(os.path.join(relative_root_path, path))
+            return os.path.normpath(path) if os.path.isabs(path) else os.path.normpath(os.path.join(relative_root_path, path))
         if isinstance(fallback_path, list):
             return os.path.abspath(os.path.join(*fallback_path))
         return fallback_path
