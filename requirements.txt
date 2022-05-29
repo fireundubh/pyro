@@ -2,3 +2,4 @@ lxml
 nuitka
 psutil
 wcmatch
+ordered-set
