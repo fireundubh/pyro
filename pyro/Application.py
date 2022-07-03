@@ -4,7 +4,11 @@ import os
 import sys
 
 from pyro.Enums.Event import (BuildEvent,
-                              ImportEvent)
+                              ImportEvent,
+                              CompileEvent,
+                              AnonymizeEvent,
+                              PackageEvent,
+                              ZipEvent)
 from pyro.BuildFacade import BuildFacade
 from pyro.Comparators import startswith
 from pyro.PapyrusProject import PapyrusProject
@@ -145,11 +149,23 @@ class Application:
             ppj.try_run_event(BuildEvent.PRE)
 
         if build.scripts_count > 0:
+            if ppj.use_pre_compile_event:
+                ppj.try_run_event(CompileEvent.PRE)
+
             build.try_compile()
+
+            if ppj.use_post_compile_event:
+                ppj.try_run_event(CompileEvent.POST)
 
             if ppj.options.anonymize:
                 if build.compile_data.failed_count == 0 or ppj.options.ignore_errors:
+                    if ppj.use_pre_anonymize_event:
+                        ppj.try_run_event(AnonymizeEvent.PRE)
+
                     build.try_anonymize()
+
+                    if ppj.use_post_anonymize_event:
+                        ppj.try_run_event(AnonymizeEvent.POST)
                 else:
                     Application.log.error(f'Cannot anonymize scripts because {build.compile_data.failed_count} scripts failed to compile')
                     sys.exit(build.compile_data.failed_count)
@@ -158,7 +174,13 @@ class Application:
 
         if ppj.options.package:
             if build.compile_data.failed_count == 0 or ppj.options.ignore_errors:
+                if ppj.use_pre_package_event:
+                    ppj.try_run_event(PackageEvent.PRE)
+
                 build.try_pack()
+
+                if ppj.use_post_package_event:
+                    ppj.try_run_event(PackageEvent.POST)
             else:
                 Application.log.error(f'Cannot create Packages because {build.compile_data.failed_count} scripts failed to compile')
                 sys.exit(build.compile_data.failed_count)
@@ -167,7 +189,13 @@ class Application:
 
         if ppj.options.zip:
             if build.compile_data.failed_count == 0 or ppj.options.ignore_errors:
+                if ppj.use_pre_zip_event:
+                    ppj.try_run_event(ZipEvent.PRE)
+
                 build.try_zip()
+
+                if ppj.use_post_zip_event:
+                    ppj.try_run_event(ZipEvent.POST)
             else:
                 Application.log.error(f'Cannot create ZipFile because {build.compile_data.failed_count} scripts failed to compile')
                 sys.exit(build.compile_data.failed_count)
