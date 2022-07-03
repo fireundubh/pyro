@@ -12,4 +12,24 @@ class ImportEvent(Enum):
     POST = 1
 
 
-Event = Union[BuildEvent, ImportEvent]
+class CompileEvent(Enum):
+    PRE = 0
+    POST = 1
+
+
+class AnonymizeEvent(Enum):
+    PRE = 0
+    POST = 1
+
+
+class PackageEvent(Enum):
+    PRE = 0
+    POST = 1
+
+
+class ZipEvent(Enum):
+    PRE = 0
+    POST = 1
+
+
+Event = Union[BuildEvent, ImportEvent, CompileEvent, AnonymizeEvent, PackageEvent, ZipEvent]

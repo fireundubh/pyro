@@ -22,6 +22,14 @@
                     <xs:element minOccurs="0" name="PostBuildEvent" type="pyro:commandList"/>
                     <xs:element minOccurs="0" name="PreImportEvent" type="pyro:commandList"/>
                     <xs:element minOccurs="0" name="PostImportEvent" type="pyro:commandList"/>
+                    <xs:element minOccurs="0" name="PreCompileEvent" type="pyro:commandList"/>
+                    <xs:element minOccurs="0" name="PostCompileEvent" type="pyro:commandList"/>
+                    <xs:element minOccurs="0" name="PreAnonymizeEvent" type="pyro:commandList"/>
+                    <xs:element minOccurs="0" name="PostAnonymizeEvent" type="pyro:commandList"/>
+                    <xs:element minOccurs="0" name="PrePackageEvent" type="pyro:commandList"/>
+                    <xs:element minOccurs="0" name="PostPackageEvent" type="pyro:commandList"/>
+                    <xs:element minOccurs="0" name="PreZipEvent" type="pyro:commandList"/>
+                    <xs:element minOccurs="0" name="PostZipEvent" type="pyro:commandList"/>
                 </xs:choice>
             </xs:sequence>
             <xs:attribute name="Game" type="pyro:gameType"/>

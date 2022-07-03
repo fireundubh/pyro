@@ -12,7 +12,11 @@ from wcmatch import wcmatch
 
 from pyro.Enums.Event import (Event,
                               BuildEvent,
-                              ImportEvent)
+                              ImportEvent,
+                              CompileEvent,
+                              AnonymizeEvent,
+                              PackageEvent,
+                              ZipEvent)
 from pyro.CommandArguments import CommandArguments
 from pyro.Comparators import (endswith,
                               is_folder_node,
@@ -45,6 +49,16 @@ class PapyrusProject(ProjectBase):
     zip_files_node: etree.ElementBase = None
     pre_build_node: etree.ElementBase = None
     post_build_node: etree.ElementBase = None
+    pre_import_node: etree.ElementBase = None
+    post_import_node: etree.ElementBase = None
+    pre_compile_node: etree.ElementBase = None
+    post_compile_node: etree.ElementBase = None
+    pre_anonymize_node: etree.ElementBase = None
+    post_anonymize_node: etree.ElementBase = None
+    pre_package_node: etree.ElementBase = None
+    post_package_node: etree.ElementBase = None
+    pre_zip_node: etree.ElementBase = None
+    post_zip_node: etree.ElementBase = None
 
     remote: RemoteBase = None
     remote_schemas: tuple = ('https:', 'http:')
@@ -131,6 +145,30 @@ class PapyrusProject(ProjectBase):
 
         self.post_import_node = self.ppj_root.find(XmlTagName.POST_IMPORT_EVENT)
         self.use_post_import_event = bool_attr(self.post_import_node, XmlAttributeName.USE_IN_BUILD)
+
+        self.pre_compile_node = self.ppj_root.find(XmlTagName.PRE_COMPILE_EVENT)
+        self.use_pre_compile_event = bool_attr(self.pre_compile_node, XmlAttributeName.USE_IN_BUILD)
+
+        self.post_compile_node = self.ppj_root.find(XmlTagName.POST_COMPILE_EVENT)
+        self.use_post_compile_event = bool_attr(self.post_compile_node, XmlAttributeName.USE_IN_BUILD)
+
+        self.pre_anonymize_node = self.ppj_root.find(XmlTagName.PRE_ANONYMIZE_EVENT)
+        self.use_pre_anonymize_event = bool_attr(self.pre_anonymize_node, XmlAttributeName.USE_IN_BUILD)
+
+        self.post_anonymize_node = self.ppj_root.find(XmlTagName.POST_ANONYMIZE_EVENT)
+        self.use_post_anonymize_event = bool_attr(self.post_anonymize_node, XmlAttributeName.USE_IN_BUILD)
+
+        self.pre_package_node = self.ppj_root.find(XmlTagName.PRE_PACKAGE_EVENT)
+        self.use_pre_package_event = bool_attr(self.pre_package_node, XmlAttributeName.USE_IN_BUILD)
+
+        self.post_package_node = self.ppj_root.find(XmlTagName.POST_PACKAGE_EVENT)
+        self.use_post_package_event = bool_attr(self.post_package_node, XmlAttributeName.USE_IN_BUILD)
+
+        self.pre_zip_node = self.ppj_root.find(XmlTagName.PRE_ZIP_EVENT)
+        self.use_pre_zip_event = bool_attr(self.pre_zip_node, XmlAttributeName.USE_IN_BUILD)
+
+        self.post_zip_node = self.ppj_root.find(XmlTagName.POST_ZIP_EVENT)
+        self.use_post_zip_event = bool_attr(self.post_zip_node, XmlAttributeName.USE_IN_BUILD)
 
         if self.options.package and self.packages_node is not None:
             if not self.options.package_path:
@@ -758,5 +796,21 @@ class PapyrusProject(ProjectBase):
             ProcessManager.run_event(self.pre_build_node, self.project_path)
         elif event == BuildEvent.POST:
             ProcessManager.run_event(self.post_build_node, self.project_path)
+        elif event == CompileEvent.PRE:
+            ProcessManager.run_event(self.pre_compile_node, self.project_path)
+        elif event == CompileEvent.POST:
+            ProcessManager.run_event(self.post_compile_node, self.project_path)
+        elif event == AnonymizeEvent.PRE:
+            ProcessManager.run_event(self.pre_anonymize_node, self.project_path)
+        elif event == AnonymizeEvent.POST:
+            ProcessManager.run_event(self.post_anonymize_node, self.project_path)
+        elif event == PackageEvent.PRE:
+            ProcessManager.run_event(self.pre_package_node, self.project_path)
+        elif event == PackageEvent.POST:
+            ProcessManager.run_event(self.post_package_node, self.project_path)
+        elif event == ZipEvent.PRE:
+            ProcessManager.run_event(self.pre_zip_node, self.project_path)
+        elif event == ZipEvent.POST:
+            ProcessManager.run_event(self.post_zip_node, self.project_path)
         else:
             raise NotImplementedError

@@ -7,6 +7,8 @@ import subprocess
 import sys
 import zipfile
 
+from pyro.Comparators import endswith
+
 
 class Application:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname).4s] %(message)s')
@@ -24,25 +26,38 @@ class Application:
         self.root_tools_path: str = os.path.join(self.root_path, 'tools')
         self.dist_tools_path: str = os.path.join(self.dist_path, 'tools')
 
+        self.site_path: str = os.path.join(self.dist_path, 'site')
+        self.zip_path: str = os.path.join(self.root_path, 'bin', f'{self.package_name}.zip')
+
+        self.dist_glob_pattern: str = os.path.join(self.dist_path, r'**\*')
+
+        self.icon_path: str = os.path.join(self.root_path, 'fire.ico')
+
+        pyro_version: str = '1.0.0.0'
+
         self.nuitka_args: list = [
             'python', '-m', 'nuitka',
             '--standalone', 'pyro',
             '--include-package=pyro',
-            '--experimental=use_pefile',
-            '--python-flag=nosite',
-            f'--python-for-scons={sys.executable}',
             '--assume-yes-for-downloads',
             '--plugin-enable=multiprocessing',
-            '--show-progress',
-            '--plugin-enable=pkg-resources'
+            '--plugin-enable=pkg-resources',
+            '--msvc=14.3',
+            '--disable-ccache',
+            '--windows-company-name=fireundubh',
+            f'--windows-product-name={self.package_name.capitalize()}',
+            f'--windows-file-version={pyro_version}',
+            f'--windows-product-version={pyro_version}',
+            '--windows-file-description=https://github.com/fireundubh/pyro',
+            '--windows-icon-from-ico=fire.ico'
         ]
 
     def __setattr__(self, key: str, value: object) -> None:
         # sanitize paths
-        if isinstance(value, str) and key.endswith('path'):
+        if isinstance(value, str) and endswith(key, 'path', ignorecase=True):
             value = os.path.normpath(value)
             # normpath converts empty paths to os.curdir which we don't want
-            if value == '.':
+            if value == os.curdir:
                 value = ''
         super(Application, self).__setattr__(key, value)
 
@@ -57,6 +72,7 @@ class Application:
             'python37.dll',
             'python38.dll',
             'python39.dll',
+            'python310.dll',
             '_elementpath.pyd',
             '_hashlib.pyd',
             '_multiprocessing.pyd',
@@ -69,7 +85,7 @@ class Application:
             'unicodedata.pyd'
         )
 
-        for f in glob.iglob(os.path.join(self.dist_path, r'**\*'), recursive=True):
+        for f in glob.iglob(self.dist_glob_pattern, recursive=True):
             if not os.path.isfile(f):
                 continue
 
@@ -80,7 +96,7 @@ class Application:
             Application.log.warning(f'Deleting: "{f}"')
             os.remove(f)
 
-        for f in glob.iglob(os.path.join(self.dist_path, r'**\*'), recursive=True):
+        for f in glob.iglob(self.dist_glob_pattern, recursive=True):
             if not os.path.isdir(f):
                 continue
 
@@ -88,24 +104,20 @@ class Application:
                 Application.log.warning(f'Deleting empty folder: "{f}"')
                 shutil.rmtree(f, ignore_errors=True)
 
-        site_dir: str = os.path.join(self.dist_path, 'site')
-        if os.path.exists(site_dir):
-            shutil.rmtree(site_dir, ignore_errors=True)
+        if os.path.exists(self.site_path):
+            shutil.rmtree(self.site_path, ignore_errors=True)
 
-    def _build_zip_archive(self) -> str:
-        zip_path: str = os.path.join(self.root_path, 'bin', f'{self.package_name}.zip')
-        os.makedirs(os.path.dirname(zip_path), exist_ok=True)
+    def _build_zip_archive(self) -> None:
+        os.makedirs(os.path.dirname(self.zip_path), exist_ok=True)
 
-        files: list = [f for f in glob.glob(os.path.join(self.dist_path, r'**\*'), recursive=True)
+        files: list = [f for f in glob.glob(self.dist_glob_pattern, recursive=True)
                        if os.path.isfile(f)]
 
-        with zipfile.ZipFile(zip_path, 'w') as z:
+        with zipfile.ZipFile(self.zip_path, 'w') as z:
             for f in files:
                 z.write(f, os.path.join(self.package_name, os.path.relpath(f, self.dist_path)),
                         compress_type=zipfile.ZIP_STORED)
                 Application.log.info(f'Added file to archive: {f}')
-
-        return zip_path
 
     @staticmethod
     def exec_process(cmd: list, env: dict) -> int:
@@ -126,7 +138,7 @@ class Application:
             sys.exit(1)
 
         if self.vcvars64_path:
-            if not os.path.exists(self.vcvars64_path) or not self.vcvars64_path.endswith('.bat'):
+            if not os.path.exists(self.vcvars64_path) or not endswith(self.vcvars64_path, '.bat', ignorecase=True):
                 Application.log.error('Cannot build Pyro with MSVC compiler because VsDevCmd path is invalid')
                 sys.exit(1)
 
@@ -193,9 +205,9 @@ class Application:
 
             if not self.no_zip:
                 Application.log.info('Building archive...')
-                zip_created: str = self._build_zip_archive()
+                self._build_zip_archive()
 
-                Application.log.info(f'Wrote archive: "{zip_created}"')
+                Application.log.info(f'Wrote archive: "{self.zip_path}"')
 
             Application.log.info('Build complete.')
 
