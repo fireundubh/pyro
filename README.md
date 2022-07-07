@@ -4,6 +4,7 @@
 *A parallelized incremental build system for **Bethesda** games.*
 
 <br>
+<br>
 
 <div align = center>
 
@@ -21,11 +22,11 @@
 
 ## Supported
 
-- **Skyrim Special Edition** ( SSE )
+- **Skyrim Special Edition**  ( SSE )
 
-- **Skyrim Classic** ( TESV )
+- **Skyrim Classic**  ( TESV )
 
-- **Fallout 4** ( FO4 )
+- **Fallout 4**  ( FO4 )
 
 <br>
 <br>
@@ -39,6 +40,8 @@
     - Packaging **BSA** / **BA2** archives
     
     - Preparing builds for distribution
+    
+    <br>
 
 -   Can be integrated into any IDE as an external tool <br>
     to allow modders to `Instant Build` projects with <br>
