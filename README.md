@@ -1,15 +1,70 @@
-**Pyro** is a parallelized incremental build system for _Skyrim Classic_ (TESV), _Skyrim Special Edition_ (SSE), and _Fallout 4_ (FO4) projects. Pyro provides mod authors with an all-in-one tool for compiling Papyrus scripts, packaging BSA and BA2 archives, and preparing builds for distribution. Pyro can be integrated as an external tool into any IDE, allowing mod authors to "Instant Build" projects with a single hotkey.
+
+# Pyro   [![Badge License]][Releases]   [![Badge CI]][Actions]
+
+*A parallelized incremental build system for **Bethesda** games.*
+
+<br>
+
+<div align = center>
+
+---
+
+[![Button Releases]][Releases]   
+[![Button Documentation]][Wiki]
+
+---
+
+</div>
+
+<br>
+<br>
+
+## Supported
+
+- **Skyrim Special Edition** ( SSE )
+
+- **Skyrim Classic** ( TESV )
+
+- **Fallout 4** ( FO4 )
+
+<br>
+<br>
+
+## Features
+
+-   All-in-one tool for:
+    
+    - Compiling **[Papyrus]** scripts
+    
+    - Packaging **BSA** / **BA2** archives
+    
+    - Preparing builds for distribution
+
+-   Can be integrated into any IDE as an external tool <br>
+    to allow modders to `Instant Build` projects with <br>
+    a single press of a button.
+
+<br>
 
 
-## Binaries
+<!----------------------------------------------------------------------------->
 
-Latest build from master branch:
+[Releases]: https://github.com/fireundubh/pyro/releases
+[Papyrus]: https://ck.uesp.net/wiki/Papyrus_Introduction
+[Actions]: https://github.com/fireundubh/pyro/actions
+[Wiki]: https://wiki.fireundubh.com/pyro
 
-[![](https://github.com/fireundubh/pyro/workflows/GitHub%20CI/badge.svg)](https://github.com/fireundubh/pyro/actions)
-
-See also: [Releases](https://github.com/fireundubh/pyro/releases)
+[License]: LICENSE
 
 
-## Documentation
+<!---------------------------------[ Badges ]---------------------------------->
 
-External link: [Pyro Wiki](https://wiki.fireundubh.com/pyro)
+[Badge License]: https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge
+[Badge CI]: https://img.shields.io/github/workflow/status/fireundubh/pyro/GitHub%20CI?color=CB2E6D&style=for-the-badge
+
+
+<!--------------------------------[ Buttons ]---------------------------------->
+
+[Button Documentation]: https://img.shields.io/badge/Documentation-2396F3?style=for-the-badge&logoColor=white&logo=Wikipedia
+[Button Releases]: https://img.shields.io/badge/Releases-569A31?style=for-the-badge&logoColor=white&logo=AzureArtifacts
+
