@@ -1,5 +1,5 @@
 
-# Pyro   [![Badge License]][Releases]   [![Badge CI]][Actions]
+# Pyro   [![Badge License]][License]   [![Badge CI]][Actions]
 
 *A parallelized incremental build system for **Bethesda** games.*
 
