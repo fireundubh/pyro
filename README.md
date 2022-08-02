@@ -62,8 +62,8 @@
 
 <!---------------------------------[ Badges ]---------------------------------->
 
-[Badge License]: https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge
-[Badge CI]: https://img.shields.io/github/workflow/status/fireundubh/pyro/GitHub%20CI?color=CB2E6D&style=for-the-badge
+[Badge License]: https://img.shields.io/badge/License-MIT-ac8b11.svg?style=for-the-badge&labelColor=yellow
+[Badge CI]: https://img.shields.io/github/workflow/status/fireundubh/pyro/GitHub%20CI?color=93224f&style=for-the-badge&labelColor=CB2E6D
 
 
 <!--------------------------------[ Buttons ]---------------------------------->
