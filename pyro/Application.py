@@ -1,7 +1,9 @@
 import argparse
+import json
 import logging
 import os
 import sys
+from typing import List
 
 from pyro.Enums.Event import (BuildEvent,
                               ImportEvent,
@@ -32,6 +34,9 @@ class Application:
             self.parser.print_help()
             sys.exit(1)
 
+        # Quiet logging for output commands
+        if self.args.resolve_project or self.args.resolve_project_scripts:
+            Application.log.setLevel('ERROR')
         self.args.input_path = self._try_fix_input_path(self.args.input_path or self.args.input_path_deprecated)
 
         if not self.args.create_project and not os.path.isfile(self.args.input_path):
@@ -94,6 +99,54 @@ class Application:
             Application.log.error('Cannot proceed without flags file in any import folder')
             sys.exit(1)
 
+    @staticmethod
+    def populate_project(ppj: PapyrusProject) -> bool:
+        if ppj.scripts_node is not None or ppj.folders_node is not None or ppj.remote_paths:
+            ppj.try_initialize_remotes()
+
+            if ppj.use_pre_import_event:
+                ppj.try_run_event(ImportEvent.PRE)
+
+            ppj.try_populate_imports()
+
+            if ppj.use_post_import_event:
+                ppj.try_run_event(ImportEvent.POST)
+
+            ppj.try_set_game_type()
+            ppj.find_missing_scripts()
+            ppj.try_set_game_path()
+            return True
+        return False
+
+    @staticmethod
+    def get_json_blob(ppj: PapyrusProject) -> str:
+        if not Application.populate_project(ppj):
+            return ""
+        project_info = dict[str, any]()
+        project_info["name"] = ppj.project_name
+        project_info["path"] = ppj.project_path
+        project_info["flags_path"] = ppj.get_flags_path()
+        project_info["output_path"] = ppj.get_output_path()
+        project_info["package_path"] = ppj.get_package_path()
+        import_script_infos: List[dict[str, str]] = []
+        project_script_infos: List[dict[str, str]] = []
+
+        for object_name, script_path in ppj._get_import_psc_paths(True).items():
+            import_script_info = dict[str, str]()
+            import_script_info["name"] = object_name.removesuffix(".psc").replace(os.path.sep, ":")
+            import_script_info["source_path"] = script_path
+            import_script_infos.append(import_script_info)
+        project_info["imported_scripts"] = import_script_infos
+
+        for object_name, script_path in ppj.psc_paths.items():
+            project_script_info = dict[str, str]()
+            project_script_info["name"] = object_name.removesuffix(".psc").replace(os.path.sep, ":")
+            project_script_info["source_path"] = script_path
+            project_script_info["output_path"] = ppj._get_pex_path(object_name)
+            project_script_infos.append(project_script_info)
+        project_info["project_scripts"] = project_script_infos
+        return json.dumps(project_info, indent=4)
+
     def run(self) -> int:
         """
         Entry point
@@ -112,22 +165,11 @@ class Application:
         ppj = PapyrusProject(options)
 
         self._validate_project_file(ppj)
+        if options.resolve_project_scripts:
+            print(self.get_json_blob(ppj))
+            sys.exit(0)
 
-        if ppj.scripts_node is not None or ppj.folders_node is not None or ppj.remote_paths:
-            ppj.try_initialize_remotes()
-
-            if ppj.use_pre_import_event:
-                ppj.try_run_event(ImportEvent.PRE)
-
-            ppj.try_populate_imports()
-
-            if ppj.use_post_import_event:
-                ppj.try_run_event(ImportEvent.POST)
-
-            ppj.try_set_game_type()
-            ppj.find_missing_scripts()
-            ppj.try_set_game_path()
-
+        if self.populate_project(ppj):
             self._validate_project_paths(ppj)
 
             Application.log.info('Imports found:')

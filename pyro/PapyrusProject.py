@@ -6,6 +6,7 @@ import sys
 import time
 import typing
 from copy import deepcopy
+from pathlib import Path
 
 from lxml import etree
 from wcmatch import wcmatch
@@ -508,6 +509,9 @@ class PapyrusProject(ProjectBase):
 
         return PathHelper.uniqify(implicit_paths)
 
+    def _get_pex_path(self, object_name: str) -> str:
+        return os.path.join(self.options.output_path, object_name.replace('.psc', '.pex'))
+
     def _get_pex_paths(self) -> list:
         """
         Returns absolute paths to compiled scripts that may not exist yet in output folder
@@ -515,13 +519,33 @@ class PapyrusProject(ProjectBase):
         pex_paths: list = []
 
         for object_name, script_path in self.psc_paths.items():
-            pex_path = os.path.join(self.options.output_path, object_name.replace('.psc', '.pex'))
+            pex_path = self._get_pex_path(object_name)
 
             # do not check if file exists, we do that in _find_missing_script_paths for a different reason
             if pex_path not in pex_paths:
                 pex_paths.append(pex_path)
 
         return pex_paths
+
+    def _get_psc_path(self, script_path: str) -> str or None:
+        # ignore existing absolute paths
+        if os.path.isabs(script_path) and os.path.isfile(script_path):
+            return script_path
+
+        # try to add existing project-relative paths
+        test_path = os.path.join(self.project_path, script_path)
+        if os.path.isfile(test_path):
+            return test_path
+
+        # try to add existing import-relative paths
+        for import_path in self.import_paths:
+            if not os.path.isabs(import_path):
+                import_path = os.path.join(self.project_path, import_path)
+
+            test_path = os.path.join(import_path, script_path)
+            if os.path.isfile(test_path):
+                return test_path
+        return None
 
     def _get_psc_paths(self) -> dict:
         """Returns script paths from Folders and Scripts nodes"""
@@ -541,28 +565,37 @@ class PapyrusProject(ProjectBase):
 
         # convert user paths to absolute paths
         for object_name, script_path in object_names.items():
-            # ignore existing absolute paths
-            if os.path.isabs(script_path) and os.path.isfile(script_path):
-                continue
-
-            # try to add existing project-relative paths
-            test_path = os.path.join(self.project_path, script_path)
-            if os.path.isfile(test_path):
+            test_path = self._get_psc_path(script_path)
+            if test_path:
                 object_names[object_name] = test_path
-                continue
-
-            # try to add existing import-relative paths
-            for import_path in self.import_paths:
-                if not os.path.isabs(import_path):
-                    import_path = os.path.join(self.project_path, import_path)
-
-                test_path = os.path.join(import_path, script_path)
-                if os.path.isfile(test_path):
-                    object_names[object_name] = test_path
-                    break
 
         PapyrusProject.log.info(f'{len(object_names)} unique script paths resolved to absolute paths.')
 
+        return object_names
+
+    def _get_import_psc_paths(self, filter_project_scripts: bool = False) -> dict:
+        object_names: dict = {}
+        base_folder = os.path.join("Scripts", "Source", "Base")
+        user_folder = os.path.join("Scripts", "Source", "User")
+        for import_path in reversed(PathHelper.uniqify(self.import_paths)):
+            # normalize
+            import_path = str(Path(import_path))
+            rel_path: str = ""
+            if self.options.game_type == GameType.FO4:
+                if import_path.find(base_folder) != -1:
+                    rel_path = str(Path(import_path.split(base_folder)[0]).joinpath(base_folder)) + os.path.sep
+                elif import_path.find(user_folder) != -1:
+                    rel_path = str(Path(import_path.split(user_folder)[0]).joinpath(user_folder)) + os.path.sep
+                else:
+                    rel_path = str(Path(import_path).parent) + os.path.sep
+            for script_path in PathHelper.find_script_paths_from_folder(import_path, no_recurse=False):
+                if self.options.game_type == GameType.FO4:
+                    object_name = script_path.removeprefix(rel_path)
+                else:
+                    object_name = os.path.basename(script_path)
+                if not filter_project_scripts or object_name not in self.psc_paths.keys():
+                    # Later imports are overridden by previous ones
+                    object_names[object_name] = script_path
         return object_names
 
     def _get_remote_path(self, node: etree.ElementBase) -> str:
