@@ -50,6 +50,7 @@ class ProjectOptions:
     log_path: str = field(init=False, default_factory=str)
     create_project: bool = field(init=False, default_factory=bool)
     resolve_project: bool = field(init=False, default_factory=bool)
+    resolve_project_scripts: bool = field(init=False, default_factory=bool)
 
     def __post_init__(self) -> None:
         for attr_key, attr_value in self.__dict__.items():

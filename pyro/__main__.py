@@ -119,6 +119,9 @@ if __name__ == '__main__':
     _project_arguments.add_argument('--resolve-project',
                                     action='store_true',
                                     help='resolve variables and paths in project file')
+    _project_arguments.add_argument('--resolve-project-scripts',
+                                    action='store_true',
+                                    help='Print project info and resolved script paths as json')
 
     _program_arguments = _parser.add_argument_group('program arguments')
     _program_arguments.add_argument('--help', dest='show_help',
