@@ -752,11 +752,11 @@ class PapyrusProject(ProjectBase):
         for object_name, script_path in psc_paths.items():
             import_paths: list = self.import_paths
 
-            if self.options.game_type != GameType.FO4:
+            if self.options.game_type != GameType.FO4 and self.options.game_type != GameType.SF1:
                 object_name = script_path
 
             # remove unnecessary import paths for script
-            if self.options.game_type == GameType.FO4:
+            if self.options.game_type == GameType.FO4 or self.options.game_type == GameType.SF1:
                 for import_path in reversed(self.import_paths):
                     if self._can_remove_folder(import_path, object_name, script_path):
                         import_paths.remove(import_path)
@@ -768,7 +768,7 @@ class PapyrusProject(ProjectBase):
             arguments.append(';'.join(import_paths), key='i', enquote_value=True)
             arguments.append(output_path, key='o', enquote_value=True)
 
-            if self.options.game_type == GameType.FO4:
+            if self.options.game_type == GameType.FO4 or self.options.game_type == GameType.SF1:
                 # noinspection PyUnboundLocalVariable
                 if self.release:
                     arguments.append('-release')

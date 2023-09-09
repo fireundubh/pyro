@@ -62,8 +62,8 @@ if __name__ == '__main__':
     _game_arguments = _parser.add_argument_group('game arguments')
     _game_arguments.add_argument('-g', '--game-type',
                                  action='store', type=str,
-                                 choices=('fo4', 'tes5', 'sse'),
-                                 help='set game type (choices: fo4, tes5, sse)')
+                                 choices=('fo4', 'tes5', 'sf1', 'sse'),
+                                 help='set game type (choices: fo4, tes5, sf1, sse)')
 
     _game_path_arguments = _game_arguments.add_mutually_exclusive_group()
     _game_path_arguments.add_argument('--game-path',

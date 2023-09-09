@@ -213,7 +213,7 @@ class PackageManager:
 
         flags = wcmatch.RECURSIVE | wcmatch.IGNORECASE
 
-        if self.options.game_type == GameType.FO4:
+        if self.options.game_type == GameType.FO4 or self.options.game_type == GameType.SF1:
             for _ in wcmatch.WcMatch(containing_folder, '!*.dds', flags=flags).imatch():
                 arguments.append('-fo4')
                 break
