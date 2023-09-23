@@ -36,11 +36,13 @@ class ProcessManager:
         ws: re.Pattern = re.compile('[ \t\n\r]+')
 
         environ: dict = os.environ.copy()
-        command: str = ' && '.join(
-            ws.sub(' ', node.text)
-            for node in filter(is_command_node, event_node)
-        )
+        # command: str = ' && '.join(
+        #     ws.sub(' ', node.text)
+        #     for node in filter(is_command_node, event_node)
+        # )
 
+        for node in filter(is_command_node, event_node):
+            command = ws.sub(' ', node.text)
         ProcessManager.run_command(command, project_path, environ)
 
     @staticmethod
