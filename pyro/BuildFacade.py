@@ -94,6 +94,7 @@ class BuildFacade:
 
         if self.ppj.options.no_parallel or self.compile_data.command_count == 1:
             for command in commands:
+                BuildFacade.log.debug(f'Command: {command}')
                 if ProcessManager.run_compiler(command) == ProcessState.SUCCESS:
                     self.compile_data.success_count += 1
         elif self.compile_data.command_count > 0:
