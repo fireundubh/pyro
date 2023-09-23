@@ -281,7 +281,7 @@ class PackageManager:
 
                 adj_relpath = os.path.normpath(os.path.join(attr_path, relpath))
 
-                PackageManager.log.info(f'+ "{adj_relpath.casefold()}"')
+                PackageManager.log.debug(f'+ "{adj_relpath.casefold()}"')
 
                 target_path: str = os.path.join(self.options.temp_path, adj_relpath)
 
@@ -353,7 +353,7 @@ class PackageManager:
                                 _, attr_file_name = os.path.split(include_path)
                                 arcname = attr_file_name if attr_path == os.curdir else os.path.join(attr_path, attr_file_name)
 
-                            PackageManager.log.info('+ "{}"'.format(arcname))
+                            PackageManager.log.debug('+ "{}"'.format(arcname))
                             z.write(include_path, arcname, compress_type=compress_type)
 
                             self.includes += 1
