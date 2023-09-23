@@ -223,35 +223,16 @@ class PapyrusProject(ProjectBase):
             PapyrusProject.log.error('Failed to build list of import paths')
             sys.exit(1)
 
-        if not self.options.no_implicit_imports:
-            # ensure that folder paths are implicitly imported
-            implicit_folder_paths: list = self._get_implicit_folder_imports()
+        # remove project path, if added by user
+        self.import_paths = [p for p in self.import_paths if not startswith(p, self.project_path, ignorecase=True)]
 
-            if len(implicit_folder_paths) > 0:
-                PapyrusProject.log.info('Implicitly imported folder paths found:')
-                for path in implicit_folder_paths:
-                    PapyrusProject.log.info(f'+ "{path}"')
+        # prepend project path
+        self.import_paths.insert(0, self.project_path)
 
-                PathHelper.merge_implicit_import_paths(implicit_folder_paths, self.import_paths)
-
-        # we need to populate psc paths after explicit and implicit import paths are populated
-        # this also needs to be set before we populate implicit import paths from psc paths
-        # not sure if this must run again after populating implicit import paths from psc paths
         self.psc_paths = self._get_psc_paths()
         if not self.psc_paths:
             PapyrusProject.log.error('Failed to build list of script paths')
             sys.exit(1)
-
-        if not self.options.no_implicit_imports:
-            # this adds implicit imports from script paths
-            implicit_script_paths: list = self._get_implicit_script_imports()
-
-            if len(implicit_script_paths) > 0:
-                PapyrusProject.log.info('Implicitly imported script paths found:')
-                for path in implicit_script_paths:
-                    PapyrusProject.log.info(f'+ "{path}"')
-
-                PathHelper.merge_implicit_import_paths(implicit_script_paths, self.import_paths)
 
     def try_set_game_type(self) -> None:
         # we need to set the game type after imports are populated but before pex paths are populated
@@ -415,22 +396,14 @@ class PapyrusProject(ProjectBase):
     def _calculate_object_name(self, psc_path: str) -> str:
         return PathHelper.calculate_relative_object_name(psc_path, self.import_paths)
 
-    @staticmethod
-    def _can_remove_folder(import_path: str, object_name: str, script_path: str) -> bool:
-        import_path = import_path.casefold()
-        object_name = object_name.casefold()
-        script_path = script_path.casefold()
-        return startswith(script_path, import_path) and os.path.join(import_path, object_name) != script_path
-
     def _find_missing_script_paths(self) -> dict:
         """Returns list of script paths for compiled scripts that do not exist"""
         results: dict = {}
 
         for object_name, script_path in self.psc_paths.items():
-            pex_path: str = os.path.join(self.options.output_path, object_name.replace('.psc', '.pex'))
+            pex_path: str = os.path.join(self.get_output_path(), object_name.replace('.psc', '.pex'))
 
             if not os.path.isfile(pex_path) and script_path not in results:
-                object_name = script_path if not os.path.isabs(script_path) else self._calculate_object_name(script_path)
                 results[object_name] = script_path
 
         return results
@@ -470,44 +443,6 @@ class PapyrusProject(ProjectBase):
 
         return PathHelper.uniqify(results)
 
-    def _get_implicit_folder_imports(self) -> list:
-        """Returns absolute implicit import paths from Folder node paths"""
-        implicit_paths: list = []
-
-        if self.folders_node is None:
-            return []
-
-        def try_append_path(path: str) -> None:
-            if os.path.isdir(path) and path not in self.import_paths:
-                implicit_paths.append(path)
-
-        for folder_node in filter(is_folder_node, self.folders_node):
-            folder_path: str = os.path.normpath(folder_node.text)
-            try_append_path(folder_path if os.path.isabs(folder_path) else os.path.join(self.project_path, folder_path))
-
-        return PathHelper.uniqify(implicit_paths)
-
-    def _get_implicit_script_imports(self) -> list:
-        """Returns absolute implicit import paths from Script node paths"""
-        implicit_paths: list = []
-
-        for object_name, script_path in self.psc_paths.items():
-            script_folder_path = os.path.dirname(script_path)
-
-            for import_path in self.import_paths:
-                # TODO: figure out how to handle imports on different drives
-                try:
-                    relpath = os.path.relpath(script_folder_path, import_path)
-                except ValueError as e:
-                    PapyrusProject.log.warning(f'{e} (path: "{script_folder_path}", start: "{import_path}")')
-                    continue
-
-                test_path = os.path.normpath(os.path.join(import_path, relpath))
-                if os.path.isdir(test_path) and test_path not in self.import_paths:
-                    implicit_paths.append(test_path)
-
-        return PathHelper.uniqify(implicit_paths)
-
     def _get_pex_paths(self) -> list:
         """
         Returns absolute paths to compiled scripts that may not exist yet in output folder
@@ -523,32 +458,30 @@ class PapyrusProject(ProjectBase):
 
         return pex_paths
 
+    def get_object_item(self, path: str) -> tuple:
+        object_name = path if not os.path.isabs(path) else self._calculate_object_name(path)
+        object_path = path if endswith(path, '.psc', ignorecase=True) else f'{path}.psc'
+        return object_name, object_path
+
     def _get_psc_paths(self) -> dict:
         """Returns script paths from Folders and Scripts nodes"""
         object_names: dict = {}
 
-        def add_object_name(p: str) -> None:
-            object_names[p if not os.path.isabs(p) else self._calculate_object_name(p)] = p
-
-        # try to populate paths with scripts from Folders and Scripts nodes
+        # populate object names dictionary
         if self.folders_node is not None:
             for path in self._get_script_paths_from_folders_node():
-                add_object_name(path)
+                k, v = self.get_object_item(path)
+                object_names[k] = v
 
         if self.scripts_node is not None:
             for path in self._get_script_paths_from_scripts_node():
-                add_object_name(path)
+                k, v = self.get_object_item(path)
+                object_names[k] = v
 
         # convert user paths to absolute paths
-        for object_name, script_path in object_names.items():
+        for k, v in object_names.items():
             # ignore existing absolute paths
-            if os.path.isabs(script_path) and os.path.isfile(script_path):
-                continue
-
-            # try to add existing project-relative paths
-            test_path = os.path.join(self.project_path, script_path)
-            if os.path.isfile(test_path):
-                object_names[object_name] = test_path
+            if os.path.isabs(v) and os.path.isfile(v):
                 continue
 
             # try to add existing import-relative paths
@@ -556,9 +489,24 @@ class PapyrusProject(ProjectBase):
                 if not os.path.isabs(import_path):
                     import_path = os.path.join(self.project_path, import_path)
 
-                test_path = os.path.join(import_path, script_path)
+                # test for shallow matches
+                test_path = os.path.join(import_path, v)
                 if os.path.isfile(test_path):
-                    object_names[object_name] = test_path
+                    object_names[k] = test_path
+                    break
+
+                # go deep
+                matcher = wcmatch.WcMatch(import_path, '*.psc', flags=wcmatch.IGNORECASE | wcmatch.RECURSIVE)
+
+                flag = False
+
+                for f in matcher.imatch():
+                    if endswith(f, os.path.basename(v), ignorecase=True):
+                        object_names[k] = f
+                        flag = True
+                        break
+
+                if flag:
                     break
 
         PapyrusProject.log.info(f'{len(object_names)} unique script paths resolved to absolute paths.')
@@ -643,25 +591,6 @@ class PapyrusProject(ProjectBase):
                                                                     no_recurse=attr_no_recurse)
                 continue
 
-            # try to add project-relative folder path
-            test_path = os.path.join(self.project_path, folder_path)
-            if os.path.isdir(test_path):
-                # count scripts to avoid issue where an errant `test_path` may exist and contain no sources
-                # this can be a problem if that folder contains sources but user error is hard to fix
-                test_passed = False
-
-                user_flags = wcmatch.RECURSIVE if not attr_no_recurse else 0x0
-                matcher = wcmatch.WcMatch(test_path, '*.psc', flags=wcmatch.IGNORECASE | user_flags)
-                for _ in matcher.imatch():
-                    test_passed = True
-                    break
-
-                if test_passed:
-                    yield from PathHelper.find_script_paths_from_folder(test_path,
-                                                                        no_recurse=attr_no_recurse,
-                                                                        matcher=matcher)
-                    continue
-
             # try to add import-relative folder path
             for import_path in self.import_paths:
                 test_path = os.path.join(import_path, folder_path)
@@ -732,10 +661,6 @@ class PapyrusProject(ProjectBase):
 
         arguments = CommandArguments()
 
-        compiler_path: str = self.options.compiler_path
-        flags_path: str = self.options.flags_path
-        output_path: str = self.options.output_path
-
         if self.options.no_incremental_build:
             psc_paths: dict = self.psc_paths
         else:
@@ -746,44 +671,46 @@ class PapyrusProject(ProjectBase):
             if object_name not in psc_paths.keys():
                 psc_paths[object_name] = script_path
 
-        source_import_paths = deepcopy(self.import_paths)
+        if endswith(self.get_compiler_path(), 'Caprica.exe', ignorecase=True):
+            arguments.append(self.get_compiler_path(), enquote_value=True)
 
-        # TODO: depth sorting solution is not foolproof! parse psc files for imports to determine command order
-        for object_name, script_path in psc_paths.items():
-            import_paths: list = self.import_paths
+            arguments.append(os.path.join(self.program_path, 'tools', 'caprica.cfg'), key='-config-file', enquote_value=True)
 
-            if self.options.game_type != GameType.FO4 and self.options.game_type != GameType.SF1:
-                object_name = script_path
+            if self.options.game_type == GameType.SF1:
+                arguments.append('starfield', key='g', enquote_value=True)
+            elif self.options.game_type == GameType.FO4:
+                arguments.append('fallout4', key='g', enquote_value=True)
+            elif self.options.game_type in [GameType.TES5, GameType.SSE]:
+                arguments.append('skyrim', key='g', enquote_value=True)
 
-            # remove unnecessary import paths for script
-            if self.options.game_type == GameType.FO4 or self.options.game_type == GameType.SF1:
-                for import_path in reversed(self.import_paths):
-                    if self._can_remove_folder(import_path, object_name, script_path):
-                        import_paths.remove(import_path)
+            arguments.append(self.get_flags_path(), key='f', enquote_value=True)
+            arguments.append(';'.join(self.import_paths), key='i', enquote_value=True)
+            arguments.append(self.get_output_path(), key='o', enquote_value=True)
 
-            arguments.clear()
-            arguments.append(compiler_path, enquote_value=True)
-            arguments.append(object_name, enquote_value=True)
-            arguments.append(flags_path, key='f', enquote_value=True)
-            arguments.append(';'.join(import_paths), key='i', enquote_value=True)
-            arguments.append(output_path, key='o', enquote_value=True)
+            object_names = ';'.join(psc_paths.keys())
+            arguments.append(object_names, enquote_value=True)
 
-            if self.options.game_type == GameType.FO4 or self.options.game_type == GameType.SF1:
-                # noinspection PyUnboundLocalVariable
-                if self.release:
-                    arguments.append('-release')
+        else:
+            for object_name, script_path in psc_paths.items():
+                arguments.clear()
+                arguments.append(self.get_compiler_path(), enquote_value=True)
+                arguments.append(object_name if self.options.game_type == GameType.FO4 else script_path, enquote_value=True)
+                arguments.append(self.get_flags_path(), key='f', enquote_value=True)
+                arguments.append(';'.join(self.import_paths), key='i', enquote_value=True)
+                arguments.append(self.get_output_path(), key='o', enquote_value=True)
 
-                # noinspection PyUnboundLocalVariable
-                if self.final:
-                    arguments.append('-final')
+                if self.options.game_type in [GameType.FO4, GameType.SF1]:
+                    if self.release:
+                        arguments.append('-release')
 
-            if self.optimize:
-                arguments.append('-op')
+                    if self.final:
+                        arguments.append('-final')
 
-            arg_s = arguments.join()
-            commands.append(arg_s)
+                if self.optimize:
+                    arguments.append('-op')
 
-        self.import_paths = source_import_paths
+        arg_s = arguments.join()
+        commands.append(arg_s)
 
         return commands
 

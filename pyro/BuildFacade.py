@@ -92,7 +92,7 @@ class BuildFacade:
 
         self.compile_data.time.start_time = time.time()
 
-        if self.ppj.options.no_parallel or self.compile_data.command_count == 1:
+        if self.ppj.options.no_parallel or self.compile_data.command_count == 1 or endswith(self.ppj.get_compiler_path(), 'Caprica.exe', ignorecase=True) :
             for command in commands:
                 BuildFacade.log.debug(f'Command: {command}')
                 if ProcessManager.run_compiler(command) == ProcessState.SUCCESS:

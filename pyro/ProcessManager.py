@@ -43,7 +43,7 @@ class ProcessManager:
 
         for node in filter(is_command_node, event_node):
             command = ws.sub(' ', node.text)
-        ProcessManager.run_command(command, project_path, environ)
+            ProcessManager.run_command(command, project_path, environ)
 
     @staticmethod
     def run_command(command: str, cwd: str, env: dict) -> ProcessState:
@@ -61,8 +61,7 @@ class ProcessManager:
 
         try:
             while process.poll() is None:
-                line: str = process.stdout.readline().strip()
-                if line:
+                if (line := process.stdout.readline().strip()) != '':
                     ProcessManager.log.info(line)
 
         except KeyboardInterrupt:
@@ -112,22 +111,20 @@ class ProcessManager:
 
         try:
             while process.poll() is None:
-                line = process.stdout.readline().strip()
+                if (line := process.stdout.readline().strip()) != '':
+                    if startswith(line, exclusions):
+                        continue
 
-                if startswith(line, exclusions):
-                    continue
+                    if startswith(line, 'Packing'):
+                        package_path = line.split(':', 1)[1].strip()
+                        ProcessManager.log.info(f'Packaging folder "{package_path}"...')
+                        continue
 
-                if startswith(line, 'Packing'):
-                    package_path = line.split(':', 1)[1].strip()
-                    ProcessManager.log.info(f'Packaging folder "{package_path}"...')
-                    continue
+                    if startswith(line, 'Archive Name'):
+                        archive_path = line.split(':', 1)[1].strip()
+                        ProcessManager.log.info(f'Building "{archive_path}"...')
+                        continue
 
-                if startswith(line, 'Archive Name'):
-                    archive_path = line.split(':', 1)[1].strip()
-                    ProcessManager.log.info(f'Building "{archive_path}"...')
-                    continue
-
-                if line:
                     ProcessManager.log.info(line)
 
         except KeyboardInterrupt:
@@ -179,23 +176,25 @@ class ProcessManager:
 
         try:
             while process.poll() is None:
-                line = process.stdout.readline().strip()
+                if (line := process.stdout.readline().strip()) != '':
+                    if startswith(line, exclusions):
+                        continue
 
-                if not line or startswith(line, exclusions):
-                    continue
+                    if (match := line_error.search(line)) is not None:
+                        path, location, message = match.groups()
+                        head, tail = os.path.split(path)
+                        ProcessManager.log.error(f'COMPILATION FAILED: '
+                                                 f'{os.path.basename(head)}\\{tail}{location}: {message}')
+                        process.terminate()
+                        error_count += 1
 
-                match = line_error.search(line)
+                    elif startswith(line, 'Fatal Error', ignorecase=True):
+                        ProcessManager.log.error(line)
+                        process.terminate()
+                        error_count += 1
 
-                if match is not None:
-                    path, location, message = match.groups()
-                    head, tail = os.path.split(path)
-                    ProcessManager.log.error(f'COMPILATION FAILED: '
-                                             f'{os.path.basename(head)}\\{tail}{location}: {message}')
-                    process.terminate()
-                    error_count += 1
-
-                elif 'error(s)' not in line:
-                    ProcessManager.log.info(line)
+                    elif 'error(s)' not in line:
+                        ProcessManager.log.info(line)
 
         except KeyboardInterrupt:
             try:
