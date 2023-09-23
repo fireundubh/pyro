@@ -32,6 +32,13 @@ class Application:
             self.parser.print_help()
             sys.exit(1)
 
+        # set up log levels
+        log_level_argv = self.args.log_level.upper()
+        log_level = getattr(logging, log_level_argv, logging.DEBUG)
+        self.log.setLevel(log_level)
+
+        Application.log.debug(f'Set log level to: {log_level_argv}')
+
         self.args.input_path = self._try_fix_input_path(self.args.input_path or self.args.input_path_deprecated)
 
         if not self.args.create_project and not os.path.isfile(self.args.input_path):

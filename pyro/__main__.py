@@ -121,6 +121,10 @@ if __name__ == '__main__':
                                     help='resolve variables and paths in project file')
 
     _program_arguments = _parser.add_argument_group('program arguments')
+    _program_arguments.add_argument('--log-level', dest='log_level',
+                                    action='store', type=str, default='debug',
+                                    choices=('all', 'debug', 'info', 'warn', 'error', 'fatal'),
+                                    help='show help and exit')
     _program_arguments.add_argument('--help', dest='show_help',
                                     action='store_true', default=False,
                                     help='show help and exit')
