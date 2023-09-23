@@ -86,7 +86,7 @@ class BuildFacade:
 
     def try_compile(self) -> None:
         """Builds and passes commands to Papyrus Compiler"""
-        commands: list = self.ppj.build_commands()
+        commands: list = [c for c in self.ppj.build_commands() if c]
 
         self.compile_data.command_count = len(commands)
 
