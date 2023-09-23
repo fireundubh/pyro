@@ -67,7 +67,10 @@ class ProjectBase:
         """Expands string tokens and environment variables, and returns the parsed string"""
         t = StringTemplate(value)
         try:
-            return os.path.expanduser(os.path.expandvars(t.substitute(self.variables)))
+            retval = os.path.expanduser(os.path.expandvars(t.substitute(self.variables)))
+            if os.path.isabs(retval):
+                retval = os.path.normpath(retval)
+            return retval
         except KeyError as e:
             ProjectBase.log.error(f'Failed to parse variable "{e.args[0]}" in "{value}". Is the variable name correct?')
             sys.exit(1)
