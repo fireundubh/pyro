@@ -401,7 +401,12 @@ class PapyrusProject(ProjectBase):
         results: dict = {}
 
         for object_name, script_path in self.psc_paths.items():
-            pex_path: str = os.path.join(self.get_output_path(), object_name.replace('.psc', '.pex'))
+            if endswith(object_name, '.pex', ignorecase=True):
+                pex_path = os.path.join(self.get_output_path(), object_name)
+            elif endswith(object_name, '.psc', ignorecase=True):
+                pex_path = os.path.join(self.get_output_path(), object_name.replace('.psc', '.pex'))
+            else:
+                pex_path = os.path.join(self.get_output_path(), object_name + '.pex')
 
             if not os.path.isfile(pex_path) and script_path not in results:
                 results[object_name] = script_path
@@ -450,7 +455,7 @@ class PapyrusProject(ProjectBase):
         pex_paths: list = []
 
         for object_name, script_path in self.psc_paths.items():
-            pex_path = os.path.join(self.options.output_path, object_name.replace('.psc', '.pex'))
+            pex_path = os.path.join(self.options.output_path, os.path.basename(script_path).replace('.psc', '.pex'))
 
             # do not check if file exists, we do that in _find_missing_script_paths for a different reason
             if pex_path not in pex_paths:
@@ -626,12 +631,17 @@ class PapyrusProject(ProjectBase):
         psc_paths: dict = {}
 
         for object_name, script_path in self.psc_paths.items():
-            script_name, _ = os.path.splitext(os.path.basename(script_path))
+            if endswith(object_name, '.pex', ignorecase=True):
+                script_name = object_name
+            elif endswith(object_name, '.psc', ignorecase=True):
+                script_name = object_name.replace('.psc', '.pex')
+            else:
+                script_name = object_name + '.pex'
 
             # if pex exists, compare time_t in pex header with psc's last modified timestamp
             matching_path: str = ''
             for pex_path in self.pex_paths:
-                if endswith(pex_path, f'{script_name}.pex', ignorecase=True):
+                if endswith(pex_path, script_name, ignorecase=True):
                     matching_path = pex_path
                     break
 
@@ -653,7 +663,7 @@ class PapyrusProject(ProjectBase):
 
         return psc_paths
 
-    def build_commands(self) -> list:
+    def build_commands(self) -> tuple[int, list]:
         """
         Builds list of commands for compiling scripts
         """
@@ -670,6 +680,10 @@ class PapyrusProject(ProjectBase):
         for object_name, script_path in self.missing_scripts.items():
             if object_name not in psc_paths.keys():
                 psc_paths[object_name] = script_path
+
+        # do not try to compile nothing
+        if psc_paths is None or psc_paths == {}:
+            return 0, []
 
         if endswith(self.get_compiler_path(), 'Caprica.exe', ignorecase=True):
             arguments.append(self.get_compiler_path(), enquote_value=True)
@@ -738,7 +752,7 @@ class PapyrusProject(ProjectBase):
         arg_s = arguments.join()
         commands.append(arg_s)
 
-        return commands
+        return len(psc_paths.keys()), commands
 
     def try_run_event(self, event: Event) -> None:
         if event == ImportEvent.PRE:

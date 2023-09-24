@@ -165,7 +165,7 @@ class Application:
                 ppj.try_run_event(CompileEvent.POST)
 
             if ppj.options.anonymize:
-                if build.compile_data.failed_count == 0 or ppj.options.ignore_errors:
+                if build.get_compile_data().failed_count == 0 or ppj.options.ignore_errors:
                     if ppj.use_pre_anonymize_event:
                         ppj.try_run_event(AnonymizeEvent.PRE)
 
@@ -174,13 +174,13 @@ class Application:
                     if ppj.use_post_anonymize_event:
                         ppj.try_run_event(AnonymizeEvent.POST)
                 else:
-                    Application.log.error(f'Cannot anonymize scripts because {build.compile_data.failed_count} scripts failed to compile')
-                    sys.exit(build.compile_data.failed_count)
+                    Application.log.error(f'Cannot anonymize scripts because {build.get_compile_data().failed_count} scripts failed to compile')
+                    sys.exit(build.get_compile_data().failed_count)
             else:
                 Application.log.info('Cannot anonymize scripts because Anonymize is disabled in project')
 
         if ppj.options.package:
-            if build.compile_data.failed_count == 0 or ppj.options.ignore_errors:
+            if build.get_compile_data().failed_count == 0 or ppj.options.ignore_errors:
                 if ppj.use_pre_package_event:
                     ppj.try_run_event(PackageEvent.PRE)
 
@@ -189,13 +189,13 @@ class Application:
                 if ppj.use_post_package_event:
                     ppj.try_run_event(PackageEvent.POST)
             else:
-                Application.log.error(f'Cannot create Packages because {build.compile_data.failed_count} scripts failed to compile')
-                sys.exit(build.compile_data.failed_count)
+                Application.log.error(f'Cannot create Packages because {build.get_compile_data().failed_count} scripts failed to compile')
+                sys.exit(build.get_compile_data().failed_count)
         elif ppj.packages_node is not None:
             Application.log.info('Cannot create Packages because Package is disabled in project')
 
         if ppj.options.zip:
-            if build.compile_data.failed_count == 0 or ppj.options.ignore_errors:
+            if build.get_compile_data().failed_count == 0 or ppj.options.ignore_errors:
                 if ppj.use_pre_zip_event:
                     ppj.try_run_event(ZipEvent.PRE)
 
@@ -204,13 +204,13 @@ class Application:
                 if ppj.use_post_zip_event:
                     ppj.try_run_event(ZipEvent.POST)
             else:
-                Application.log.error(f'Cannot create ZipFile because {build.compile_data.failed_count} scripts failed to compile')
-                sys.exit(build.compile_data.failed_count)
+                Application.log.error(f'Cannot create ZipFile because {build.get_compile_data().failed_count} scripts failed to compile')
+                sys.exit(build.get_compile_data().failed_count)
         elif ppj.zip_files_node is not None:
             Application.log.info('Cannot create ZipFile because Zip is disabled in project')
 
         if build.scripts_count > 0:
-            Application.log.info(build.compile_data.to_string() if build.compile_data.success_count > 0 else 'No scripts were compiled.')
+            Application.log.info(build.get_compile_data().to_string() if build.get_compile_data().success_count > 0 else 'No scripts were compiled.')
 
         if ppj.packages_node is not None:
             Application.log.info(build.package_data.to_string() if build.package_data.file_count > 0 else 'No files were packaged.')
@@ -220,7 +220,7 @@ class Application:
 
         Application.log.info('DONE!')
 
-        if ppj.use_post_build_event and build.compile_data.failed_count == 0:
+        if ppj.use_post_build_event and build.get_compile_data().failed_count == 0:
             ppj.try_run_event(BuildEvent.POST)
 
-        return build.compile_data.failed_count
+        return build.get_compile_data().failed_count
