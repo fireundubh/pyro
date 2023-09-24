@@ -51,6 +51,10 @@ if __name__ == '__main__':
                                      action='store', type=str,
                                      help='relative or absolute path to PapyrusCompiler.exe\n'
                                           '(if relative, must be relative to current working directory)')
+    _compiler_arguments.add_argument('--compiler-config-path',
+                                     action='store', type=str,
+                                     help='relative or absolute path to compiler config file\n'
+                                          '(if relative, must be relative to current working directory)')
     _compiler_arguments.add_argument('--flags-path',
                                      action='store', type=str,
                                      help='relative or absolute path to Papyrus Flags file\n'

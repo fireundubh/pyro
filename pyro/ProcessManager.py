@@ -146,7 +146,7 @@ class ProcessManager:
         """
         command_size = len(command)
 
-        if command_size > 32768:
+        if command_size > 32766:
             ProcessManager.log.error(f'Cannot create process because command exceeds max length: {command_size}')
             return ProcessState.FAILURE
 

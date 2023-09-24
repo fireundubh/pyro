@@ -104,6 +104,12 @@ class ProjectBase:
                               relative_root_path=os.getcwd(),
                               fallback_path=[self.options.game_path, 'Papyrus Compiler', 'PapyrusCompiler.exe'])
 
+    def get_compiler_config_path(self) -> str:
+        """Returns absolute compiler config file path from arguments"""
+        return self._get_path(self.options.compiler_config_path,
+                              relative_root_path=os.getcwd(),
+                              fallback_path=[self.program_path, 'tools', 'caprica.cfg'])
+
     def get_flags_path(self) -> str:
         """
         Returns absolute flags path or flags file name from arguments or game path

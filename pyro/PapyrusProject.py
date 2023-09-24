@@ -674,21 +674,47 @@ class PapyrusProject(ProjectBase):
         if endswith(self.get_compiler_path(), 'Caprica.exe', ignorecase=True):
             arguments.append(self.get_compiler_path(), enquote_value=True)
 
-            arguments.append(os.path.join(self.program_path, 'tools', 'caprica.cfg'), key='-config-file', enquote_value=True)
+            object_names = ';'.join(psc_paths.keys())
 
-            if self.options.game_type == GameType.SF1:
-                arguments.append('starfield', key='g', enquote_value=True)
-            elif self.options.game_type == GameType.FO4:
-                arguments.append('fallout4', key='g', enquote_value=True)
+            with open(self.get_compiler_config_path(), encoding='utf-8') as f:
+                options = f.read().splitlines()
+
+            # disable parallel compilation if the user overrides the default
+            if self.options.no_parallel and 'parallel-compile=1' in options:
+                for i, option in enumerate(options):
+                    if startswith(option, 'parallel-compile', ignorecase=True):
+                        options.pop(i)
+                        break
+
+            use_config_file_for_input_paths = False
+
+            if len(object_names) > 32486:  # 32766 total - 280 chars for all arguments
+                use_config_file_for_input_paths = True
+                options.append(f'input-file={object_names.strip()}\n')
+
+            config_dir_path = os.path.dirname(self.get_compiler_config_path())
+            config_file_path = os.path.join(config_dir_path, f'caprica_{str(int(time.time()))}.cfg')
+
+            with open(config_file_path, mode='w', encoding='utf-8') as f:
+                f.write('\n'.join(options))
+
+            arguments.append(config_file_path, key='-config-file', enquote_value=True)
+
+            # caprica defaults to starfield
+            game_name = 'starfield'
+            if self.options.game_type == GameType.FO4:
+                game_name = 'fallout4'
             elif self.options.game_type in [GameType.TES5, GameType.SSE]:
-                arguments.append('skyrim', key='g', enquote_value=True)
+                game_name = 'skyrim'
+
+            arguments.append(game_name, key='g', enquote_value=True)
 
             arguments.append(self.get_flags_path(), key='f', enquote_value=True)
             arguments.append(';'.join(self.import_paths), key='i', enquote_value=True)
             arguments.append(self.get_output_path(), key='o', enquote_value=True)
 
-            object_names = ';'.join(psc_paths.keys())
-            arguments.append(object_names, enquote_value=True)
+            if not use_config_file_for_input_paths:
+                arguments.append(object_names, enquote_value=True)
 
         else:
             for object_name, script_path in psc_paths.items():
