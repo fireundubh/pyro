@@ -188,7 +188,7 @@ class ProcessManager:
                         process.terminate()
                         error_count += 1
 
-                    elif startswith(line, 'Fatal Error', ignorecase=True):
+                    elif startswith(line, ('Error', 'Fatal Error'), ignorecase=True):
                         ProcessManager.log.error(line)
                         process.terminate()
                         error_count += 1
