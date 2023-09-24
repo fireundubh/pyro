@@ -31,9 +31,10 @@ if __name__ == '__main__':
     _build_arguments.add_argument('--ignore-errors',
                                   action='store_true', default=False,
                                   help='ignore compiler errors during build')
-    _build_arguments.add_argument('--no-implicit-imports',
+    # deprecated argument (functionality no longer exists, retained arg to avoid breaking change)
+    _build_arguments.add_argument('--no-implicit-imports', dest='no_implicit_imports_deprecated',
                                   action='store_true', default=False,
-                                  help='do not build with implicit imports')
+                                  help=SUPPRESS)
     _build_arguments.add_argument('--no-incremental-build',
                                   action='store_true', default=False,
                                   help='do not build incrementally')
