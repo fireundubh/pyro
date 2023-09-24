@@ -38,6 +38,7 @@ class ProjectBase:
 
         self.project_name = os.path.splitext(os.path.basename(self.options.input_path))[0]
         self.project_path = os.path.dirname(self.options.input_path)
+        os.chdir(self.project_path)
 
     def __setattr__(self, key: str, value: object) -> None:
         if isinstance(value, str) and endswith(key, 'path'):
