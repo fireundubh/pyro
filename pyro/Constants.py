@@ -3,18 +3,21 @@ from pyro.Constant import Constant
 
 class FlagsName(Constant):
     FO4: str = 'Institute_Papyrus_Flags.flg'
+    SF1: str = 'Starfield_Papyrus_Flags.flg'
     SSE: str = 'TESV_Papyrus_Flags.flg'
     TES5: str = 'TESV_Papyrus_Flags.flg'
 
 
 class GameName(Constant):
     FO4: str = 'Fallout 4'
+    SF1: str = 'Starfield'
     SSE: str = 'Skyrim Special Edition'
     TES5: str = 'Skyrim'
 
 
 class GameType(Constant):
     FO4: str = 'fo4'
+    SF1: str = 'sf1'
     SSE: str = 'sse'
     TES5: str = 'tes5'
 

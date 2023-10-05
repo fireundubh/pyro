@@ -38,6 +38,7 @@ class ProjectBase:
 
         self.project_name = os.path.splitext(os.path.basename(self.options.input_path))[0]
         self.project_path = os.path.dirname(self.options.input_path)
+        os.chdir(self.project_path)
 
     def __setattr__(self, key: str, value: object) -> None:
         if isinstance(value, str) and endswith(key, 'path'):
@@ -67,7 +68,10 @@ class ProjectBase:
         """Expands string tokens and environment variables, and returns the parsed string"""
         t = StringTemplate(value)
         try:
-            return os.path.expanduser(os.path.expandvars(t.substitute(self.variables)))
+            retval = os.path.expanduser(os.path.expandvars(t.substitute(self.variables)))
+            if os.path.isabs(retval):
+                retval = os.path.normpath(retval)
+            return retval
         except KeyError as e:
             ProjectBase.log.error(f'Failed to parse variable "{e.args[0]}" in "{value}". Is the variable name correct?')
             sys.exit(1)
@@ -101,6 +105,12 @@ class ProjectBase:
                               relative_root_path=os.getcwd(),
                               fallback_path=[self.options.game_path, 'Papyrus Compiler', 'PapyrusCompiler.exe'])
 
+    def get_compiler_config_path(self) -> str:
+        """Returns absolute compiler config file path from arguments"""
+        return self._get_path(self.options.compiler_config_path,
+                              relative_root_path=os.getcwd(),
+                              fallback_path=[self.program_path, 'tools', 'caprica.cfg'])
+
     def get_flags_path(self) -> str:
         """
         Returns absolute flags path or flags file name from arguments or game path
@@ -117,6 +127,8 @@ class ProjectBase:
         if self.options.game_path:
             if endswith(self.options.game_path, GameName.FO4, ignorecase=True):
                 return FlagsName.FO4
+            if endswith(self.options.game_path, GameName.SF1, ignorecase=True):
+                return FlagsName.SF1
 
         return FlagsName.TES5
 
@@ -155,6 +167,8 @@ class ProjectBase:
                 game_name = GameName.get(game_type)
             else:
                 raise KeyError('Cannot determine registry path from game type')
+            if startswith(game_name, 'Starfield'):
+                return r'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 1716740\InstallLocation'
             if startswith(game_name, 'Fallout'):
                 game_name = game_name.replace(' ', '')
             return rf'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Bethesda Softworks\{game_name}\Installed Path'
@@ -233,6 +247,10 @@ class ProjectBase:
     @staticmethod
     def _get_game_type_from_path(path: str) -> str:
         parts: list = path.casefold().split(os.sep)
+        if GameName.SF1.casefold() in parts:
+            return GameType.SF1
+        if GameName.SF1.casefold().replace(' ', '') in parts:
+            return GameType.SF1
         if GameName.FO4.casefold() in parts:
             return GameType.FO4
         if GameName.FO4.casefold().replace(' ', '') in parts:
@@ -269,6 +287,10 @@ class ProjectBase:
                     return game_type
 
         if self.options.flags_path:
+            if endswith(self.options.flags_path, FlagsName.SF1, ignorecase=True):
+                ProjectBase.log.info(f'Using game type: {GameName.FO4} (determined from flags path)')
+                return GameType.SF1
+
             if endswith(self.options.flags_path, FlagsName.FO4, ignorecase=True):
                 ProjectBase.log.info(f'Using game type: {GameName.FO4} (determined from flags path)')
                 return GameType.FO4

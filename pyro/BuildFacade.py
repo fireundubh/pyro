@@ -3,6 +3,7 @@ import multiprocessing
 import os
 import sys
 import time
+from typing import Union
 from copy import deepcopy
 
 import psutil
@@ -11,7 +12,8 @@ from pyro.Anonymizer import Anonymizer
 from pyro.PackageManager import PackageManager
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
-from pyro.Performance.CompileData import CompileData
+from pyro.Performance.CompileData import (CompileData,
+                                          CompileDataCaprica)
 from pyro.Performance.PackageData import PackageData
 from pyro.Performance.ZippingData import ZippingData
 from pyro.PexReader import PexReader
@@ -28,6 +30,7 @@ class BuildFacade:
     ppj: PapyrusProject = None
 
     compile_data: CompileData = CompileData()
+    compile_data_caprica: CompileData = CompileDataCaprica()
     package_data: PackageData = PackageData()
     zipping_data: ZippingData = ZippingData()
 
@@ -84,30 +87,43 @@ class BuildFacade:
         process = psutil.Process(os.getpid())
         process.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS if sys.platform == 'win32' else 19)
 
+    def get_compile_data(self) -> Union[CompileData, CompileDataCaprica]:
+        using_caprica = endswith(self.ppj.get_compiler_path(), 'Caprica.exe', ignorecase=True)
+        return self.compile_data_caprica if using_caprica else self.compile_data
+
     def try_compile(self) -> None:
         """Builds and passes commands to Papyrus Compiler"""
-        commands: list = self.ppj.build_commands()
+        using_caprica = endswith(self.ppj.get_compiler_path(), 'Caprica.exe', ignorecase=True)
 
-        self.compile_data.command_count = len(commands)
+        compile_data = self.get_compile_data()
 
-        self.compile_data.time.start_time = time.time()
+        compile_data.command_count, commands = self.ppj.build_commands()
 
-        if self.ppj.options.no_parallel or self.compile_data.command_count == 1:
+        compile_data.time.start_time = time.time()
+
+        if using_caprica or self.ppj.options.no_parallel or compile_data.command_count == 1:
             for command in commands:
+                BuildFacade.log.debug(f'Command: {command}')
                 if ProcessManager.run_compiler(command) == ProcessState.SUCCESS:
-                    self.compile_data.success_count += 1
-        elif self.compile_data.command_count > 0:
+                    compile_data.success_count += 1
+
+        elif compile_data.command_count > 0:
             multiprocessing.freeze_support()
-            worker_limit = min(self.compile_data.command_count, self.ppj.options.worker_limit)
+            worker_limit = min(compile_data.command_count, self.ppj.options.worker_limit)
             with multiprocessing.Pool(processes=worker_limit,
                                       initializer=BuildFacade._limit_priority) as pool:
                 for state in pool.imap(ProcessManager.run_compiler, commands):
                     if state == ProcessState.SUCCESS:
-                        self.compile_data.success_count += 1
+                        compile_data.success_count += 1
                 pool.close()
                 pool.join()
 
-        self.compile_data.time.end_time = time.time()
+        compile_data.time.end_time = time.time()
+
+        # caprica success = all files compiled
+        if using_caprica and compile_data.success_count > 0:
+            compile_data.scripts_count = compile_data.command_count
+            compile_data.success_count = compile_data.success_count
 
     def try_anonymize(self) -> None:
         """Obfuscates identifying metadata in compiled scripts"""

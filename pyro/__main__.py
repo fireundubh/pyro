@@ -31,9 +31,10 @@ if __name__ == '__main__':
     _build_arguments.add_argument('--ignore-errors',
                                   action='store_true', default=False,
                                   help='ignore compiler errors during build')
-    _build_arguments.add_argument('--no-implicit-imports',
+    # deprecated argument (functionality no longer exists, retained arg to avoid breaking change)
+    _build_arguments.add_argument('--no-implicit-imports', dest='no_implicit_imports_deprecated',
                                   action='store_true', default=False,
-                                  help='do not build with implicit imports')
+                                  help=SUPPRESS)
     _build_arguments.add_argument('--no-incremental-build',
                                   action='store_true', default=False,
                                   help='do not build incrementally')
@@ -50,6 +51,10 @@ if __name__ == '__main__':
                                      action='store', type=str,
                                      help='relative or absolute path to PapyrusCompiler.exe\n'
                                           '(if relative, must be relative to current working directory)')
+    _compiler_arguments.add_argument('--compiler-config-path',
+                                     action='store', type=str,
+                                     help='relative or absolute path to compiler config file\n'
+                                          '(if relative, must be relative to current working directory)')
     _compiler_arguments.add_argument('--flags-path',
                                      action='store', type=str,
                                      help='relative or absolute path to Papyrus Flags file\n'
@@ -62,8 +67,8 @@ if __name__ == '__main__':
     _game_arguments = _parser.add_argument_group('game arguments')
     _game_arguments.add_argument('-g', '--game-type',
                                  action='store', type=str,
-                                 choices=('fo4', 'tes5', 'sse'),
-                                 help='set game type (choices: fo4, tes5, sse)')
+                                 choices=('fo4', 'tes5', 'sf1', 'sse'),
+                                 help='set game type (choices: fo4, tes5, sf1, sse)')
 
     _game_path_arguments = _game_arguments.add_mutually_exclusive_group()
     _game_path_arguments.add_argument('--game-path',
@@ -121,6 +126,10 @@ if __name__ == '__main__':
                                     help='resolve variables and paths in project file')
 
     _program_arguments = _parser.add_argument_group('program arguments')
+    _program_arguments.add_argument('--log-level', dest='log_level',
+                                    action='store', type=str, default='debug',
+                                    choices=('all', 'debug', 'info', 'warn', 'error', 'fatal'),
+                                    help='show help and exit')
     _program_arguments.add_argument('--help', dest='show_help',
                                     action='store_true', default=False,
                                     help='show help and exit')
