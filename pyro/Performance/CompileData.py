@@ -19,7 +19,7 @@ class CompileData:
         return self.command_count - self.success_count
 
     def to_string(self) -> str:
-        raw_time, avg_time = ('{0:.3f}s'.format(t)
+        raw_time, avg_time = ('{0:.3f}s'.format(t)  # type: ignore
                               for t in (self.time.value(), self.time.average(self.success_count)))
 
         return f'Compile time: ' \
@@ -29,15 +29,7 @@ class CompileData:
                f'({self.scripts_count} scripts)'
 
 @dataclass
-class CompileDataCaprica:
-    time: TimeElapsed = field(init=False, default_factory=TimeElapsed)
-    scripts_count: int = field(init=False, default_factory=int)
-    success_count: int = field(init=False, default_factory=int)
-    command_count: int = field(init=False, default_factory=int)
-
-    def __post_init__(self) -> None:
-        self.time = TimeElapsed()
-
+class CompileDataCaprica(CompileData):
     @property
     def failed_count(self) -> int:
         return 1 if self.success_count == 0 else 0

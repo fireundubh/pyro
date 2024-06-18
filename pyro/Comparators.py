@@ -1,11 +1,11 @@
 import os
-from typing import Union
+from typing import Optional, Union
 
 from lxml import etree
 
 
 def startswith(a_source: str, a_prefix: Union[str, tuple],
-               a_start: int = None, a_end: int = None, /, ignorecase: bool = False) -> bool:
+               a_start: Optional[int] = None, a_end: Optional[int] = None, /, ignorecase: bool = False) -> bool:
 
     source = a_source[a_start:a_end]
 
@@ -25,7 +25,7 @@ def startswith(a_source: str, a_prefix: Union[str, tuple],
 
 
 def endswith(a_source: str, a_suffix: Union[str, tuple],
-             a_start: int = None, a_end: int = None, /, ignorecase: bool = False) -> bool:
+             a_start: Optional[int] = None, a_end: Optional[int] = None, /, ignorecase: bool = False) -> bool:
 
     source = a_source[a_start:a_end]
 

@@ -21,7 +21,7 @@ class Application:
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s [%(levelname).4s] %(message)s')
     log = logging.getLogger('pyro')
 
-    args: argparse.Namespace = None
+    args: argparse.Namespace
 
     def __init__(self, parser: argparse.ArgumentParser) -> None:
         self.parser = parser
