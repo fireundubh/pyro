@@ -17,16 +17,17 @@ jobs:
   runs-on: windows-latest
   
   steps:
-   - uses: actions/checkout@v1
+   - uses: actions/checkout@v4
    - name: Set up Visual Studio environment
      if: success()
      uses: seanmiddleditch/gha-setup-vsdevenv@master
-   - name: Set up Python 3.10.4 (x64)
+   - name: Set up Python 3.12.4 (x64)
      if: success()
-     uses: actions/setup-python@v2
+     uses: actions/setup-python@v5
      with:
-      python-version: 3.10.4
+      python-version: 3.12.4
       architecture: x64
+      cache: pip
    - name: Create virtual environment
      if: success()
      run: python -m venv env
@@ -38,7 +39,7 @@ jobs:
      run: python D:\a\pyro\pyro\build.py --no-zip
    - name: Upload artifact
      if: success()
-     uses: actions/upload-artifact@v1
+     uses: actions/upload-artifact@v4
      with:
       name: pyro-master-${{ github.event.repository.pushed_at }}
       path: D:\a\pyro\pyro\pyro.dist
