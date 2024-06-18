@@ -5,7 +5,6 @@ import os
 import sys
 import time
 import typing
-from copy import deepcopy
 
 from lxml import etree
 from wcmatch import wcmatch
@@ -41,7 +40,7 @@ from pyro.XmlRoot import XmlRoot
 
 
 class PapyrusProject(ProjectBase):
-    ppj_root: XmlRoot = None
+    ppj_root: XmlRoot
     folders_node: etree.ElementBase = None
     imports_node: etree.ElementBase = None
     packages_node: etree.ElementBase = None
@@ -60,7 +59,7 @@ class PapyrusProject(ProjectBase):
     pre_zip_node: etree.ElementBase = None
     post_zip_node: etree.ElementBase = None
 
-    remote: RemoteBase = None
+    remote: RemoteBase
     remote_schemas: tuple = ('https:', 'http:')
 
     zip_file_name: str = ''

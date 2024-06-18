@@ -15,7 +15,7 @@ from pyro.StringTemplate import StringTemplate
 class ProjectBase:
     log: logging.Logger = logging.getLogger('pyro')
 
-    options: ProjectOptions = None
+    options: ProjectOptions
 
     variables: dict = {}
 
