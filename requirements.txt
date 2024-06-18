@@ -1,5 +1,5 @@
 lxml
 nuitka
-psutil
+psutil==5.9.3
 wcmatch
 ordered-set
