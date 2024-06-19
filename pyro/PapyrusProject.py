@@ -700,6 +700,12 @@ class PapyrusProject(ProjectBase):
                     if startswith(option, 'parallel-compile', ignorecase=True):
                         options.pop(i)
                         break
+            
+            # parallel compilation by default
+            if (not self.options.no_parallel 
+                and 'parallel-compile=0' not in options 
+                and 'parallel-compile=1' not in options):
+                options.append(f'parallel-compile=1\n')
 
             use_config_file_for_input_paths = False
 

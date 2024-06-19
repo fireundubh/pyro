@@ -104,26 +104,20 @@ class BuildFacade:
         if using_caprica or self.ppj.options.no_parallel or compile_data.command_count == 1:
             for command in commands:
                 BuildFacade.log.debug(f'Command: {command}')
-                if ProcessManager.run_compiler(command) == ProcessState.SUCCESS:
-                    compile_data.success_count += 1
+                ProcessManager.run_compiler(command, compile_data)
 
         elif compile_data.command_count > 0:
             multiprocessing.freeze_support()
             worker_limit = min(compile_data.command_count, self.ppj.options.worker_limit)
             with multiprocessing.Pool(processes=worker_limit,
                                       initializer=BuildFacade._limit_priority) as pool:
-                for state in pool.imap(ProcessManager.run_compiler, commands):
+                for state in pool.imap(ProcessManager.run_compiler, [commands, compile_data]):
                     if state == ProcessState.SUCCESS:
                         compile_data.success_count += 1
                 pool.close()
                 pool.join()
 
         compile_data.time.end_time = time.time()
-
-        # caprica success = all files compiled
-        if using_caprica and compile_data.success_count > 0:
-            compile_data.scripts_count = compile_data.command_count
-            compile_data.success_count = compile_data.command_count
 
     def try_anonymize(self) -> None:
         """Obfuscates identifying metadata in compiled scripts"""
