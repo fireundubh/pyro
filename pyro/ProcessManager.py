@@ -179,11 +179,12 @@ class ProcessManager:
         line_error_papyrus = re.compile(r'(.*)(\(-?\d*\.?\d+,-?\d*\.?\d+\)):\s+(.*)')
         
         # Caprica's error structure:
-        # filename      [example.psc ]  (.*)\s+
+        # filename      [example.psc ]  ([^\(]*\.psc)\s+
         # location      [(69, 4:20)]    (\(-?\d*\.?\d+, -?\d*\.?\d+:-?\d*\.?\d+\))
         # error/warning [: Warning 1: ] :\s+(.*):\s+
-        # error message [bad molly]     (.*)
-        line_error_caprica = re.compile(r'(.*)\s+(\(-?\d*\.?\d+, -?\d*\.?\d+:-?\d*\.?\d+\)):\s+(.*):\s+(.*)')
+        # error message [bad molly.]    ((?:[^p]|p(?:[^s]|$)|ps(?:[^c]|$))*[^\w\s\\/])(?=$|(?:.+psc))
+        # sometimes, caprica sends two error messages in one line, so we gotta parse them both
+        line_error_caprica = re.compile(r'([^\(]*\.psc)\s+(\(-?\d*\.?\d+, -?\d*\.?\d+:-?\d*\.?\d+\)):\s+(\w*):\s+((?:[^p]|p(?:[^s]|$)|ps(?:[^c]|$))*[^\w\s\\/])(?=$|(?:.+psc))')
         
         line_error = line_error_caprica if using_caprica else line_error_papyrus
 
@@ -194,28 +195,30 @@ class ProcessManager:
                 if (line := process.stdout.readline().strip()) != '':
                     if startswith(line, exclusions):
                         continue
-                    
-                    if (match := line_error.search(line)) is not None:
-                        if (using_caprica):
-                            path, location, message_type, message = match.groups()
-                        else:
-                            path, location, message = match.groups()
-                        head, tail = os.path.split(path)
-                        if not head:
-                            script_path = tail
-                        else:
-                            script_path = f'{os.path.basename(head)}\\{tail}'
+                    matches = line_error.finditer(line)
+                    #if (match := line_error.findall(line)) is not None:
+                    if line_error.search(line) is not None:
+                        for match in matches:
+                            if (using_caprica):
+                                path, location, message_type, message = match.groups()
+                            else:
+                                path, location, message = match.groups()
+                            head, tail = os.path.split(path)
+                            if not head:
+                                script_path = tail
+                            else:
+                                script_path = f'{os.path.basename(head)}\\{tail}'
 
-                        pyro_message = f'{script_path}{location}: {message}'
-                        if (not using_caprica or message_type.lower() == "fatal error"):
-                            ProcessManager.log.error(f'COMPILATION FAILED: {pyro_message}')
-                            process.terminate()
-                            error_count += 1
-                        elif (message_type.lower() == "error"):
-                            ProcessManager.log.error(f'COMPILATION ERROR: {pyro_message}')
-                            error_count += 1
-                        else:
-                            ProcessManager.log.warning(f'{message_type}: {pyro_message}')
+                            pyro_message = f'{script_path}{location}: {message}'
+                            if (not using_caprica or message_type.lower() == "fatal error"):
+                                ProcessManager.log.error(f'COMPILATION FAILED: {pyro_message}')
+                                process.terminate()
+                                error_count += 1
+                            elif (message_type.lower() == "error"):
+                                ProcessManager.log.error(f'COMPILATION ERROR: {pyro_message}')
+                                error_count += 1
+                            else:
+                                ProcessManager.log.warning(f'{message_type}: {pyro_message}')
 
                     elif startswith(line, ('Error', 'Fatal Error'), ignorecase=True):
                         ProcessManager.log.error(line)

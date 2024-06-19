@@ -691,6 +691,7 @@ class PapyrusProject(ProjectBase):
 
             # create file if it doesn't exist
             with open(self.get_compiler_config_path(), mode="a+", encoding='utf-8') as f:
+                f.seek(0)
                 options = f.read().splitlines()
 
             # disable parallel compilation if the user overrides the default
