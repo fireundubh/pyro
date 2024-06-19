@@ -32,7 +32,7 @@ class CompileData:
 class CompileDataCaprica(CompileData):
     @property
     def failed_count(self) -> int:
-        return 1 if self.success_count == 0 else 0
+        return 1 if (self.success_count == 0 and self.command_count > 0) else 0
 
     def to_string(self) -> str:
         raw_time = '{0:.3f}s'.format(self.time.value())

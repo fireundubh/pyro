@@ -123,7 +123,7 @@ class BuildFacade:
         # caprica success = all files compiled
         if using_caprica and compile_data.success_count > 0:
             compile_data.scripts_count = compile_data.command_count
-            compile_data.success_count = compile_data.success_count
+            compile_data.success_count = compile_data.command_count
 
     def try_anonymize(self) -> None:
         """Obfuscates identifying metadata in compiled scripts"""
