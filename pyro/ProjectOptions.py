@@ -31,6 +31,7 @@ class ProjectOptions:
     compiler_path: str = field(init=False, default_factory=str)
     flags_path: str = field(init=False, default_factory=str)
     output_path: str = field(init=False, default_factory=str)
+    compiler_config_path: str = field(init=False, default_factory=str)
 
     # bsarch arguments
     bsarch_path: str = field(init=False, default_factory=str)

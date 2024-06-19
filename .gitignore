@@ -4,6 +4,7 @@
 __pycache__/
 bin/
 dev/
+env/
 pyro/dist/
 pyro/logs/
 pyro/out/

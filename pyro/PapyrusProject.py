@@ -689,7 +689,8 @@ class PapyrusProject(ProjectBase):
 
             object_names = ';'.join(psc_paths.keys())
 
-            with open(self.get_compiler_config_path(), encoding='utf-8') as f:
+            # create file if it doesn't exist
+            with open(self.get_compiler_config_path(), mode="a+", encoding='utf-8') as f:
                 options = f.read().splitlines()
 
             # disable parallel compilation if the user overrides the default
