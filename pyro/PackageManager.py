@@ -27,8 +27,8 @@ from pyro.ProjectOptions import ProjectOptions
 class PackageManager:
     log: logging.Logger = logging.getLogger('pyro')
 
-    ppj: PapyrusProject = None
-    options: ProjectOptions = None
+    ppj: PapyrusProject
+    options: ProjectOptions
     pak_extension: str = ''
     zip_extension: str = ''
 

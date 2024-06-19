@@ -27,7 +27,7 @@ from pyro.Comparators import (endswith,
 class BuildFacade:
     log: logging.Logger = logging.getLogger('pyro')
 
-    ppj: PapyrusProject = None
+    ppj: PapyrusProject
 
     compile_data: CompileData = CompileData()
     compile_data_caprica: CompileData = CompileDataCaprica()

@@ -1,6 +1,7 @@
 import os
 from typing import (Generator,
-                    Iterable)
+                    Iterable,
+                    Optional)
 from urllib.parse import (unquote_plus,
                           urlparse)
 
@@ -50,7 +51,7 @@ class PathHelper:
         return file_name
 
     @staticmethod
-    def find_script_paths_from_folder(root_dir: str, *, no_recurse: bool, matcher: wcmatch.WcMatch = None) -> Generator:
+    def find_script_paths_from_folder(root_dir: str, *, no_recurse: bool, matcher: Optional[wcmatch.WcMatch] = None) -> Generator:
         """Yields existing script paths starting from absolute folder path"""
         if not matcher:
             user_flags = wcmatch.RECURSIVE if not no_recurse else 0x0
