@@ -61,52 +61,6 @@ class Application:
                 value = ''
         super(Application, self).__setattr__(key, value)
 
-    def _clean_dist_folder(self) -> None:
-        if not os.path.exists(self.dist_path):
-            return
-
-        files_to_keep: tuple = (
-            f'{self.package_name}.exe',
-            'libcrypto-1_1.dll',
-            'libssl-1_1.dll',
-            'python37.dll',
-            'python38.dll',
-            'python39.dll',
-            'python310.dll',
-            '_elementpath.pyd',
-            '_hashlib.pyd',
-            '_multiprocessing.pyd',
-            '_psutil_windows.pyd',
-            '_queue.pyd',
-            '_socket.pyd',
-            '_ssl.pyd',
-            'etree.pyd',
-            'select.pyd',
-            'unicodedata.pyd'
-        )
-
-        for f in glob.iglob(self.dist_glob_pattern, recursive=True):
-            if not os.path.isfile(f):
-                continue
-
-            _, file_name = os.path.split(f)
-            if file_name.casefold() in files_to_keep:
-                continue
-
-            Application.log.warning(f'Deleting: "{f}"')
-            os.remove(f)
-
-        for f in glob.iglob(self.dist_glob_pattern, recursive=True):
-            if not os.path.isdir(f):
-                continue
-
-            if not os.listdir(f):
-                Application.log.warning(f'Deleting empty folder: "{f}"')
-                shutil.rmtree(f, ignore_errors=True)
-
-        if os.path.exists(self.site_path):
-            shutil.rmtree(self.site_path, ignore_errors=True)
-
     def _build_zip_archive(self) -> None:
         os.makedirs(os.path.dirname(self.zip_path), exist_ok=True)
 
@@ -188,9 +142,6 @@ class Application:
             fail_state = 1
 
         if fail_state == 0:
-            Application.log.info('Removing unnecessary files...')
-            self._clean_dist_folder()
-
             Application.log.info('Copying schemas...')
             for schema_file_name in ['PapyrusProject.xsd']:
                 shutil.copy2(os.path.join(self.root_path, self.package_name, schema_file_name),
