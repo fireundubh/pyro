@@ -104,6 +104,7 @@ class BuildFacade:
         if using_caprica or self.ppj.options.no_parallel or compile_data.command_count == 1:
             for command in commands:
                 BuildFacade.log.debug(f'Command: {command}')
+                # caprica success logic is handled in the process manager
                 ProcessManager.run_compiler(command, compile_data)
 
         elif compile_data.command_count > 0:

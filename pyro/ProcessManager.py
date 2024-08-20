@@ -171,7 +171,8 @@ class ProcessManager:
             'Failed',
             'No output',
             'Papyrus',
-            'Starting'
+            'Starting',
+            'Adding'
         )
 
         # PapyrusCompiler's error structure:
@@ -183,16 +184,17 @@ class ProcessManager:
         # Caprica's error structure:
         # filename      [example.psc ]  ([^\(]*\.psc)\s+
         # location      [(69, 4:20)]    (\(-?\d*\.?\d+, -?\d*\.?\d+:-?\d*\.?\d+\))
-        # error/warning [: Warning 1: ] :\s+(.*):\s+
+        # error/warning [: Warning 1: ] :\s+([\w\s]+):\s+
         # error message [bad molly.]    ((?:[^p]|p(?:[^s]|$)|ps(?:[^c]|$))*[^\w\s\\/])(?=$|(?:.+psc))
         # sometimes, caprica sends two error messages in one line
         # The above regex uses the psc in the file extension to find where to stop
-        line_error_caprica = re.compile(r'([^\(]*\.psc)\s+(\(-?\d*\.?\d+, -?\d*\.?\d+:-?\d*\.?\d+\)):\s+(\w*):\s+((?:[^p]|p(?:[^s]|$)|ps(?:[^c]|$))*[^\w\s\\/])(?=$|(?:.+psc))')
+        line_error_caprica = re.compile(r'([^\(]*\.psc)\s+(\(-?\d*\.?\d+, -?\d*\.?\d+:-?\d*\.?\d+\)):\s+([\w\s]+):\s+((?:[^p]|p(?:[^s]|$)|ps(?:[^c]|$))*[^\w\s\\/])(?=$|(?:.+psc))')
         
         line_error = line_error_caprica if using_caprica else line_error_papyrus
 
         compilation_count_caprica = re.compile(r'Compiling (\d+)')
-
+        compilation_count = 0
+        
         error_count = 0
         errors = set()
 
