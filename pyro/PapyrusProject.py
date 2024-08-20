@@ -298,6 +298,24 @@ class PapyrusProject(ProjectBase):
 
             self.variables.update({key: value})
 
+        self.variables.update({
+            'UNIXTIME': str(int(time.time())),
+            'PROGRAM_PATH': self.program_path,
+            'PROJECT_PATH': self.project_path,
+            'O_BSARCH_PATH': self.options.bsarch_path,
+            'O_COMPILER_PATH': self.options.compiler_path,
+            'O_COMPILER_CONFIG_PATH': self.options.compiler_config_path,
+            'O_FLAGS_PATH': self.options.flags_path,
+            'O_GAME_PATH': self.options.game_path,
+            'O_LOG_PATH': self.options.log_path,
+            'O_OUTPUT_PATH': self.options.output_path,
+            'O_PACKAGE_PATH': self.options.package_path,
+            'O_REGISTRY_PATH': self.options.registry_path,
+            'O_REMOTE_TEMP_PATH': self.options.remote_temp_path,
+            'O_TEMP_PATH': self.options.temp_path,
+            'O_ZIP_OUTPUT_PATH': self.options.zip_output_path
+        })
+
         # allow variables to reference other variables
         for key, value in self.variables.items():
             self.variables.update({key: self.parse(value)})
@@ -306,10 +324,6 @@ class PapyrusProject(ProjectBase):
         for key in reversed(self.variables.keys()):
             value = self.variables[key]
             self.variables.update({key: self.parse(value)})
-
-        self.variables.update({
-            'UNIXTIME': str(int(time.time()))
-        })
 
     def _update_attributes(self, parent_node: etree.ElementBase) -> None:
         """Updates attributes of element tree with missing attributes and default values"""
