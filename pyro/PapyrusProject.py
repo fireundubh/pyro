@@ -708,18 +708,21 @@ class PapyrusProject(ProjectBase):
                 f.seek(0)
                 options = f.read().splitlines()
 
-            # disable parallel compilation if the user overrides the default
-            if self.options.no_parallel and 'parallel-compile=1' in options:
-                for i, option in enumerate(options):
-                    if startswith(option, 'parallel-compile', ignorecase=True):
-                        options.pop(i)
-                        break
-            
-            # parallel compilation by default
-            if (not self.options.no_parallel 
-                and 'parallel-compile=0' not in options 
-                and 'parallel-compile=1' not in options):
-                options.append(f'parallel-compile=1\n')
+            # check and update config for parallel compilation
+            # and language extensions
+            for argument, argument_name, argument_value in \
+            ((self.options.no_parallel, "parallel-compile", 1), 
+             (self.options.no_caprica_language_extensions, "enable-language-extensions", 0)):
+                
+                # disable the option if the user overrides the default
+                if argument and f'{argument_name}={argument_value}' in options:
+                    options = [option for option in options 
+                            if not startswith(option, argument_name, ignorecase=True)]
+                
+                # but set it to argument_value if the user hasn't set it
+                if (not argument
+                    and not any(opt.startswith(argument_name) for opt in options)):
+                    options.append(f'{argument_name}={argument_value}\n')
 
             use_config_file_for_input_paths = False
 
