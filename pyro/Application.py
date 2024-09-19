@@ -83,8 +83,12 @@ class Application:
     @staticmethod
     def _validate_project_paths(ppj: PapyrusProject) -> None:
         compiler_path = ppj.get_compiler_path()
-        if not compiler_path or not os.path.isfile(compiler_path):
+        if not compiler_path:
             Application.log.error('Cannot proceed without compiler path')
+            sys.exit(1)
+            
+        if not os.path.isfile(compiler_path):
+            Application.log.error('Cannot proceed with invalid compiler path')
             sys.exit(1)
 
         flags_path = ppj.get_flags_path()
