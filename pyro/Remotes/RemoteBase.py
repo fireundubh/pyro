@@ -3,6 +3,7 @@ import os
 from typing import Generator, Optional
 from urllib.error import HTTPError
 from urllib.parse import urlparse
+from urllib.parse import unquote
 
 from pyro.Comparators import startswith
 from pyro.Remotes.RemoteUri import RemoteUri
@@ -30,23 +31,21 @@ class RemoteBase:
         """
         parsed_url = urlparse(url)
 
-        netloc = parsed_url.netloc
+        netloc = unquote(parsed_url.netloc)
+        url_path_parts = parsed_url.path.split('/')
+        url_path_parts.pop(0) if not url_path_parts[0] else None  # pop empty space
+        
+        # unquote url
+        url_path_parts = [unquote(part) for part in url_path_parts]
 
         if netloc in self.url_patterns:
-            url_path_parts = parsed_url.path.split('/')
-            url_path_parts.pop(0) if not url_path_parts[0] else None  # pop empty space
-
             if netloc == 'github.com' and len(url_path_parts) == 2:
                 return os.sep.join(url_path_parts)
 
             for i in self.url_patterns[netloc]:
                 url_path_parts.pop(i)
 
-            url_path = os.sep.join(url_path_parts)
-        else:
-            url_path_parts = parsed_url.path.split('/')
-            url_path_parts.pop(0) if not url_path_parts[0] else None  # pop empty space
-            url_path = os.sep.join(url_path_parts)
+        url_path = os.sep.join(url_path_parts)
 
         return url_path
 
@@ -105,11 +104,11 @@ class RemoteBase:
                 request_url = url
 
         if 'api/v1' not in path:
-            result.owner = url_path_parts[0]
-            result.repo = url_path_parts[1]
+            result.owner = unquote(url_path_parts[0])
+            result.repo = unquote(url_path_parts[1])
         else:
-            result.owner = url_path_parts[3]
-            result.repo = url_path_parts[4]
+            result.owner = unquote(url_path_parts[3])
+            result.repo = unquote(url_path_parts[4])
 
         result.url = request_url
 
