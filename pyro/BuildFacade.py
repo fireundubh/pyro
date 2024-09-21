@@ -112,7 +112,7 @@ class BuildFacade:
             worker_limit = min(compile_data.command_count, self.ppj.options.worker_limit)
             with multiprocessing.Pool(processes=worker_limit,
                                       initializer=BuildFacade._limit_priority) as pool:
-                for state in pool.imap(ProcessManager.run_compiler, [commands, compile_data]):
+                for state in pool.starmap(ProcessManager.run_compiler, [(command, compile_data) for command in commands]):
                     if state == ProcessState.SUCCESS:
                         compile_data.success_count += 1
                 pool.close()
