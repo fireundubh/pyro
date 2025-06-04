@@ -63,6 +63,10 @@ if __name__ == '__main__':
                                      action='store', type=str,
                                      help='relative or absolute path to output folder\n'
                                           '(if relative, must be relative to project)')
+    _compiler_arguments.add_argument('--caprica-language-extensions',
+                                     action='store_true', default=False,
+                                     help='enable Caprica language extensions\n'
+                                          '(only works if using Caprica as your compiler)')
 
     _game_arguments = _parser.add_argument_group('game arguments')
     _game_arguments.add_argument('-g', '--game-type',
