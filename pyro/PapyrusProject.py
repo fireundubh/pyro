@@ -69,6 +69,11 @@ class PapyrusProject(ProjectBase):
     pex_paths: list = []
     psc_paths: dict = {}
 
+    def __get_boolean_attribute(self, element: etree.Element, attr_name: str, default: bool = False) -> bool:
+        if element is None:
+            return default
+        return element.get(attr_name) == 'True'
+
     def __init__(self, options: ProjectOptions) -> None:
         super(PapyrusProject, self).__init__(options)
 
@@ -116,16 +121,13 @@ class PapyrusProject(ProjectBase):
         if self.options.output_path and not os.path.isabs(self.options.output_path):
             self.options.output_path = self.get_output_path()
 
-        def bool_attr(element: etree.Element, attr_name: str) -> bool:
-            return element is not None and element.get(attr_name) == 'True'
+        self.optimize = self.__get_boolean_attribute(self.ppj_root, XmlAttributeName.OPTIMIZE)
+        self.release = self.__get_boolean_attribute(self.ppj_root, XmlAttributeName.RELEASE)
+        self.final = self.__get_boolean_attribute(self.ppj_root, XmlAttributeName.FINAL)
 
-        self.optimize = bool_attr(self.ppj_root, XmlAttributeName.OPTIMIZE)
-        self.release = bool_attr(self.ppj_root, XmlAttributeName.RELEASE)
-        self.final = bool_attr(self.ppj_root, XmlAttributeName.FINAL)
-
-        self.options.anonymize = bool_attr(self.ppj_root, XmlAttributeName.ANONYMIZE)
-        self.options.package = bool_attr(self.ppj_root, XmlAttributeName.PACKAGE)
-        self.options.zip = bool_attr(self.ppj_root, XmlAttributeName.ZIP)
+        self.options.anonymize = self.__get_boolean_attribute(self.ppj_root, XmlAttributeName.ANONYMIZE)
+        self.options.package = self.__get_boolean_attribute(self.ppj_root, XmlAttributeName.PACKAGE)
+        self.options.zip = self.__get_boolean_attribute(self.ppj_root, XmlAttributeName.ZIP)
 
         self.imports_node = self.ppj_root.find(XmlTagName.IMPORTS)
         self.scripts_node = self.ppj_root.find(XmlTagName.SCRIPTS)
@@ -134,40 +136,40 @@ class PapyrusProject(ProjectBase):
         self.zip_files_node = self.ppj_root.find(XmlTagName.ZIP_FILES)
 
         self.pre_build_node = self.ppj_root.find(XmlTagName.PRE_BUILD_EVENT)
-        self.use_pre_build_event = bool_attr(self.pre_build_node, XmlAttributeName.USE_IN_BUILD)
+        self.use_pre_build_event = self.__get_boolean_attribute(self.pre_build_node, XmlAttributeName.USE_IN_BUILD)
 
         self.post_build_node = self.ppj_root.find(XmlTagName.POST_BUILD_EVENT)
-        self.use_post_build_event = bool_attr(self.post_build_node, XmlAttributeName.USE_IN_BUILD)
+        self.use_post_build_event = self.__get_boolean_attribute(self.post_build_node, XmlAttributeName.USE_IN_BUILD)
 
         self.pre_import_node = self.ppj_root.find(XmlTagName.PRE_IMPORT_EVENT)
-        self.use_pre_import_event = bool_attr(self.pre_import_node, XmlAttributeName.USE_IN_BUILD)
+        self.use_pre_import_event = self.__get_boolean_attribute(self.pre_import_node, XmlAttributeName.USE_IN_BUILD)
 
         self.post_import_node = self.ppj_root.find(XmlTagName.POST_IMPORT_EVENT)
-        self.use_post_import_event = bool_attr(self.post_import_node, XmlAttributeName.USE_IN_BUILD)
+        self.use_post_import_event = self.__get_boolean_attribute(self.post_import_node, XmlAttributeName.USE_IN_BUILD)
 
         self.pre_compile_node = self.ppj_root.find(XmlTagName.PRE_COMPILE_EVENT)
-        self.use_pre_compile_event = bool_attr(self.pre_compile_node, XmlAttributeName.USE_IN_BUILD)
+        self.use_pre_compile_event = self.__get_boolean_attribute(self.pre_compile_node, XmlAttributeName.USE_IN_BUILD)
 
         self.post_compile_node = self.ppj_root.find(XmlTagName.POST_COMPILE_EVENT)
-        self.use_post_compile_event = bool_attr(self.post_compile_node, XmlAttributeName.USE_IN_BUILD)
+        self.use_post_compile_event = self.__get_boolean_attribute(self.post_compile_node, XmlAttributeName.USE_IN_BUILD)
 
         self.pre_anonymize_node = self.ppj_root.find(XmlTagName.PRE_ANONYMIZE_EVENT)
-        self.use_pre_anonymize_event = bool_attr(self.pre_anonymize_node, XmlAttributeName.USE_IN_BUILD)
+        self.use_pre_anonymize_event = self.__get_boolean_attribute(self.pre_anonymize_node, XmlAttributeName.USE_IN_BUILD)
 
         self.post_anonymize_node = self.ppj_root.find(XmlTagName.POST_ANONYMIZE_EVENT)
-        self.use_post_anonymize_event = bool_attr(self.post_anonymize_node, XmlAttributeName.USE_IN_BUILD)
+        self.use_post_anonymize_event = self.__get_boolean_attribute(self.post_anonymize_node, XmlAttributeName.USE_IN_BUILD)
 
         self.pre_package_node = self.ppj_root.find(XmlTagName.PRE_PACKAGE_EVENT)
-        self.use_pre_package_event = bool_attr(self.pre_package_node, XmlAttributeName.USE_IN_BUILD)
+        self.use_pre_package_event = self.__get_boolean_attribute(self.pre_package_node, XmlAttributeName.USE_IN_BUILD)
 
         self.post_package_node = self.ppj_root.find(XmlTagName.POST_PACKAGE_EVENT)
-        self.use_post_package_event = bool_attr(self.post_package_node, XmlAttributeName.USE_IN_BUILD)
+        self.use_post_package_event = self.__get_boolean_attribute(self.post_package_node, XmlAttributeName.USE_IN_BUILD)
 
         self.pre_zip_node = self.ppj_root.find(XmlTagName.PRE_ZIP_EVENT)
-        self.use_pre_zip_event = bool_attr(self.pre_zip_node, XmlAttributeName.USE_IN_BUILD)
+        self.use_pre_zip_event = self.__get_boolean_attribute(self.pre_zip_node, XmlAttributeName.USE_IN_BUILD)
 
         self.post_zip_node = self.ppj_root.find(XmlTagName.POST_ZIP_EVENT)
-        self.use_post_zip_event = bool_attr(self.post_zip_node, XmlAttributeName.USE_IN_BUILD)
+        self.use_post_zip_event = self.__get_boolean_attribute(self.post_zip_node, XmlAttributeName.USE_IN_BUILD)
 
         if self.options.package and self.packages_node is not None:
             if not self.options.package_path:
@@ -221,9 +223,6 @@ class PapyrusProject(ProjectBase):
         if not self.import_paths:
             PapyrusProject.log.error('Failed to build list of import paths')
             sys.exit(1)
-
-        # remove project path, if added by user
-        self.import_paths = [p for p in self.import_paths if not startswith(p, self.project_path, ignorecase=True)]
 
         # prepend project path
         self.import_paths.insert(0, self.project_path)
