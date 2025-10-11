@@ -1,27 +1,120 @@
+import ctypes
 import logging
-import multiprocessing
 import os
 import sys
 import time
-from typing import Union
-from copy import deepcopy
 
-import psutil
+import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
+
+from copy import deepcopy
+from dataclasses import (dataclass,
+                         field)
+from decimal import Context, Decimal, ROUND_DOWN
+from typing import Union
 
 from pyro.Anonymizer import Anonymizer
+from pyro.Comparators import (endswith,
+                              startswith)
+from pyro.Enums.ProcessState import ProcessState
 from pyro.PackageManager import PackageManager
 from pyro.PapyrusProject import PapyrusProject
 from pyro.PathHelper import PathHelper
-from pyro.Performance.CompileData import (CompileData,
-                                          CompileDataCaprica)
-from pyro.Performance.PackageData import PackageData
-from pyro.Performance.ZippingData import ZippingData
 from pyro.PexReader import PexReader
 from pyro.ProcessManager import ProcessManager
-from pyro.Enums.ProcessState import ProcessState
 
-from pyro.Comparators import (endswith,
-                              startswith)
+
+class TimeElapsed:
+    start_time: float = 0.0
+    end_time: float = 0.0
+
+    def __init__(self) -> None:
+        self._context = Context(prec=4, rounding=ROUND_DOWN)
+        self.start_time = 0.0
+        self.end_time = 0.0
+
+    def average(self, dividend: int) -> Decimal:
+        if dividend == 0:
+            return round(Decimal(0), 8)
+        value = self.value()
+        if value.compare(0) == 0:
+            return round(Decimal(0), 8)
+        return round(value / Decimal(dividend, self._context), 8)
+
+    def value(self) -> Decimal:
+        return Decimal(self.end_time) - Decimal(self.start_time)
+
+
+@dataclass
+class CompileData:
+    time: TimeElapsed = field(init=False, default_factory=TimeElapsed)
+    scripts_count: int = field(init=False, default_factory=int)
+    success_count: int = field(init=False, default_factory=int)
+    command_count: int = field(init=False, default_factory=int)
+
+    def __post_init__(self) -> None:
+        self.time = TimeElapsed()
+
+    @property
+    def failed_count(self) -> int:
+        return self.command_count - self.success_count
+
+    def to_string(self) -> str:
+        raw_time, avg_time = ('{0:.3f}s'.format(t)
+                              for t in (self.time.value(), self.time.average(self.success_count)))
+
+        return f'Compile time: ' \
+               f'{raw_time} ({avg_time}/script) - ' \
+               f'{self.success_count} succeeded, ' \
+               f'{self.failed_count} failed ' \
+               f'({self.scripts_count} scripts)'
+
+
+@dataclass
+class CompileDataCaprica(CompileData):
+    @property
+    def failed_count(self) -> int:
+        return 1 if self.success_count == 0 else 0
+
+    def to_string(self) -> str:
+        raw_time = '{0:.3f}s'.format(self.time.value())
+        avg_time = '{0:.4f}s'.format(self.time.average(self.scripts_count))
+
+        return f'Compile time: ' \
+               f'{raw_time} ({avg_time}/script) - ' \
+               f'({self.scripts_count} scripts)'
+
+
+@dataclass
+class PackageData:
+    time: TimeElapsed = field(init=False, default_factory=TimeElapsed)
+    file_count: int = field(init=False, default_factory=int)
+
+    def __post_init__(self) -> None:
+        self.time = TimeElapsed()
+
+    def to_string(self) -> str:
+        raw_time, avg_time = ('{0:.3f}s'.format(t)
+                              for t in (self.time.value(), self.time.average(self.file_count)))
+
+        return f'Package time: ' \
+               f'{raw_time} ({avg_time}/file, {self.file_count} files)'
+
+
+@dataclass
+class ZippingData:
+    time: TimeElapsed = field(init=False, default_factory=TimeElapsed)
+    file_count: int = field(init=False, default_factory=int)
+
+    def __post_init__(self) -> None:
+        self.time = TimeElapsed()
+
+    def to_string(self) -> str:
+        raw_time, avg_time = ('{0:.3f}s'.format(t)
+                              for t in (self.time.value(), self.time.average(self.file_count)))
+
+        return f'Zipping time: ' \
+               f'{raw_time} ({avg_time}/file, {self.file_count} files)'
 
 
 class BuildFacade:
@@ -84,8 +177,12 @@ class BuildFacade:
 
     @staticmethod
     def _limit_priority() -> None:
-        process = psutil.Process(os.getpid())
-        process.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS if sys.platform == 'win32' else 19)
+        if sys.platform == 'win32':
+            BELOW_NORMAL_PRIORITY_CLASS = 0x4000
+            handle = ctypes.windll.kernel32.GetCurrentProcess()
+            ctypes.windll.kernel32.SetPriorityClass(handle, BELOW_NORMAL_PRIORITY_CLASS)
+        else:
+            os.nice(19)
 
     def get_compile_data(self) -> Union[CompileData, CompileDataCaprica]:
         using_caprica = endswith(self.ppj.get_compiler_path(), 'Caprica.exe', ignorecase=True)
@@ -108,15 +205,12 @@ class BuildFacade:
                     compile_data.success_count += 1
 
         elif compile_data.command_count > 0:
-            multiprocessing.freeze_support()
             worker_limit = min(compile_data.command_count, self.ppj.options.worker_limit)
-            with multiprocessing.Pool(processes=worker_limit,
-                                      initializer=BuildFacade._limit_priority) as pool:
-                for state in pool.imap(ProcessManager.run_compiler, commands):
-                    if state == ProcessState.SUCCESS:
+            with ThreadPoolExecutor(max_workers=worker_limit) as executor:
+                futures = [executor.submit(ProcessManager.run_compiler, command) for command in commands]
+                for future in concurrent.futures.as_completed(futures):
+                    if future.result() == ProcessState.SUCCESS:
                         compile_data.success_count += 1
-                pool.close()
-                pool.join()
 
         compile_data.time.end_time = time.time()
 

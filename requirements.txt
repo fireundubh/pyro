@@ -1,5 +1,4 @@
 lxml>=5.2.2
 nuitka>=2.3.10
-psutil==5.9.3
 wcmatch>=8.5.2
 ordered-set>=4.1.0
