@@ -1,17 +1,18 @@
+import concurrent.futures
 import logging
 import os
 import shutil
 import sys
+import threading
 import typing
 import zipfile
-
-import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
 
 from lxml import etree
 from wcmatch import (glob,
                      wcmatch)
 
+from pyro.CaseInsensitiveList import CaseInsensitiveList
 from pyro.CommandArguments import CommandArguments
 from pyro.Comparators import (endswith,
                               is_include_node,
@@ -19,7 +20,6 @@ from pyro.Comparators import (endswith,
                               is_package_node,
                               is_zipfile_node,
                               startswith)
-from pyro.CaseInsensitiveList import CaseInsensitiveList
 from pyro.Constants import (GameType,
                             XmlAttributeName)
 from pyro.PapyrusProject import PapyrusProject
@@ -275,7 +275,7 @@ class PackageManager:
 
             PackageManager.log.info(f'Creating "{attr_file_name}"...')
 
-            copy_tasks = []
+            tasks = []
 
             for source_path, attr_path in self._generate_include_paths(package_node, root_dir):
                 if os.path.isabs(source_path):
@@ -294,9 +294,9 @@ class PackageManager:
                 if endswith(source_path, '.pex', ignorecase=True) and not startswith(relpath, 'scripts', ignorecase=True):
                     target_path = os.path.join(self.options.temp_path, 'Scripts', relpath)
 
-                copy_tasks.append((source_path, target_path))
+                tasks.append((source_path, target_path))
 
-            self.includes = len(copy_tasks)
+            self.includes = len(tasks)
 
             def copy_task_fn(s, t):
                 os.makedirs(os.path.dirname(t), exist_ok=True)
@@ -305,7 +305,7 @@ class PackageManager:
             worker_limit = min(self.includes, self.ppj.options.worker_limit)
             with ThreadPoolExecutor(max_workers=worker_limit) as executor:
                 futures = [executor.submit(copy_task_fn, source_path, target_path)
-                           for source_path, target_path in copy_tasks]
+                           for source_path, target_path in tasks]
                 concurrent.futures.wait(futures)
 
             # run bsarch
@@ -354,28 +354,39 @@ class PackageManager:
             if root_dir:
                 PackageManager.log.info(f'Creating "{attr_file_name}"...')
 
-                try:
+                tasks = []
+
+                for include_path, attr_path in self._generate_include_paths(zip_node, root_dir, True):
+                    if not attr_path:
+                        if root_dir in include_path:
+                            arcname = os.path.relpath(include_path, root_dir)
+                        else:
+                            arcname = os.path.basename(include_path)
+                    else:
+                        _, attr_fn = os.path.split(include_path)
+                        arcname = attr_fn if attr_path == os.curdir else os.path.join(attr_path, attr_fn)
+
+                    tasks.append((include_path, arcname))
+                    PackageManager.log.debug(f'+ "{arcname}"')
+
+                self.includes = len(tasks)
+
+                if self.includes > 0:
+                    def add_to_zip(zf: zipfile.ZipFile, fn: str, an: str, lk: threading.Lock) -> None:
+                        with lk:
+                            zf.write(fn, an)
+
+                    lock = threading.Lock()
+                    worker_limit = min(self.includes, self.ppj.options.worker_limit)
                     with zipfile.ZipFile(file_path, mode='w', compression=compress_type) as z:
-                        for include_path, attr_path in self._generate_include_paths(zip_node, root_dir, True):
-                            if not attr_path:
-                                if root_dir in include_path:
-                                    arcname = os.path.relpath(include_path, root_dir)
-                                else:
-                                    # just add file to zip root
-                                    arcname = os.path.basename(include_path)
-                            else:
-                                _, attr_file_name = os.path.split(include_path)
-                                arcname = attr_file_name if attr_path == os.curdir else os.path.join(attr_path, attr_file_name)
-
-                            PackageManager.log.debug('+ "{}"'.format(arcname))
-                            z.write(include_path, arcname, compress_type=compress_type)
-
-                            self.includes += 1
+                        with ThreadPoolExecutor(max_workers=worker_limit) as executor:
+                            futures = []
+                            for include_path, arcname in tasks:
+                                future = executor.submit(add_to_zip, z, include_path, arcname, lock)
+                                futures.append(future)
+                            concurrent.futures.wait(futures)
 
                     PackageManager.log.info(f'Wrote ZIP file: "{file_path}"')
-                except PermissionError:
-                    PackageManager.log.error(f'Cannot open ZIP file for writing: "{file_path}"')
-                    sys.exit(1)
             else:
                 PackageManager.log.error(f'Cannot resolve RootDir path to existing folder: "{root_dir}"')
                 sys.exit(1)
