@@ -42,7 +42,7 @@ class ProjectBase:
 
     def __setattr__(self, key: str, value: object) -> None:
         if isinstance(value, str) and endswith(key, 'path'):
-            if os.altsep in value:
+            if os.altsep and str(os.altsep) in value:
                 value = os.path.normpath(value)
         elif isinstance(value, list) and endswith(key, 'paths'):
             value = [os.path.normpath(path) if path != os.curdir else path for path in value]
