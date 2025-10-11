@@ -5,6 +5,9 @@ import sys
 import typing
 import zipfile
 
+import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
+
 from lxml import etree
 from wcmatch import (glob,
                      wcmatch)
@@ -272,6 +275,8 @@ class PackageManager:
 
             PackageManager.log.info(f'Creating "{attr_file_name}"...')
 
+            copy_tasks = []
+
             for source_path, attr_path in self._generate_include_paths(package_node, root_dir):
                 if os.path.isabs(source_path):
                     relpath: str = os.path.relpath(source_path, root_dir)
@@ -289,10 +294,19 @@ class PackageManager:
                 if endswith(source_path, '.pex', ignorecase=True) and not startswith(relpath, 'scripts', ignorecase=True):
                     target_path = os.path.join(self.options.temp_path, 'Scripts', relpath)
 
-                os.makedirs(os.path.dirname(target_path), exist_ok=True)
-                shutil.copy2(source_path, target_path)
+                copy_tasks.append((source_path, target_path))
 
-                self.includes += 1
+            self.includes = len(copy_tasks)
+
+            def copy_task_fn(s, t):
+                os.makedirs(os.path.dirname(t), exist_ok=True)
+                shutil.copy2(s, t)
+
+            worker_limit = min(self.includes, self.ppj.options.worker_limit)
+            with ThreadPoolExecutor(max_workers=worker_limit) as executor:
+                futures = [executor.submit(copy_task_fn, source_path, target_path)
+                           for source_path, target_path in copy_tasks]
+                concurrent.futures.wait(futures)
 
             # run bsarch
             command: str = self.build_commands(self.options.temp_path, file_path)
