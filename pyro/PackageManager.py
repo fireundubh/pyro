@@ -23,6 +23,7 @@ from pyro.Comparators import (endswith,
 from pyro.Constants import (GameType,
                             XmlAttributeName)
 from pyro.PapyrusProject import PapyrusProject
+from pyro.PathHelper import PathHelper
 from pyro.ProcessManager import ProcessManager
 from pyro.ProjectOptions import ProjectOptions
 
@@ -99,14 +100,14 @@ class PackageManager:
                 PackageManager.log.error(f'Include path at line {include_node.sourceline} in project file is empty')
                 sys.exit(1)
 
+            # normalize early; pardir check remains for validation
+            search_path = PathHelper.normalize_relative_path(search_path, root_path)
+
             if not zip_mode and startswith(search_path, os.pardir):
                 PackageManager.log.error(f'Include paths cannot start with "{os.pardir}"')
                 sys.exit(1)
 
-            if startswith(search_path, os.curdir):
-                search_path = search_path.replace(os.curdir, root_path, 1)
-
-            # fix invalid pattern with leading separator
+            # fix invalid pattern with leading separator (post-norm; assumes normpath handles seps)
             if not zip_mode and startswith(search_path, (os.path.sep, os.path.altsep)):
                 search_path = '**' + search_path
 
@@ -155,16 +156,9 @@ class PackageManager:
             attr_exclude: str = match_node.get(XmlAttributeName.EXCLUDE).strip()
             attr_path: str = match_node.get(XmlAttributeName.PATH).strip()  # type: ignore
 
-            in_path: str = os.path.normpath(attr_in)
+            in_path: str = PathHelper.normalize_relative_path(attr_in, root_path)
 
-            if in_path == os.pardir or startswith(in_path, os.pardir):
-                in_path = in_path.replace(os.pardir, os.path.normpath(os.path.join(root_path, os.pardir)), 1)
-            elif in_path == os.curdir or startswith(in_path, os.curdir):
-                in_path = in_path.replace(os.curdir, root_path, 1)
-
-            if not os.path.isabs(in_path):
-                in_path = os.path.join(root_path, in_path)
-            elif zip_mode and root_path not in in_path:
+            if zip_mode and root_path not in in_path:
                 PackageManager.log.error(f'Cannot match path outside RootDir: "{in_path}"')
                 sys.exit(1)
 
@@ -260,61 +254,70 @@ class PackageManager:
                                                relative_root_path=self.ppj.project_path,
                                                fallback_path=[self.ppj.project_path, os.path.basename(attr_file_name)])
 
-            # prevent clobbering files previously created in this session
-            if attr_file_name in file_names:
-                attr_file_name = f'{self.ppj.project_name} ({i})'
+            root_dir = PathHelper.normalize_relative_path(root_dir, self.ppj.project_path) if root_dir else ''
 
-            if attr_file_name not in file_names:
-                file_names.append(attr_file_name)
+            if root_dir and os.path.isdir(root_dir):
+                # prevent clobbering files previously created in this session
+                if attr_file_name in file_names:
+                    attr_file_name = f'{self.ppj.project_name} ({i})'
 
-            attr_file_name = self._fix_package_extension(attr_file_name)
+                if attr_file_name not in file_names:
+                    file_names.append(attr_file_name)
 
-            file_path: str = os.path.join(self.options.package_path, attr_file_name)
+                attr_file_name = self._fix_package_extension(attr_file_name)
 
-            self._check_write_permission(file_path)
+                file_path: str = os.path.join(self.options.package_path, attr_file_name)
 
-            PackageManager.log.info(f'Creating "{attr_file_name}"...')
+                self._check_write_permission(file_path)
 
-            tasks = []
+                PackageManager.log.info(f'Creating "{attr_file_name}"...')
 
-            for source_path, attr_path in self._generate_include_paths(package_node, root_dir):
-                if os.path.isabs(source_path):
-                    relpath: str = os.path.relpath(source_path, root_dir)
-                else:
-                    relpath: str = source_path  # type: ignore
-                    source_path = os.path.join(self.ppj.project_path, source_path)
+                tasks = []
 
-                adj_relpath = os.path.normpath(os.path.join(attr_path, relpath))
+                for source_path, raw_attr_path in self._generate_include_paths(package_node, root_dir):
+                    # Normalize attr_path once (user-provided relative)
+                    attr_path = PathHelper.normalize_relative_path(raw_attr_path, self.ppj.project_path) if raw_attr_path else ''
 
-                PackageManager.log.debug(f'+ "{adj_relpath.casefold()}"')
+                    if os.path.isabs(source_path):
+                        relpath: str = os.path.relpath(source_path, root_dir)
+                    else:
+                        relpath = source_path  # Already normalized upstream
+                        source_path = os.path.join(self.ppj.project_path, relpath)  # But re-norm if needed
 
-                target_path: str = os.path.join(self.options.temp_path, adj_relpath)
+                    adj_relpath = os.path.normpath(os.path.join(attr_path, relpath))  # Keep for join safety
 
-                # fix target path if user passes a deeper package root (RootDir)
-                if endswith(source_path, '.pex', ignorecase=True) and not startswith(relpath, 'scripts', ignorecase=True):
-                    target_path = os.path.join(self.options.temp_path, 'Scripts', relpath)
+                    PackageManager.log.debug(f'+ "{adj_relpath.casefold()}"')
 
-                tasks.append((source_path, target_path))
+                    target_path: str = os.path.join(self.options.temp_path, adj_relpath)
 
-            self.includes = len(tasks)
+                    # fix target path if user passes a deeper package root (RootDir)
+                    if endswith(source_path, '.pex', ignorecase=True) and not startswith(relpath, 'scripts', ignorecase=True):
+                        target_path = os.path.join(self.options.temp_path, 'Scripts', relpath)
 
-            def copy_task_fn(s, t):
-                os.makedirs(os.path.dirname(t), exist_ok=True)
-                shutil.copy2(s, t)
+                    tasks.append((source_path, target_path))
 
-            worker_limit = min(self.includes, self.ppj.options.worker_limit)
-            with ThreadPoolExecutor(max_workers=worker_limit) as executor:
-                futures = [executor.submit(copy_task_fn, source_path, target_path)
-                           for source_path, target_path in tasks]
-                concurrent.futures.wait(futures)
+                self.includes = len(tasks)
 
-            # run bsarch
-            command: str = self.build_commands(self.options.temp_path, file_path)
-            ProcessManager.run_bsarch(command)
+                def copy_task_fn(s, t):
+                    os.makedirs(os.path.dirname(t), exist_ok=True)
+                    shutil.copy2(s, t)
 
-            # clear temporary data
-            if os.path.isdir(self.options.temp_path):
-                shutil.rmtree(self.options.temp_path, ignore_errors=True)
+                worker_limit = min(self.includes, self.ppj.options.worker_limit)
+                with ThreadPoolExecutor(max_workers=worker_limit) as executor:
+                    futures = [executor.submit(copy_task_fn, source_path, target_path)
+                               for source_path, target_path in tasks]
+                    concurrent.futures.wait(futures)
+
+                # run bsarch
+                command: str = self.build_commands(self.options.temp_path, file_path)
+                ProcessManager.run_bsarch(command)
+
+                # clear temporary data
+                if os.path.isdir(self.options.temp_path):
+                    shutil.rmtree(self.options.temp_path, ignore_errors=True)
+            else:
+                PackageManager.log.error(f'Cannot resolve RootDir path to existing folder: "{root_dir}"')
+                sys.exit(1)
 
     def create_zip(self) -> None:
         # ensure zip output path exists
@@ -351,12 +354,16 @@ class PackageManager:
                                                relative_root_path=self.ppj.project_path,
                                                fallback_path='')
 
-            if root_dir:
+            root_dir = PathHelper.normalize_relative_path(root_dir, self.ppj.project_path) if root_dir else ''
+
+            if root_dir and os.path.isdir(root_dir):
                 PackageManager.log.info(f'Creating "{attr_file_name}"...')
 
                 tasks = []
 
-                for include_path, attr_path in self._generate_include_paths(zip_node, root_dir, True):
+                for include_path, raw_attr_path in self._generate_include_paths(zip_node, root_dir, True):
+                    attr_path = PathHelper.normalize_relative_path(raw_attr_path, self.ppj.project_path) if raw_attr_path else ''
+
                     if not attr_path:
                         if root_dir in include_path:
                             arcname = os.path.relpath(include_path, root_dir)
@@ -364,7 +371,7 @@ class PackageManager:
                             arcname = os.path.basename(include_path)
                     else:
                         _, attr_fn = os.path.split(include_path)
-                        arcname = attr_fn if attr_path == os.curdir else os.path.join(attr_path, attr_fn)
+                        arcname = attr_fn if attr_path == os.curdir else os.path.join(attr_path, attr_fn)  # curdir check post-norm
 
                     tasks.append((include_path, arcname))
                     PackageManager.log.debug(f'+ "{arcname}"')

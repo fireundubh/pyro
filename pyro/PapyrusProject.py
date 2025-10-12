@@ -70,9 +70,9 @@ class PapyrusProject(ProjectBase):
         if self.options.create_project:
             sys.exit(1)
 
-        variables_node = self.xml_handler.ppj_root.find(XmlTagName.VARIABLES)
-        if variables_node is not None:
-            self._parse_variables(variables_node)
+        self.xml_handler.variables_node = self.xml_handler.ppj_root.find(XmlTagName.VARIABLES)
+        if self.xml_handler.variables_node is not None:
+            self._parse_variables(self.xml_handler.variables_node)
 
         self.xml_handler.update_attributes(self.parse)
 

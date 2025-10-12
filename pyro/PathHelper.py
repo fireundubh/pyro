@@ -60,6 +60,14 @@ class PathHelper:
             yield script_path
 
     @staticmethod
+    def normalize_relative_path(path: str, base_path: str) -> str:
+        if startswith(path, (os.curdir, os.pardir)):
+            path = path.replace(os.curdir, base_path, 1).replace(os.pardir, os.path.normpath(os.path.join(base_path, os.pardir)), 1)
+        if os.altsep and str(os.altsep) in path:
+            path = os.path.normpath(path)
+        return os.path.normpath(os.path.expanduser(os.path.expandvars(path)))
+
+    @staticmethod
     def uniqify(items: Iterable) -> list:
         """Returns ordered list without duplicates"""
         return list(dict.fromkeys(items))

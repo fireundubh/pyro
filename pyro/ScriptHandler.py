@@ -92,42 +92,26 @@ class ScriptHandler:
 
             folder_path: str = folder_node.text
 
-            # handle . and .. in path
-            if folder_path == os.pardir or startswith(folder_path, os.pardir):
-                folder_path = folder_path.replace(os.pardir, os.path.normpath(os.path.join(self.project.project_path, os.pardir)), 1)
-                yield from PathHelper.find_script_paths_from_folder(folder_path,
-                                                                    no_recurse=attr_no_recurse)
-                continue
-
-            if folder_path == os.curdir or startswith(folder_path, os.curdir):
-                folder_path = folder_path.replace(os.curdir, self.project.project_path, 1)
-                yield from PathHelper.find_script_paths_from_folder(folder_path,
-                                                                    no_recurse=attr_no_recurse)
-                continue
-
             if startswith(folder_path, self.project.import_handler.remote_schemas, ignorecase=True):
                 local_path = self.project.import_handler._get_remote_path(folder_node)
                 self.log.info(f'Adding import path from remote: "{local_path}"...')
                 self.project.import_paths.insert(0, local_path)
                 self.log.info(f'Adding folder path from remote: "{local_path}"...')
-                yield from PathHelper.find_script_paths_from_folder(local_path,
-                                                                    no_recurse=attr_no_recurse)
+                yield from PathHelper.find_script_paths_from_folder(local_path, no_recurse=attr_no_recurse)
                 continue
 
-            folder_path = os.path.normpath(folder_path)
+            folder_path = PathHelper.normalize_relative_path(folder_path, self.project.project_path)
 
             # try to add absolute path
             if os.path.isabs(folder_path) and os.path.isdir(folder_path):
-                yield from PathHelper.find_script_paths_from_folder(folder_path,
-                                                                    no_recurse=attr_no_recurse)
+                yield from PathHelper.find_script_paths_from_folder(folder_path, no_recurse=attr_no_recurse)
                 continue
 
             # try to add import-relative folder path
             for import_path in self.project.import_paths:
                 test_path = os.path.join(import_path, folder_path)
                 if os.path.isdir(test_path):
-                    yield from PathHelper.find_script_paths_from_folder(test_path,
-                                                                        no_recurse=attr_no_recurse)
+                    yield from PathHelper.find_script_paths_from_folder(test_path, no_recurse=attr_no_recurse)
 
     def _get_script_paths_from_scripts_node(self) -> typing.Generator:
         """Returns script paths from the Scripts node"""
@@ -136,21 +120,17 @@ class ScriptHandler:
 
             script_path: str = script_node.text
 
-            if script_path == os.pardir or script_path == os.curdir:
+            if script_path in (os.pardir, os.curdir):
                 self.log.error(f'Script path at line {script_node.sourceline} in project file is not a file path')
                 sys.exit(1)
 
-            # handle . and .. in path
-            if startswith(script_path, os.pardir):
-                script_path = script_path.replace(os.pardir, os.path.normpath(os.path.join(self.project.project_path, os.pardir)), 1)
-            elif startswith(script_path, os.curdir):
-                script_path = script_path.replace(os.curdir, self.project.project_path, 1)
+            script_path = PathHelper.normalize_relative_path(script_path, self.project.project_path)
 
             if os.path.isdir(script_path):
                 self.log.error(f'Script path at line {script_node.sourceline} in project file is not a file path')
                 sys.exit(1)
 
-            yield os.path.normpath(script_path)
+            yield script_path
 
     def get_pex_paths(self) -> list:
         """

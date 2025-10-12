@@ -94,24 +94,12 @@ class ImportHandler:
                 local_path = self._get_remote_path(import_node)
                 self.log.info(f'Adding import path from remote: "{local_path}"...')
                 results.append(local_path)
-                continue
-
-            if import_path == os.pardir or startswith(import_path, os.pardir):
-                import_path = import_path.replace(os.pardir, os.path.normpath(os.path.join(self.project.project_path, os.pardir)), 1)
-            elif import_path == os.curdir or startswith(import_path, os.curdir):
-                import_path = import_path.replace(os.curdir, self.project.project_path, 1)
-
-            # relative import paths should be relative to the project
-            if not os.path.isabs(import_path):
-                import_path = os.path.join(self.project.project_path, import_path)
-
-            import_path = os.path.normpath(import_path)
-
-            if os.path.isdir(import_path):
-                results.append(import_path)
             else:
-                self.log.error(f'Import path does not exist: "{import_path}"')
-                sys.exit(1)
+                import_path = PathHelper.normalize_relative_path(import_path, self.project.project_path)
+                if not os.path.isdir(import_path):
+                    self.log.error(f'Import path does not exist: "{import_path}"')
+                    sys.exit(1)
+                results.append(import_path)
 
         return PathHelper.uniqify(results)
 

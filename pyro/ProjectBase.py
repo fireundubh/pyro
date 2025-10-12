@@ -8,6 +8,7 @@ from pyro.Comparators import (endswith,
 from pyro.Constants import (FlagsName,
                             GameName,
                             GameType)
+from pyro.PathHelper import PathHelper
 from pyro.ProjectOptions import ProjectOptions
 from pyro.StringTemplate import StringTemplate
 
@@ -42,10 +43,9 @@ class ProjectBase:
 
     def __setattr__(self, key: str, value: object) -> None:
         if isinstance(value, str) and endswith(key, 'path'):
-            if os.altsep and str(os.altsep) in value:
-                value = os.path.normpath(value)
+            value = PathHelper.normalize_relative_path(value, self.project_path)
         elif isinstance(value, list) and endswith(key, 'paths'):
-            value = [os.path.normpath(path) if path != os.curdir else path for path in value]
+            value = [PathHelper.normalize_relative_path(path, self.project_path) if path != os.curdir else path for path in value]
         super(ProjectBase, self).__setattr__(key, value)
 
     @staticmethod
