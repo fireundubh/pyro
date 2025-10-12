@@ -1,7 +1,6 @@
 import io
 import os
 import re
-import typing
 
 from lxml import etree
 
@@ -16,9 +15,9 @@ class XmlHelper:
         return io.StringIO(xml_document)
 
     @staticmethod
-    def validate_schema(namespace: str, program_path: str) -> typing.Optional[etree.XMLSchema]:
+    def validate_schema(namespace: str, program_path: str) -> etree.XMLSchema:
         if not namespace:
-            return None
+            return etree.XMLSchema()
 
         schema_path = os.path.join(program_path, namespace)
         if not os.path.isfile(schema_path):

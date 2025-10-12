@@ -7,7 +7,7 @@ class XmlRoot:
     node: etree.ElementBase = None
     ns: str = ''
 
-    def __init__(self, element_tree: etree.ElementTree) -> None:
+    def __init__(self, element_tree: etree._ElementTree) -> None:
         self.node = element_tree.getroot()
 
         nsmap, prefix = self.node.nsmap, self.node.prefix
@@ -17,5 +17,5 @@ class XmlRoot:
         path = key if not self.ns else f'ns:{key}', {'ns': self.ns}
         return self.node.find(*path)
 
-    def get(self, key: str, default: Any = None) -> Any:  # type: ignore
+    def get(self, key: str, default: Any = None) -> Any:
         return self.node.get(key, default)
