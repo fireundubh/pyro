@@ -15,6 +15,7 @@ from pyro.XmlRoot import XmlRoot
 
 class PapyrusXmlHandler:
     log: logging.Logger = logging.getLogger('pyro')
+    variables_node: etree.ElementBase
 
     def __init__(self, input_path: str, program_path: str) -> None:
         xml_parser: etree.XMLParser = etree.XMLParser(remove_blank_text=True, remove_comments=True)
@@ -56,10 +57,6 @@ class PapyrusXmlHandler:
         self.pre_zip_node: etree.ElementBase = self.ppj_root.find(XmlTagName.PRE_ZIP_EVENT)
         self.post_zip_node: etree.ElementBase = self.ppj_root.find(XmlTagName.POST_ZIP_EVENT)
 
-        self.game_type: str = self.ppj_root.get(XmlAttributeName.GAME, default='')
-        self.flags_path: str = self.ppj_root.get(XmlAttributeName.FLAGS)
-        self.output_path: str = self.ppj_root.get(XmlAttributeName.OUTPUT)
-
         self.optimize: bool = self.get_boolean_attribute(self.ppj_root, XmlAttributeName.OPTIMIZE)
         self.release: bool = self.get_boolean_attribute(self.ppj_root, XmlAttributeName.RELEASE)
         self.final: bool = self.get_boolean_attribute(self.ppj_root, XmlAttributeName.FINAL)
@@ -80,8 +77,25 @@ class PapyrusXmlHandler:
         self.use_pre_zip_event: bool = self.get_boolean_attribute(self.pre_zip_node, XmlAttributeName.USE_IN_BUILD)
         self.use_post_zip_event: bool = self.get_boolean_attribute(self.post_zip_node, XmlAttributeName.USE_IN_BUILD)
 
-        self.packages_output: str = self.packages_node.get(XmlAttributeName.OUTPUT) if self.packages_node is not None else ''
-        self.zip_output: str = self.zip_files_node.get(XmlAttributeName.OUTPUT) if self.zip_files_node is not None else ''
+    @property
+    def game_type(self) -> str:
+        return self.ppj_root.get(XmlAttributeName.GAME, default='')
+
+    @property
+    def flags_path(self) -> str:
+        return self.ppj_root.get(XmlAttributeName.FLAGS, default='')
+
+    @property
+    def output_path(self) -> str:
+        return self.ppj_root.get(XmlAttributeName.OUTPUT, default='')
+
+    @property
+    def packages_output(self) -> str:
+        return self.packages_node.get(XmlAttributeName.OUTPUT, default='') if self.packages_node is not None else ''
+
+    @property
+    def zip_output(self) -> str:
+        return self.zip_files_node.get(XmlAttributeName.OUTPUT, default='') if self.zip_files_node is not None else ''
 
     def update_attributes(self, parse_func) -> None:
         """Updates attributes of element tree with missing attributes and default values"""
