@@ -7,6 +7,7 @@ import threading
 import typing
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 from lxml import etree
 from wcmatch import (glob,
@@ -46,6 +47,7 @@ class PackageManager:
     def __init__(self, ppj: PapyrusProject) -> None:
         self.ppj = ppj
         self.options = ppj.options
+        self.log.setLevel(self.ppj.log.level)
 
         self.pak_extension = '.ba2' if self.options.game_type == GameType.FO4 else '.bsa'
         self.zip_extension = '.zip'
@@ -158,8 +160,8 @@ class PackageManager:
 
             in_path: str = PathHelper.normalize_relative_path(attr_in, root_path)
 
-            if zip_mode and root_path not in in_path:
-                PackageManager.log.error(f'Cannot match path outside RootDir: "{in_path}"')
+            if zip_mode and not os.path.exists(os.path.join(root_path, in_path)):
+                PackageManager.log.error(f'Cannot match path outside RootDir: "{root_path}" not in "{in_path}"')
                 sys.exit(1)
 
             if not os.path.isdir(in_path):
@@ -286,7 +288,7 @@ class PackageManager:
 
                     adj_relpath = os.path.normpath(os.path.join(attr_path, relpath))  # Keep for join safety
 
-                    PackageManager.log.debug(f'+ "{adj_relpath.casefold()}"')
+                    PackageManager.log.info(f'+ "{adj_relpath.casefold()}"')
 
                     target_path: str = os.path.join(self.options.temp_path, adj_relpath)
 
@@ -352,29 +354,68 @@ class PackageManager:
 
             root_dir: str = self.ppj._get_path(zip_node.get(XmlAttributeName.ROOT_DIR),
                                                relative_root_path=self.ppj.project_path,
-                                               fallback_path='')
+                                               fallback_path=self.ppj.project_path)
 
-            root_dir = PathHelper.normalize_relative_path(root_dir, self.ppj.project_path) if root_dir else ''
+            root_dir = PathHelper.normalize_relative_path(root_dir, self.ppj.project_path)
 
             if root_dir and os.path.isdir(root_dir):
                 PackageManager.log.info(f'Creating "{attr_file_name}"...')
 
                 tasks = []
 
-                for include_path, raw_attr_path in self._generate_include_paths(zip_node, root_dir, True):
-                    attr_path = PathHelper.normalize_relative_path(raw_attr_path, self.ppj.project_path) if raw_attr_path else ''
+                root_p = Path(root_dir)  # Pre-compute for reuse
+
+                for ip, ap in self._generate_include_paths(zip_node, root_dir, True):
+                    attr_path = PathHelper.normalize_relative_path(ap, self.ppj.project_path) if ap else ''
+
+                    # FIX: Resolve ip to absolute if relative (handles yields from _match as rel to root_dir)
+                    if os.path.isabs(ip):
+                        include_path_abs = ip
+                    else:
+                        include_path_abs = os.path.normpath(os.path.join(root_dir, ip))
+
+                    include_path = Path(include_path_abs)
 
                     if not attr_path:
-                        if root_dir in include_path:
-                            arcname = os.path.relpath(include_path, root_dir)
-                        else:
-                            arcname = os.path.basename(include_path)
-                    else:
-                        _, attr_fn = os.path.split(include_path)
-                        arcname = attr_fn if attr_path == os.curdir else os.path.join(attr_path, attr_fn)  # curdir check post-norm
+                        try:
+                            rel_to_root = include_path.relative_to(root_p)
+                            arcname = str(rel_to_root)  # POSIX '/' for ZIP
+                            if PackageManager.log.level > logging.INFO:
+                                PackageManager.log.warning(f'Relative arcname from "{include_path}" (resolved from rel "{ip}") to "{root_p}": {arcname}')
+                        except ValueError:
+                            # TRUE drive mismatch or invalid subpath: log with details
+                            if PackageManager.log.level > logging.INFO:
+                                root_drive = root_p.drive or 'N/A (relative)'
+                                include_drive = include_path.drive or 'N/A (relative)'
+                                if root_drive != include_drive and root_drive != 'N/A (relative)':
+                                    PackageManager.log.warning(f'True drive mismatch: root={root_drive}, include={include_drive} for resolved "{include_path}"; using basename: {include_path.name}')
+                                else:
+                                    PackageManager.log.warning(f'Same drive ({root_drive}) but resolved "{include_path}" not under "{root_p}"; using basename: {include_path.name}')
 
-                    tasks.append((include_path, arcname))
-                    PackageManager.log.debug(f'+ "{arcname}"')
+                            arcname = include_path.name
+                    else:
+                        try:
+                            rel_to_root = include_path.relative_to(root_p)
+                            arcname = str(rel_to_root) if attr_path == os.curdir else os.path.join(attr_path, str(rel_to_root))
+                            if PackageManager.log.level > logging.INFO:
+                                PackageManager.log.warning(f'Relative arcname under {attr_path} from "{include_path}" (resolved from rel "{ip}") to "{root_p}": {arcname}')
+                        except ValueError:
+                            # TRUE drive mismatch or invalid subpath: log with details
+                            fallback_arc = include_path.name if attr_path == os.curdir else os.path.join(attr_path, include_path.name)
+
+                            if PackageManager.log.level > logging.INFO:
+                                root_drive = root_p.drive or 'N/A (relative)'
+                                include_drive = include_path.drive or 'N/A (relative)'
+
+                                if root_drive != include_drive and root_drive != 'N/A (relative)':
+                                    PackageManager.log.warning(f'True drive mismatch under {attr_path}: root={root_drive}, include={include_drive} for resolved "{include_path}"; flattening to {fallback_arc}')
+                                else:
+                                    PackageManager.log.warning(f'Same drive ({root_drive}) under {attr_path} but resolved "{include_path}" not under "{root_p}"; flattening to {fallback_arc}')
+
+                            arcname = fallback_arc
+
+                    tasks.append((include_path_abs, arcname))
+                    PackageManager.log.info(f'+ "{arcname}"')
 
                 self.includes = len(tasks)
 
@@ -388,8 +429,8 @@ class PackageManager:
                     with zipfile.ZipFile(file_path, mode='w', compression=compress_type) as z:
                         with ThreadPoolExecutor(max_workers=worker_limit) as executor:
                             futures = []
-                            for include_path, arcname in tasks:
-                                future = executor.submit(add_to_zip, z, include_path, arcname, lock)
+                            for include_path_abs, arcname in tasks:
+                                future = executor.submit(add_to_zip, z, include_path_abs, arcname, lock)
                                 futures.append(future)
                             concurrent.futures.wait(futures)
 
