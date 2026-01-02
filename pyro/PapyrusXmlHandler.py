@@ -1,6 +1,7 @@
 import io
 import logging
 import os
+import re
 import sys
 
 from typing import Union
@@ -9,8 +10,27 @@ from lxml import etree
 
 from pyro.Constants import (XmlAttributeName,
                             XmlTagName)
-from pyro.XmlHelper import XmlHelper
 from pyro.XmlRoot import XmlRoot
+
+
+def strip_xml_comments(path: str) -> io.StringIO:
+    with open(path, encoding='utf-8') as f:
+        xml_document: str = f.read()
+        comments_pattern = re.compile('(<!--.*?-->)', flags=re.DOTALL)
+        xml_document = comments_pattern.sub('', xml_document)
+    return io.StringIO(xml_document)
+
+
+def validate_schema(namespace: str, program_path: str) -> etree.XMLSchema:
+    if not namespace:
+        return etree.XMLSchema()
+
+    schema_path = os.path.join(program_path, namespace)
+    if not os.path.isfile(schema_path):
+        raise FileExistsError(f'Schema file does not exist: "{schema_path}"')
+
+    schema = etree.parse(schema_path)
+    return etree.XMLSchema(schema)
 
 
 class PapyrusXmlHandler:
@@ -20,14 +40,14 @@ class PapyrusXmlHandler:
     def __init__(self, input_path: str, program_path: str) -> None:
         xml_parser: etree.XMLParser = etree.XMLParser(remove_blank_text=True, remove_comments=True)
 
-        xml_document: io.StringIO = XmlHelper.strip_xml_comments(input_path)
+        xml_document: io.StringIO = strip_xml_comments(input_path)
 
         # noinspection PyTypeChecker
         project_xml: etree._ElementTree = etree.parse(xml_document, xml_parser)
 
         self.ppj_root: XmlRoot = XmlRoot(project_xml)
 
-        schema: etree.XMLSchema = XmlHelper.validate_schema(self.ppj_root.ns, program_path)
+        schema: etree.XMLSchema = validate_schema(self.ppj_root.ns, program_path)
 
         if schema:
             try:
