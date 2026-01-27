@@ -1,0 +1,205 @@
+"""
+CompilerCommandBuilder - Handles building compiler command lines.
+
+Extracted from PapyrusProject.build_commands().
+Supports both standard Papyrus compiler and Caprica compiler.
+"""
+import logging
+import os
+import time
+from typing import TYPE_CHECKING
+
+from pyro.CommandArguments import CommandArguments
+from pyro.Comparators import endswith, startswith
+from pyro.Constants import GameType
+
+if TYPE_CHECKING:
+    from pyro.PapyrusProject import PapyrusProject
+
+
+class CompilerCommandBuilder:
+    """
+    Builds command lines for Papyrus compilation.
+
+    Supports:
+    - Standard Papyrus Compiler (per-script commands)
+    - Caprica compiler (batch compilation with config file)
+    """
+
+    log: logging.Logger = logging.getLogger('pyro')
+
+    def __init__(self, ppj: 'PapyrusProject') -> None:
+        """
+        Initialize the command builder.
+
+        Args:
+            ppj: The PapyrusProject instance containing project configuration
+        """
+        self.ppj = ppj
+
+    def is_using_caprica(self) -> bool:
+        """Check if the project is configured to use Caprica compiler."""
+        return endswith(self.ppj.get_compiler_path(), 'Caprica.exe', ignorecase=True)
+
+    def get_game_name_for_caprica(self) -> str:
+        """
+        Get the game name parameter for Caprica compiler.
+
+        Returns:
+            Game name string: 'starfield', 'fallout4', or 'skyrim'
+        """
+        if self.ppj.options.game_type == GameType.FO4:
+            return 'fallout4'
+        elif self.ppj.options.game_type in [GameType.TES5, GameType.SSE]:
+            return 'skyrim'
+        else:
+            return 'starfield'
+
+    def build_caprica_commands(self, psc_paths: dict[str, str]) -> tuple[int, list[str]]:
+        """
+        Build commands for Caprica compiler.
+
+        Caprica compiles all scripts in a single batch operation.
+
+        Args:
+            psc_paths: Dictionary of object_name -> script_path
+
+        Returns:
+            Tuple of (script count, list of command strings)
+        """
+        commands: list[str] = []
+        arguments = CommandArguments()
+
+        arguments.append(self.ppj.get_compiler_path(), enquote_value=True)
+
+        object_names = ';'.join(psc_paths.keys())
+
+        # Read and potentially modify config file
+        with open(self.ppj.get_compiler_config_path(), encoding='utf-8') as f:
+            options = f.read().splitlines()
+
+        # Disable parallel compilation if the user overrides the default
+        if self.ppj.options.no_parallel and 'parallel-compile=1' in options:
+            for i, option in enumerate(options):
+                if startswith(option, 'parallel-compile', ignorecase=True):
+                    options.pop(i)
+                    break
+
+        use_config_file_for_input_paths = False
+
+        # Check if object names exceed command line limit
+        if len(object_names) > 32486:  # 32766 total - 280 chars for all arguments
+            use_config_file_for_input_paths = True
+            options.append(f'input-file={object_names.strip()}\n')
+
+        # Write modified config file
+        config_dir_path = os.path.dirname(self.ppj.get_compiler_config_path())
+        config_file_path = os.path.join(config_dir_path, f'caprica_{str(int(time.time()))}.cfg')
+
+        with open(config_file_path, mode='w', encoding='utf-8') as f:
+            f.write('\n'.join(options))
+
+        arguments.append(config_file_path, key='-config-file', enquote_value=True)
+
+        # Add game name
+        game_name = self.get_game_name_for_caprica()
+        arguments.append(game_name, key='g', enquote_value=True)
+
+        # Add standard arguments
+        arguments.append(self.ppj.get_flags_path(), key='f', enquote_value=True)
+        arguments.append(';'.join(self.ppj.import_paths), key='i', enquote_value=True)
+        arguments.append(self.ppj.get_output_path(), key='o', enquote_value=True)
+
+        if not use_config_file_for_input_paths:
+            arguments.append(object_names, enquote_value=True)
+
+        arg_s = arguments.join()
+        commands.append(arg_s)
+
+        return len(psc_paths.keys()), commands
+
+    def build_standard_commands(self, psc_paths: dict[str, str]) -> tuple[int, list[str]]:
+        """
+        Build commands for standard Papyrus compiler.
+
+        Creates one command per script.
+
+        Args:
+            psc_paths: Dictionary of object_name -> script_path
+
+        Returns:
+            Tuple of (script count, list of command strings)
+        """
+        commands: list[str] = []
+        arguments = CommandArguments()
+
+        for object_name, script_path in psc_paths.items():
+            arguments.clear()
+            arguments.append(self.ppj.get_compiler_path(), enquote_value=True)
+
+            # FO4 uses object names, others use script paths
+            if self.ppj.options.game_type == GameType.FO4:
+                arguments.append(object_name, enquote_value=True)
+            else:
+                arguments.append(script_path, enquote_value=True)
+
+            arguments.append(self.ppj.get_flags_path(), key='f', enquote_value=True)
+            arguments.append(';'.join(self.ppj.import_paths), key='i', enquote_value=True)
+            arguments.append(self.ppj.get_output_path(), key='o', enquote_value=True)
+
+            # FO4/SF1 specific flags
+            if self.ppj.options.game_type in [GameType.FO4, GameType.SF1]:
+                if self.ppj.release:
+                    arguments.append('-release')
+                if self.ppj.final:
+                    arguments.append('-final')
+
+            # Optimize flag
+            if self.ppj.optimize:
+                arguments.append('-op')
+
+            arg_s = arguments.join()
+            commands.append(arg_s)
+
+        return len(psc_paths.keys()), commands
+
+    def get_scripts_to_compile(self) -> dict[str, str]:
+        """
+        Get the dictionary of scripts that need to be compiled.
+
+        Handles incremental builds and missing scripts.
+
+        Returns:
+            Dictionary of object_name -> script_path
+        """
+        if self.ppj.options.no_incremental_build:
+            psc_paths = self.ppj.psc_paths.copy()
+        else:
+            psc_paths = self.ppj.script_handler.try_exclude_unmodified_scripts()
+
+        # Add scripts whose PEX counterparts are missing
+        for object_name, script_path in self.ppj.missing_scripts.items():
+            if object_name not in psc_paths.keys():
+                psc_paths[object_name] = script_path
+
+        return psc_paths
+
+    def build_commands(self) -> tuple[int, list[str]]:
+        """
+        Build the list of commands for compiling scripts.
+
+        This is the main entry point, matching the original PapyrusProject.build_commands() API.
+
+        Returns:
+            Tuple of (script count, list of command strings)
+        """
+        psc_paths = self.get_scripts_to_compile()
+
+        # Do not try to compile nothing
+        if not psc_paths:
+            return 0, []
+
+        if self.is_using_caprica():
+            return self.build_caprica_commands(psc_paths)
+        else:
+            return self.build_standard_commands(psc_paths)
