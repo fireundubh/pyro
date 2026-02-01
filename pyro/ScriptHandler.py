@@ -12,7 +12,9 @@ from pyro.Comparators import (endswith,
                               startswith,
                               is_folder_node, is_script_node)
 from pyro.Constants import (XmlAttributeName)
-from pyro.PathHelper import PathHelper
+from pyro.PathUtils import (calculate_relative_name,
+                             find_script_paths_from_folder,
+                             normalize_path)
 from pyro.PexReader import PexReader
 
 if TYPE_CHECKING:
@@ -87,7 +89,10 @@ class ScriptHandler:
         return object_name, object_path
 
     def _calculate_object_name(self, psc_path: str) -> str:
-        return PathHelper.calculate_relative_object_name(psc_path, self.project.import_paths)
+        from pathlib import Path
+        # Convert import_paths to Path objects for PathUtils
+        import_path_objs = [Path(p) for p in self.project.import_paths]
+        return calculate_relative_name(Path(psc_path), import_path_objs)
 
     def _get_script_paths_from_folders_node(self) -> Generator[str, None, None]:
         """Returns script paths from the Folders element array"""
@@ -103,21 +108,24 @@ class ScriptHandler:
                 self.log.info(f'Adding import path from remote: "{local_path}"...')
                 self.project.import_paths.insert(0, local_path)
                 self.log.info(f'Adding folder path from remote: "{local_path}"...')
-                yield from PathHelper.find_script_paths_from_folder(local_path, no_recurse=attr_no_recurse)
+                for script_path in find_script_paths_from_folder(local_path, no_recurse=attr_no_recurse):
+                    yield str(script_path)
                 continue
 
-            folder_path = PathHelper.normalize_relative_path(folder_path, self.project.project_path)
+            folder_path = str(normalize_path(folder_path, base=self.project.project_path))
 
             # try to add absolute path
             if os.path.isabs(folder_path) and os.path.isdir(folder_path):
-                yield from PathHelper.find_script_paths_from_folder(folder_path, no_recurse=attr_no_recurse)
+                for script_path in find_script_paths_from_folder(folder_path, no_recurse=attr_no_recurse):
+                    yield str(script_path)
                 continue
 
             # try to add import-relative folder path
             for import_path in self.project.import_paths:
                 test_path = os.path.join(import_path, folder_path)
                 if os.path.isdir(test_path):
-                    yield from PathHelper.find_script_paths_from_folder(test_path, no_recurse=attr_no_recurse)
+                    for script_path in find_script_paths_from_folder(test_path, no_recurse=attr_no_recurse):
+                        yield str(script_path)
 
     def _get_script_paths_from_scripts_node(self) -> Generator[str, None, None]:
         """Returns script paths from the Scripts node"""
@@ -130,7 +138,7 @@ class ScriptHandler:
                 self.log.error(f'Script path at line {script_node.sourceline} in project file is not a file path')
                 sys.exit(1)
 
-            script_path = PathHelper.normalize_relative_path(script_path, self.project.project_path)
+            script_path = str(normalize_path(script_path, base=self.project.project_path))
 
             if os.path.isdir(script_path):
                 self.log.error(f'Script path at line {script_node.sourceline} in project file is not a file path')

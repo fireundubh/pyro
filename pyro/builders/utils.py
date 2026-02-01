@@ -9,7 +9,7 @@ from wcmatch import glob, wcmatch
 from pyro.Comparators import is_include_node, is_match_node, startswith
 from pyro.Constants import XmlAttributeName
 from pyro.Exceptions import PackagingError, ZipError
-from pyro.PathHelper import PathHelper
+from pyro.PathUtils import normalize_path
 
 log: logging.Logger = logging.getLogger('pyro')
 
@@ -70,7 +70,7 @@ def generate_include_paths(includes_node: etree.ElementBase, root_path: str, zip
                 raise PackagingError(error_msg)
 
         # normalize early; pardir check remains for validation
-        search_path = PathHelper.normalize_relative_path(search_path, root_path)
+        search_path = str(normalize_path(search_path, base=root_path))
 
         if not zip_mode and startswith(search_path, os.pardir):
             error_msg = f'Include paths cannot start with "{os.pardir}"'
@@ -127,7 +127,7 @@ def generate_include_paths(includes_node: etree.ElementBase, root_path: str, zip
         attr_exclude: str = match_node.get(XmlAttributeName.EXCLUDE).strip()
         attr_path: str = match_node.get(XmlAttributeName.PATH).strip()  # type: ignore
 
-        in_path: str = PathHelper.normalize_relative_path(attr_in, root_path)
+        in_path: str = str(normalize_path(attr_in, base=root_path))
 
         if zip_mode and not os.path.exists(os.path.join(root_path, in_path)):
             error_msg = f'Cannot match path outside RootDir: "{root_path}" not in "{in_path}"'

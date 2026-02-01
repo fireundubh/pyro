@@ -12,7 +12,7 @@ from pyro.Comparators import endswith, is_zipfile_node
 from pyro.Constants import XmlAttributeName
 from pyro.Exceptions import ZipError
 from pyro.PapyrusProject import PapyrusProject
-from pyro.PathHelper import PathHelper
+from pyro.PathUtils import normalize_path
 from pyro.builders.utils import check_write_permission, generate_include_paths
 
 
@@ -73,7 +73,7 @@ class ZipArchiveBuilder:
                                                relative_root_path=self.ppj.project_path,
                                                fallback_path=self.ppj.project_path)
 
-            root_dir = PathHelper.normalize_relative_path(root_dir, self.ppj.project_path)
+            root_dir = str(normalize_path(root_dir, base=self.ppj.project_path))
 
             if root_dir and os.path.isdir(root_dir):
                 ZipArchiveBuilder.log.info(f'Creating "{attr_file_name}"...')
@@ -83,7 +83,7 @@ class ZipArchiveBuilder:
                 root_p = Path(root_dir)  # Pre-compute for reuse
 
                 for ip, ap in generate_include_paths(zip_node, root_dir, True):
-                    attr_path = PathHelper.normalize_relative_path(ap, self.ppj.project_path) if ap else ''
+                    attr_path = str(normalize_path(ap, base=self.ppj.project_path)) if ap else ''
 
                     # FIX: Resolve ip to absolute if relative (handles yields from _match as rel to root_dir)
                     if os.path.isabs(ip):

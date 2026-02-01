@@ -15,7 +15,7 @@ from pyro.Comparators import (endswith,
                               is_folder_node)
 from pyro.Remotes.GenericRemote import GenericRemote
 from pyro.Remotes.RemoteBase import RemoteBase
-from pyro.PathHelper import PathHelper
+from pyro.PathUtils import normalize_path
 
 from wcmatch import wcmatch
 
@@ -102,13 +102,14 @@ class ImportHandler:
                 self.log.info(f'Adding import path from remote: "{local_path}"...')
                 results.append(local_path)
             else:
-                import_path = PathHelper.normalize_relative_path(import_path, self.project.project_path)
+                import_path = str(normalize_path(import_path, base=self.project.project_path))
                 if not os.path.isdir(import_path):
                     self.log.error(f'Import path does not exist: "{import_path}"')
                     sys.exit(1)
                 results.append(import_path)
 
-        return PathHelper.uniqify(results)
+        # Remove duplicates while preserving order
+        return list(dict.fromkeys(results))
 
     def _get_remote_path(self, node: etree.ElementBase) -> str:
         import_path: str = node.text

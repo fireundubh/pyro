@@ -12,7 +12,7 @@ from pyro.Enums.Event import (BuildEvent,
 from pyro.BuildFacade import BuildFacade
 from pyro.Comparators import startswith
 from pyro.PapyrusProject import PapyrusProject
-from pyro.PathHelper import PathHelper
+from pyro.PathUtils import url_to_path
 from pyro.PexReader import PexReader
 from pyro.ProjectOptions import ProjectOptions
 
@@ -35,8 +35,7 @@ class Application:
             sys.exit(1)
 
         if startswith(input_path, 'file:', ignorecase=True):
-            full_path = PathHelper.url2pathname(input_path)
-            input_path = os.path.normpath(full_path)
+            input_path = str(url_to_path(input_path))
 
         if not os.path.isabs(input_path):
             cwd = os.getcwd()

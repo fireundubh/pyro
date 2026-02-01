@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 
 from pyro.Comparators import endswith
 from pyro.Exceptions import AnonymizationError, PexReadError
-from pyro.PathHelper import PathHelper
 from pyro.PexHeader import PexHeader
 from pyro.PexReader import PexReader
 
@@ -73,7 +72,8 @@ class AnonymizationService:
             if psc_last_modified < pex_last_compiled:
                 pex_paths.append(pex_path)
 
-        return PathHelper.uniqify(pex_paths)
+        # Remove duplicates while preserving order
+        return list(dict.fromkeys(pex_paths))
 
     def anonymize_script(self, path: str) -> None:
         """

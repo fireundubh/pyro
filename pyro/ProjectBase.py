@@ -1,13 +1,14 @@
 import logging
 import os
 import sys
+from pathlib import Path
 
 from pyro.Comparators import (endswith,
                               startswith)
 from pyro.Constants import (FlagsName,
                             GameName,
                             GameType)
-from pyro.PathHelper import PathHelper
+from pyro.PathUtils import normalize_path
 from pyro.ProjectOptions import ProjectOptions
 from pyro.StringTemplate import StringTemplate
 
@@ -23,7 +24,7 @@ class ProjectBase:
     project_name: str = ''
     project_path: str = ''
 
-    import_paths: list[str] = []
+    _import_paths: list[str] = []  # Private storage for import_paths property
 
     final: bool = False
     optimize: bool = False
@@ -40,12 +41,32 @@ class ProjectBase:
         self.project_path = os.path.dirname(self.options.input_path)
         os.chdir(self.project_path)
 
-    def __setattr__(self, key: str, value: object) -> None:
-        if isinstance(value, str) and endswith(key, 'path'):
-            value = PathHelper.normalize_relative_path(value, self.project_path)
-        elif isinstance(value, list) and endswith(key, 'paths'):
-            value = [PathHelper.normalize_relative_path(path, self.project_path) if path != os.curdir else path for path in value]
-        super(ProjectBase, self).__setattr__(key, value)
+    @property
+    def import_paths(self) -> list[str]:
+        """Get import paths list."""
+        return self._import_paths
+
+    @import_paths.setter
+    def import_paths(self, value: list[str]) -> None:
+        """
+        Set import paths with explicit normalization.
+
+        Normalizes paths relative to project_path, preserving os.curdir as-is.
+        No more magic __setattr__ - this setter makes the normalization explicit.
+
+        Args:
+            value: List of import path strings
+        """
+        normalized = []
+        for path in value:
+            if path == os.curdir:
+                # Preserve current directory marker as-is
+                normalized.append(path)
+            else:
+                # Normalize relative to project path, convert back to str for compatibility
+                # (Full Path migration happens in later tasks)
+                normalized.append(str(normalize_path(path, base=self.project_path)))
+        self._import_paths = normalized
 
     @staticmethod
     def _get_path(path: str, *, relative_root_path: str, fallback_path: str | list[str]) -> str:

@@ -13,7 +13,7 @@ from pyro.Comparators import endswith, is_package_node, startswith
 from pyro.Constants import GameType, XmlAttributeName
 from pyro.Exceptions import PackagingError
 from pyro.PapyrusProject import PapyrusProject
-from pyro.PathHelper import PathHelper
+from pyro.PathUtils import normalize_path
 from pyro.ProcessManager import ProcessManager
 from pyro.builders.utils import check_write_permission, generate_include_paths
 
@@ -115,7 +115,7 @@ class BsaPackageBuilder:
                                                relative_root_path=self.ppj.project_path,
                                                fallback_path=[self.ppj.project_path, os.path.basename(attr_file_name)])
 
-            root_dir = PathHelper.normalize_relative_path(root_dir, self.ppj.project_path) if root_dir else ''
+            root_dir = str(normalize_path(root_dir, base=self.ppj.project_path)) if root_dir else ''
 
             if root_dir and os.path.isdir(root_dir):
                 # prevent clobbering files previously created in this session
@@ -137,7 +137,7 @@ class BsaPackageBuilder:
 
                 for source_path, raw_attr_path in generate_include_paths(package_node, root_dir):
                     # Normalize attr_path once (user-provided relative)
-                    attr_path = PathHelper.normalize_relative_path(raw_attr_path, self.ppj.project_path) if raw_attr_path else ''
+                    attr_path = str(normalize_path(raw_attr_path, base=self.ppj.project_path)) if raw_attr_path else ''
 
                     if os.path.isabs(source_path):
                         relpath: str = os.path.relpath(source_path, root_dir)
