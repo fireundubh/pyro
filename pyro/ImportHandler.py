@@ -30,7 +30,7 @@ class ImportHandler:
         self.project = papyrus_project
         self.imports_node = papyrus_project.xml_handler.imports_node
         self.folders_node = papyrus_project.xml_handler.folders_node
-        self.remote: RemoteBase = RemoteBase()
+        self.remote: RemoteBase | None = None
         self.remote_schemas = ('https:', 'http:')
 
     @property
