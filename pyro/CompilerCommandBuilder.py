@@ -55,7 +55,7 @@ class CompilerCommandBuilder:
         else:
             return 'starfield'
 
-    def build_caprica_commands(self, psc_paths: dict[str, str]) -> tuple[int, list[str]]:
+    def build_caprica_commands(self, psc_paths: dict[str, str]) -> tuple[int, list[list[str]]]:
         """
         Build commands for Caprica compiler.
 
@@ -65,9 +65,9 @@ class CompilerCommandBuilder:
             psc_paths: Dictionary of object_name -> script_path
 
         Returns:
-            Tuple of (script count, list of command strings)
+            Tuple of (script count, list of command lists)
         """
-        commands: list[str] = []
+        commands: list[list[str]] = []
         arguments = CommandArguments()
 
         arguments.append(self.ppj.get_compiler_path(), enquote_value=True)
@@ -113,12 +113,11 @@ class CompilerCommandBuilder:
         if not use_config_file_for_input_paths:
             arguments.append(object_names, enquote_value=True)
 
-        arg_s = arguments.join()
-        commands.append(arg_s)
+        commands.append(arguments.to_list())
 
         return len(psc_paths.keys()), commands
 
-    def build_standard_commands(self, psc_paths: dict[str, str]) -> tuple[int, list[str]]:
+    def build_standard_commands(self, psc_paths: dict[str, str]) -> tuple[int, list[list[str]]]:
         """
         Build commands for standard Papyrus compiler.
 
@@ -128,9 +127,9 @@ class CompilerCommandBuilder:
             psc_paths: Dictionary of object_name -> script_path
 
         Returns:
-            Tuple of (script count, list of command strings)
+            Tuple of (script count, list of command lists)
         """
-        commands: list[str] = []
+        commands: list[list[str]] = []
         arguments = CommandArguments()
 
         for object_name, script_path in psc_paths.items():
@@ -158,8 +157,7 @@ class CompilerCommandBuilder:
             if self.ppj.optimize:
                 arguments.append('-op')
 
-            arg_s = arguments.join()
-            commands.append(arg_s)
+            commands.append(arguments.to_list())
 
         return len(psc_paths.keys()), commands
 
@@ -184,14 +182,14 @@ class CompilerCommandBuilder:
 
         return psc_paths
 
-    def build_commands(self) -> tuple[int, list[str]]:
+    def build_commands(self) -> tuple[int, list[list[str]]]:
         """
         Build the list of commands for compiling scripts.
 
         This is the main entry point, matching the original PapyrusProject.build_commands() API.
 
         Returns:
-            Tuple of (script count, list of command strings)
+            Tuple of (script count, list of command lists)
         """
         psc_paths = self.get_scripts_to_compile()
 

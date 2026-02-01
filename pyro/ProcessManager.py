@@ -47,6 +47,12 @@ class ProcessManager:
 
     @staticmethod
     def run_command(command: str, cwd: str, env: dict[str, str]) -> ProcessState:
+        """
+        Run a shell command (for events).
+
+        Note: This uses shell=True for user-defined event commands that may contain
+        shell operators. For compiler/bsarch commands, use run_compiler/run_bsarch instead.
+        """
         try:
             process = subprocess.Popen(command,
                                        stdout=subprocess.PIPE,
@@ -74,11 +80,11 @@ class ProcessManager:
         return ProcessState.SUCCESS
 
     @staticmethod
-    def run_bsarch(command: str) -> ProcessState:
+    def run_bsarch(command: list[str]) -> ProcessState:
         """
         Creates bsarch process and logs output to console
 
-        :param command: Command to execute, including absolute path to executable and its arguments
+        :param command: Command to execute as a list of arguments
         :return: ProcessState (SUCCESS, FAILURE, INTERRUPTED, ERRORS)
         """
         try:
@@ -137,19 +143,13 @@ class ProcessManager:
         return ProcessState.SUCCESS
 
     @staticmethod
-    def run_compiler(command: str) -> ProcessState:
+    def run_compiler(command: list[str]) -> ProcessState:
         """
         Creates compiler process and logs output to console
 
-        :param command: Command to execute, including absolute path to executable and its arguments
+        :param command: Command to execute as a list of arguments
         :return: ProcessState (SUCCESS, FAILURE, INTERRUPTED, ERRORS)
         """
-        command_size = len(command)
-
-        if command_size > 32766:
-            ProcessManager.log.error(f'Cannot create process because command exceeds max length: {command_size}')
-            return ProcessState.FAILURE
-
         try:
             process = subprocess.Popen(command,
                                        stdout=subprocess.PIPE,

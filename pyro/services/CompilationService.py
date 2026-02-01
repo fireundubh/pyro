@@ -124,25 +124,25 @@ class CompilationService:
         """Get the appropriate compile data tracker based on compiler type."""
         return self.compile_data_caprica if self.is_using_caprica() else self.compile_data
 
-    def compile_sequential(self, commands: list[str], compile_data: CompileData) -> None:
+    def compile_sequential(self, commands: list[list[str]], compile_data: CompileData) -> None:
         """
         Compile scripts sequentially (one at a time).
 
         Args:
-            commands: List of compiler command strings
+            commands: List of compiler command lists
             compile_data: Data tracker to update with results
         """
         for command in commands:
-            self.log.debug(f'Command: {command}')
+            self.log.debug(f'Command: {" ".join(command)}')
             if ProcessManager.run_compiler(command) == ProcessState.SUCCESS:
                 compile_data.success_count += 1
 
-    def compile_parallel(self, commands: list[str], compile_data: CompileData, worker_limit: int) -> None:
+    def compile_parallel(self, commands: list[list[str]], compile_data: CompileData, worker_limit: int) -> None:
         """
         Compile scripts in parallel using a thread pool.
 
         Args:
-            commands: List of compiler command strings
+            commands: List of compiler command lists
             compile_data: Data tracker to update with results
             worker_limit: Maximum number of parallel workers
         """

@@ -112,11 +112,12 @@ class TestStandardCommandBuilding:
 
         assert count == 1
         assert len(commands) == 1
-        assert 'PapyrusCompiler.exe' in commands[0]
-        assert 'TestScript.psc' in commands[0]
-        assert '-f=' in commands[0]
-        assert '-i=' in commands[0]
-        assert '-o=' in commands[0]
+        assert isinstance(commands[0], list)
+        assert '"C:\\Compiler\\PapyrusCompiler.exe"' in commands[0]
+        assert '"C:\\Source\\TestScript.psc"' in commands[0]
+        assert any('-f=' in arg for arg in commands[0])
+        assert any('-i=' in arg for arg in commands[0])
+        assert any('-o=' in arg for arg in commands[0])
 
     def test_build_multiple_script_commands(self):
         """Test building commands for multiple scripts."""
@@ -162,8 +163,8 @@ class TestStandardCommandBuilding:
         count, commands = builder.build_standard_commands(psc_paths)
 
         assert count == 1
-        assert 'Namespace:Script' in commands[0]
-        assert 'Script.psc' not in commands[0]  # Uses object name, not path
+        assert '"Namespace:Script"' in commands[0]
+        assert not any('Script.psc' in arg for arg in commands[0])  # Uses object name, not path
 
     def test_fo4_release_flag(self):
         """Test that FO4 release flag is added."""
@@ -183,6 +184,7 @@ class TestStandardCommandBuilding:
 
         count, commands = builder.build_standard_commands(psc_paths)
 
+        assert isinstance(commands[0], list)
         assert '-release' in commands[0]
 
     def test_fo4_final_flag(self):
@@ -203,6 +205,7 @@ class TestStandardCommandBuilding:
 
         count, commands = builder.build_standard_commands(psc_paths)
 
+        assert isinstance(commands[0], list)
         assert '-final' in commands[0]
 
     def test_optimize_flag(self):
@@ -223,6 +226,7 @@ class TestStandardCommandBuilding:
 
         count, commands = builder.build_standard_commands(psc_paths)
 
+        assert isinstance(commands[0], list)
         assert '-op' in commands[0]
 
 
@@ -299,7 +303,7 @@ class TestEmptyScripts:
 class TestCommandStructure:
     """Test command structure and formatting."""
 
-    def test_paths_are_quoted(self):
+    def test_paths_with_spaces_handled(self):
         """Test that paths containing spaces are properly quoted."""
         ppj = MagicMock()
         ppj.get_compiler_path.return_value = 'C:\\Program Files\\Compiler\\PapyrusCompiler.exe'
@@ -317,9 +321,11 @@ class TestCommandStructure:
 
         count, commands = builder.build_standard_commands(psc_paths)
 
-        # Verify paths are quoted
+        # Verify command is a list with properly quoted paths
+        assert isinstance(commands[0], list)
         assert '"C:\\Program Files\\Compiler\\PapyrusCompiler.exe"' in commands[0]
-        assert '"C:\\My Output"' in commands[0]
+        assert any('"C:\\My Output"' in arg for arg in commands[0])
+        assert any('"C:\\My Source\\Script.psc"' in arg for arg in commands[0])
 
     def test_import_paths_semicolon_separated(self):
         """Test that multiple import paths are semicolon-separated."""
@@ -339,4 +345,5 @@ class TestCommandStructure:
 
         count, commands = builder.build_standard_commands(psc_paths)
 
-        assert 'C:\\Source1;C:\\Source2;C:\\Source3' in commands[0]
+        assert isinstance(commands[0], list)
+        assert any('C:\\Source1;C:\\Source2;C:\\Source3' in arg for arg in commands[0])

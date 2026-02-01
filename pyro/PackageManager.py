@@ -197,7 +197,7 @@ class PackageManager:
 
         return test_path if os.path.isdir(test_path) else ''
 
-    def build_commands(self, containing_folder: str, output_path: str) -> str:
+    def build_commands(self, containing_folder: str, output_path: str) -> list[str]:
         """
         Builds command for creating package with BSArch
         """
@@ -235,7 +235,7 @@ class PackageManager:
         if compressed_package:
             arguments.append('-z')
 
-        return arguments.join()
+        return arguments.to_list()
 
     def create_packages(self) -> None:
         # clear temporary data
