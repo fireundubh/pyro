@@ -2,7 +2,7 @@ import os
 import sys
 from argparse import SUPPRESS
 
-from pyro.Application import Application
+from pyro.Application import create_application
 from pyro.PyroArgumentParser import PyroArgumentParser
 from pyro.PyroRawDescriptionHelpFormatter import PyroRawTextHelpFormatter
 
@@ -134,4 +134,5 @@ if __name__ == '__main__':
                                     action='store_true', default=False,
                                     help='show help and exit')
 
-    Application(_parser).run()
+    app = create_application(_parser)
+    sys.exit(app.run())

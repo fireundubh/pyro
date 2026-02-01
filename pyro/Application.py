@@ -21,29 +21,12 @@ class Application:
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s [%(levelname).4s] %(message)s')
     log = logging.getLogger('pyro')
 
-    args: argparse.Namespace
+    project: PapyrusProject
+    build_facade: BuildFacade
 
-    def __init__(self, parser: argparse.ArgumentParser) -> None:
-        self.parser = parser
-
-        self.args = self.parser.parse_args()
-
-        if self.args.show_help:
-            self.parser.print_help()
-            sys.exit(1)
-
-        # set up log levels
-        log_level_argv = self.args.log_level.upper()
-        log_level = getattr(logging, log_level_argv, logging.DEBUG)
-        self.log.setLevel(log_level)
-
-        Application.log.debug(f'Set log level to: {log_level_argv}')
-
-        self.args.input_path = self._try_fix_input_path(self.args.input_path or self.args.input_path_deprecated)
-
-        if not self.args.create_project and not os.path.isfile(self.args.input_path):
-            Application.log.error(f'Cannot load nonexistent PPJ at given path: "{self.args.input_path}"')
-            sys.exit(1)
+    def __init__(self, project: PapyrusProject, build_facade: BuildFacade) -> None:
+        self.project = project
+        self.build_facade = build_facade
 
     @staticmethod
     def _try_fix_input_path(input_path: str) -> str:
@@ -103,54 +86,10 @@ class Application:
 
     def run(self) -> int:
         """
-        Entry point
+        Executes the build pipeline using injected dependencies.
         """
-        _, extension = os.path.splitext(os.path.basename(self.args.input_path).casefold())
-
-        if extension == '.pex':
-            header = PexReader.dump(self.args.input_path)
-            Application.log.info(f'Dumping: "{self.args.input_path}"\n{header}')
-            sys.exit(0)
-        elif extension not in ('.ppj', '.pyroproject'):
-            Application.log.error('Cannot proceed without PPJ file path')
-            sys.exit(1)
-
-        options = ProjectOptions(self.args.__dict__)
-        ppj = PapyrusProject(options)
-
-        self._validate_project_file(ppj)
-
-        if ppj.scripts_node is not None or ppj.folders_node is not None or ppj.import_handler.remote_paths:
-            ppj.try_initialize_remotes()
-
-            if ppj.use_pre_import_event:
-                ppj.try_run_event(ImportEvent.PRE)
-
-            ppj.try_populate_imports()
-
-            if ppj.use_post_import_event:
-                ppj.try_run_event(ImportEvent.POST)
-
-            ppj.try_set_game_type()
-            ppj.find_missing_scripts()
-            ppj.try_set_game_path()
-
-            self._validate_project_paths(ppj)
-
-            Application.log.info('Imports found:')
-            for path in ppj.import_paths:
-                Application.log.info(f'+ "{path}"')
-
-            Application.log.info('Scripts found:')
-            for _, path in ppj.psc_paths.items():
-                Application.log.info(f'+ "{path}"')
-
-        build = BuildFacade(ppj)
-
-        # bsarch path is not set until BuildFacade initializes
-        if ppj.options.package and not os.path.isfile(ppj.options.bsarch_path):
-            Application.log.error('Cannot proceed with Package enabled without valid BSArch path')
-            sys.exit(1)
+        ppj = self.project
+        build = self.build_facade
 
         if ppj.use_pre_build_event:
             ppj.try_run_event(BuildEvent.PRE)
@@ -224,3 +163,89 @@ class Application:
             ppj.try_run_event(BuildEvent.POST)
 
         return build.get_compile_data().failed_count
+
+
+def create_application(parser: argparse.ArgumentParser) -> Application:
+    """
+    Factory function for creating an Application instance in production use.
+
+    This function handles argument parsing, logging setup, project initialization,
+    and validation before constructing the Application with its dependencies.
+
+    :param parser: Configured argument parser
+    :return: Initialized Application instance ready to run
+    """
+    # Parse arguments
+    args = parser.parse_args()
+
+    if args.show_help:
+        parser.print_help()
+        sys.exit(1)
+
+    # Setup logging
+    log_level_argv = args.log_level.upper()
+    log_level = getattr(logging, log_level_argv, logging.DEBUG)
+    Application.log.setLevel(log_level)
+    Application.log.debug(f'Set log level to: {log_level_argv}')
+
+    # Fix and validate input path
+    args.input_path = Application._try_fix_input_path(args.input_path or args.input_path_deprecated)
+
+    if not args.create_project and not os.path.isfile(args.input_path):
+        Application.log.error(f'Cannot load nonexistent PPJ at given path: "{args.input_path}"')
+        sys.exit(1)
+
+    # Handle .pex file special case (dump and exit)
+    _, extension = os.path.splitext(os.path.basename(args.input_path).casefold())
+
+    if extension == '.pex':
+        header = PexReader.dump(args.input_path)
+        Application.log.info(f'Dumping: "{args.input_path}"\n{header}')
+        sys.exit(0)
+    elif extension not in ('.ppj', '.pyroproject'):
+        Application.log.error('Cannot proceed without PPJ file path')
+        sys.exit(1)
+
+    # Create project options and project
+    options = ProjectOptions(args.__dict__)
+    ppj = PapyrusProject(options)
+
+    # Validate project file
+    Application._validate_project_file(ppj)
+
+    # Initialize remotes and imports if needed
+    if ppj.scripts_node is not None or ppj.folders_node is not None or ppj.import_handler.remote_paths:
+        ppj.try_initialize_remotes()
+
+        if ppj.use_pre_import_event:
+            ppj.try_run_event(ImportEvent.PRE)
+
+        ppj.try_populate_imports()
+
+        if ppj.use_post_import_event:
+            ppj.try_run_event(ImportEvent.POST)
+
+        ppj.try_set_game_type()
+        ppj.find_missing_scripts()
+        ppj.try_set_game_path()
+
+        # Validate project paths
+        Application._validate_project_paths(ppj)
+
+        Application.log.info('Imports found:')
+        for path in ppj.import_paths:
+            Application.log.info(f'+ "{path}"')
+
+        Application.log.info('Scripts found:')
+        for _, path in ppj.psc_paths.items():
+            Application.log.info(f'+ "{path}"')
+
+    # Create build facade
+    build_facade = BuildFacade(ppj)
+
+    # Validate bsarch path (set during BuildFacade initialization)
+    if ppj.options.package and not os.path.isfile(ppj.options.bsarch_path):
+        Application.log.error('Cannot proceed with Package enabled without valid BSArch path')
+        sys.exit(1)
+
+    return Application(ppj, build_facade)
