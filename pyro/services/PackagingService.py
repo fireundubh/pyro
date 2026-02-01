@@ -2,14 +2,14 @@
 PackagingService - Handles BSA/BA2 package creation.
 
 Extracted from BuildFacade.try_pack().
-Thin wrapper around PackageManager with timing/stats tracking.
+Thin wrapper around BsaPackageBuilder with timing/stats tracking.
 """
 import logging
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from pyro.PackageManager import PackageManager
+from pyro.builders import BsaPackageBuilder
 from pyro.services.CompilationService import TimeElapsed
 
 if TYPE_CHECKING:
@@ -51,7 +51,7 @@ class PackagingService:
         This is the main entry point, matching the original BuildFacade.try_pack() API.
         """
         self.package_data.time.start_time = time.time()
-        package_manager = PackageManager(self.ppj)
-        package_manager.create_packages()
+        builder = BsaPackageBuilder(self.ppj)
+        builder.create_packages()
         self.package_data.time.end_time = time.time()
-        self.package_data.file_count = package_manager.includes
+        self.package_data.file_count = builder.includes

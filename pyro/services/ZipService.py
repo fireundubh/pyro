@@ -2,14 +2,14 @@
 ZipService - Handles ZIP archive creation.
 
 Extracted from BuildFacade.try_zip().
-Thin wrapper around PackageManager with timing/stats tracking.
+Thin wrapper around ZipArchiveBuilder with timing/stats tracking.
 """
 import logging
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from pyro.PackageManager import PackageManager
+from pyro.builders import ZipArchiveBuilder
 from pyro.services.CompilationService import TimeElapsed
 
 if TYPE_CHECKING:
@@ -51,7 +51,7 @@ class ZipService:
         This is the main entry point, matching the original BuildFacade.try_zip() API.
         """
         self.zipping_data.time.start_time = time.time()
-        package_manager = PackageManager(self.ppj)
-        package_manager.create_zip()
+        builder = ZipArchiveBuilder(self.ppj)
+        builder.create_zip()
         self.zipping_data.time.end_time = time.time()
-        self.zipping_data.file_count = package_manager.includes
+        self.zipping_data.file_count = builder.includes
