@@ -4,6 +4,5 @@ from string import Template
 
 class StringTemplate(Template):
     delimiter = '@'
-    idpattern = r'([_a-z][_a-z0-9]*)'
+    idpattern = r'[_a-z][_a-z0-9]*'
     flags = _re.IGNORECASE | _re.ASCII
-    pattern = _re.compile(rf'{_re.escape(delimiter)}(?P<named>{idpattern})')
