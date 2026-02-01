@@ -1,6 +1,7 @@
 import configparser
 import logging
 import os
+from abc import ABC, abstractmethod
 from collections.abc import Generator
 from urllib.error import HTTPError
 from urllib.parse import urlparse
@@ -9,7 +10,7 @@ from pyro.Comparators import startswith
 from pyro.Remotes.RemoteUri import RemoteUri
 
 
-class RemoteBase:
+class RemoteBase(ABC):
     log: logging.Logger = logging.getLogger('pyro')
     access_token: str = ''
 
@@ -138,8 +139,12 @@ class RemoteBase:
                         return os.path.expanduser(os.path.expandvars(token))
         return None
 
+    @abstractmethod
     def fetch_contents(self, url: str, output_path: str) -> Generator[str | None, None, None]:
         """
         Downloads files from URL to output path
+
+        This method must be implemented by subclasses to provide
+        provider-specific file fetching logic.
         """
         yield from ()
