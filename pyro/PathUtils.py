@@ -54,16 +54,25 @@ def normalize_path(
     if expand_vars:
         path_str = os.path.expanduser(os.path.expandvars(path_str))
 
-    path_obj = Path(path_str)
+    # IMPORTANT: Only resolve . and .. against base, NOT all relative paths
+    # The compiler handles relative vs absolute paths differently, so we must
+    # preserve the distinction. Only paths starting with . or .. get resolved.
+    if base and (path_str.startswith(os.curdir) or path_str.startswith(os.pardir)):
+        # Replace . with base_path and .. with parent of base_path
+        if path_str.startswith(os.curdir):
+            path_str = path_str.replace(os.curdir, str(base), 1)
+        if os.pardir in path_str:
+            base_parent = os.path.normpath(os.path.join(str(base), os.pardir))
+            path_str = path_str.replace(os.pardir, base_parent, 1)
 
-    # Resolve relative paths against base
-    if not path_obj.is_absolute() and base:
-        path_obj = Path(base) / path_obj
+    # Handle alternate path separator (forward slash on Windows)
+    if os.altsep and os.altsep in path_str:
+        path_str = os.path.normpath(path_str)
 
     # Normalize using os.path.normpath for compatibility with old behavior
     # This just normalizes the string without checking if path exists
     # or resolving symlinks (unlike Path.resolve() which can behave unexpectedly)
-    return Path(os.path.normpath(str(path_obj)))
+    return Path(os.path.normpath(path_str))
 
 
 def resolve_import_path(object_name: str, import_paths: list[Path]) -> Path | None:
