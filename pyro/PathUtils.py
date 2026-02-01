@@ -60,13 +60,10 @@ def normalize_path(
     if not path_obj.is_absolute() and base:
         path_obj = Path(base) / path_obj
 
-    # Normalize the path (resolve . and .., make absolute)
-    try:
-        return path_obj.resolve()
-    except (OSError, RuntimeError):
-        # resolve() can fail on non-existent paths or network issues
-        # Fall back to normalization without symlink resolution
-        return Path(os.path.normpath(path_obj))
+    # Normalize using os.path.normpath for compatibility with old behavior
+    # This just normalizes the string without checking if path exists
+    # or resolving symlinks (unlike Path.resolve() which can behave unexpectedly)
+    return Path(os.path.normpath(str(path_obj)))
 
 
 def resolve_import_path(object_name: str, import_paths: list[Path]) -> Path | None:

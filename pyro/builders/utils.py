@@ -118,7 +118,8 @@ def generate_include_paths(includes_node: etree.ElementBase, root_path: str | Pa
                 yield str(root_p / include_path), attr_path
 
         elif not search_p.is_absolute():
-            test_p = (root_p / search_str).resolve()
+            # Use normpath instead of resolve() for compatibility
+            test_p = Path(os.path.normpath(root_p / search_str))
             if test_p.is_file():
                 yield str(test_p), attr_path
             elif test_p.is_dir():
@@ -138,7 +139,8 @@ def generate_include_paths(includes_node: etree.ElementBase, root_path: str | Pa
                 log.error(error_msg)
                 raise PackagingError(error_msg)
 
-            search_p = search_p.resolve()
+            # Use normpath instead of resolve() for compatibility
+            search_p = Path(os.path.normpath(search_p))
 
             if search_p.is_file():
                 yield str(search_p), attr_path
