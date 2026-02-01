@@ -4,6 +4,7 @@ import logging
 import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 from wcmatch import wcmatch
 
@@ -33,20 +34,28 @@ class BsaPackageBuilder:
         self.pak_extension = '.ba2' if self.ppj.options.game_type == GameType.FO4 else '.bsa'
 
     @staticmethod
-    def _can_compress_package(containing_folder: str) -> bool:
-        """Check if package can be safely compressed (no voices, sounds, or strings)."""
+    def _can_compress_package(containing_folder: str | Path) -> bool:
+        """Check if package can be safely compressed (no voices, sounds, or strings).
+
+        Args:
+            containing_folder: Folder to check (str or Path object)
+
+        Returns:
+            False if folder contains voice, sound, or string files; True otherwise
+        """
+        folder_str = str(containing_folder)
         flags = wcmatch.RECURSIVE | wcmatch.IGNORECASE
 
         # voices bad because bethesda no likey
-        for _ in wcmatch.WcMatch(containing_folder, '*.fuz', flags=flags).imatch():
+        for _ in wcmatch.WcMatch(folder_str, '*.fuz', flags=flags).imatch():
             return False
 
         # sounds bad because bethesda no likey
-        for _ in wcmatch.WcMatch(containing_folder, '*.wav|*.xwm', flags=flags).imatch():
+        for _ in wcmatch.WcMatch(folder_str, '*.wav|*.xwm', flags=flags).imatch():
             return False
 
         # strings bad because wrye bash no likey
-        for _ in wcmatch.WcMatch(containing_folder, '*.*strings', flags=flags).imatch():
+        for _ in wcmatch.WcMatch(folder_str, '*.*strings', flags=flags).imatch():
             return False
 
         return True

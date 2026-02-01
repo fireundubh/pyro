@@ -12,7 +12,7 @@ from pyro.Comparators import endswith, is_zipfile_node
 from pyro.Constants import XmlAttributeName
 from pyro.Exceptions import ZipError
 from pyro.PapyrusProject import PapyrusProject
-from pyro.PathUtils import normalize_path
+from pyro.PathUtils import normalize_path, to_str
 from pyro.builders.utils import check_write_permission, generate_include_paths
 
 

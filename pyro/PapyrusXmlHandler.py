@@ -4,6 +4,7 @@ import os
 import re
 import sys
 from collections.abc import Callable
+from pathlib import Path
 
 from lxml import etree
 
@@ -12,23 +13,43 @@ from pyro.Constants import (XmlAttributeName,
 from pyro.XmlRoot import XmlRoot
 
 
-def strip_xml_comments(path: str) -> io.StringIO:
-    with open(path, encoding='utf-8') as f:
-        xml_document: str = f.read()
-        comments_pattern = re.compile('(<!--.*?-->)', flags=re.DOTALL)
-        xml_document = comments_pattern.sub('', xml_document)
+def strip_xml_comments(path: str | Path) -> io.StringIO:
+    """Strip XML comments from file.
+
+    Args:
+        path: Path to XML file (str or Path object)
+
+    Returns:
+        StringIO containing XML without comments
+    """
+    file_path = Path(path)
+    xml_document: str = file_path.read_text(encoding='utf-8')
+    comments_pattern = re.compile('(<!--.*?-->)', flags=re.DOTALL)
+    xml_document = comments_pattern.sub('', xml_document)
     return io.StringIO(xml_document)
 
 
-def validate_schema(namespace: str, program_path: str) -> etree.XMLSchema:
+def validate_schema(namespace: str, program_path: str | Path) -> etree.XMLSchema:
+    """Validate XML schema file exists and parse it.
+
+    Args:
+        namespace: Schema filename
+        program_path: Program directory path (str or Path object)
+
+    Returns:
+        Parsed XMLSchema object
+
+    Raises:
+        FileExistsError: If schema file doesn't exist
+    """
     if not namespace:
         return etree.XMLSchema()
 
-    schema_path = os.path.join(program_path, namespace)
-    if not os.path.isfile(schema_path):
+    schema_path = Path(program_path) / namespace
+    if not schema_path.is_file():
         raise FileExistsError(f'Schema file does not exist: "{schema_path}"')
 
-    schema = etree.parse(schema_path)
+    schema = etree.parse(str(schema_path))
     return etree.XMLSchema(schema)
 
 
@@ -36,7 +57,13 @@ class PapyrusXmlHandler:
     log: logging.Logger = logging.getLogger('pyro')
     variables_node: etree.ElementBase
 
-    def __init__(self, input_path: str, program_path: str) -> None:
+    def __init__(self, input_path: str | Path, program_path: str | Path) -> None:
+        """Initialize PapyrusXmlHandler.
+
+        Args:
+            input_path: Path to input XML file (str or Path object)
+            program_path: Program directory path (str or Path object)
+        """
         xml_parser: etree.XMLParser = etree.XMLParser(remove_blank_text=True, remove_comments=True)
 
         xml_document: io.StringIO = strip_xml_comments(input_path)

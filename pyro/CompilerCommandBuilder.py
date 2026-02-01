@@ -7,6 +7,7 @@ Supports both standard Papyrus compiler and Caprica compiler.
 import logging
 import os
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pyro.CommandArguments import CommandArguments
@@ -93,13 +94,13 @@ class CompilerCommandBuilder:
             options.append(f'input-file={object_names.strip()}\n')
 
         # Write modified config file
-        config_dir_path = os.path.dirname(self.ppj.get_compiler_config_path())
-        config_file_path = os.path.join(config_dir_path, f'caprica_{str(int(time.time()))}.cfg')
+        config_dir = Path(self.ppj.get_compiler_config_path()).parent
+        config_file = config_dir / f'caprica_{int(time.time())}.cfg'
 
-        with open(config_file_path, mode='w', encoding='utf-8') as f:
-            f.write('\n'.join(options))
+        config_file.write_text('\n'.join(options), encoding='utf-8')
 
-        arguments.append(config_file_path, key='-config-file', enquote_value=True)
+        # Convert Path to str for external tool (compiler)
+        arguments.append(str(config_file), key='-config-file', enquote_value=True)
 
         # Add game name
         game_name = self.get_game_name_for_caprica()
