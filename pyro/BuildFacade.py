@@ -33,7 +33,7 @@ class BuildFacade:
         self.scripts_count = len(self.ppj.psc_paths)
 
         # WARN: if methods are renamed and their respective option names are not, this will break.
-        options: dict = deepcopy(self.ppj.options.__dict__)
+        options: dict[str, object] = deepcopy(self.ppj.options.__dict__)
 
         for key in options:
             if key in ('args', 'input_path', 'anonymize', 'package', 'zip', 'zip_compression'):
@@ -44,7 +44,7 @@ class BuildFacade:
                 continue
             setattr(self.ppj.options, key, getattr(self.ppj, f'get_{key}')())
 
-    def _find_modified_scripts(self) -> list:
+    def _find_modified_scripts(self) -> list[str]:
         """Delegate to AnonymizationService for backward compatibility."""
         try:
             return self._anonymization_service.find_modified_scripts()

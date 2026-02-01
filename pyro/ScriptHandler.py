@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import logging
 import os
 import sys
-import typing
+from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 from wcmatch import wcmatch
 
@@ -12,21 +15,24 @@ from pyro.Constants import (XmlAttributeName)
 from pyro.PathHelper import PathHelper
 from pyro.PexReader import PexReader
 
+if TYPE_CHECKING:
+    from pyro.PapyrusProject import PapyrusProject
+
 
 class ScriptHandler:
     log: logging.Logger = logging.getLogger('pyro')
 
-    def __init__(self, papyrus_project) -> None:
+    def __init__(self, papyrus_project: PapyrusProject) -> None:
         self.project = papyrus_project
         self.scripts_node = papyrus_project.xml_handler.scripts_node
         self.folders_node = papyrus_project.xml_handler.folders_node
-        self.psc_paths: dict = {}
-        self.pex_paths: list = []
-        self.missing_scripts: dict = {}
+        self.psc_paths: dict[str, str] = {}
+        self.pex_paths: list[str] = []
+        self.missing_scripts: dict[str, str] = {}
 
-    def get_psc_paths(self) -> dict:
+    def get_psc_paths(self) -> dict[str, str]:
         """Returns script paths from Folders and Scripts nodes"""
-        object_names: dict = {}
+        object_names: dict[str, str] = {}
 
         # populate object names dictionary
         if self.folders_node is not None:
@@ -75,7 +81,7 @@ class ScriptHandler:
         self.psc_paths = object_names
         return object_names
 
-    def get_object_item(self, path: str) -> tuple:
+    def get_object_item(self, path: str) -> tuple[str, str]:
         object_name = path if not os.path.isabs(path) else self._calculate_object_name(path)
         object_path = path if endswith(path, '.psc', ignorecase=True) else f'{path}.psc'
         return object_name, object_path
@@ -83,7 +89,7 @@ class ScriptHandler:
     def _calculate_object_name(self, psc_path: str) -> str:
         return PathHelper.calculate_relative_object_name(psc_path, self.project.import_paths)
 
-    def _get_script_paths_from_folders_node(self) -> typing.Generator:
+    def _get_script_paths_from_folders_node(self) -> Generator[str, None, None]:
         """Returns script paths from the Folders element array"""
         for folder_node in filter(is_folder_node, self.folders_node):
             self.project.try_fix_namespace_path(folder_node)
@@ -113,7 +119,7 @@ class ScriptHandler:
                 if os.path.isdir(test_path):
                     yield from PathHelper.find_script_paths_from_folder(test_path, no_recurse=attr_no_recurse)
 
-    def _get_script_paths_from_scripts_node(self) -> typing.Generator:
+    def _get_script_paths_from_scripts_node(self) -> Generator[str, None, None]:
         """Returns script paths from the Scripts node"""
         for script_node in filter(is_script_node, self.scripts_node):
             self.project.try_fix_namespace_path(script_node)
@@ -132,11 +138,11 @@ class ScriptHandler:
 
             yield script_path
 
-    def get_pex_paths(self) -> list:
+    def get_pex_paths(self) -> list[str]:
         """
         Returns absolute paths to compiled scripts that may not exist yet in output folder
         """
-        pex_paths: list = []
+        pex_paths: list[str] = []
 
         for object_name, script_path in self.psc_paths.items():
             # noinspection PyTypeChecker
@@ -149,9 +155,9 @@ class ScriptHandler:
         self.pex_paths = pex_paths
         return pex_paths
 
-    def find_missing_scripts(self) -> dict:
+    def find_missing_scripts(self) -> dict[str, str]:
         """Returns list of script paths for compiled scripts that do not exist"""
-        results: dict = {}
+        results: dict[str, str] = {}
 
         for object_name, script_path in self.psc_paths.items():
             if endswith(object_name, '.pex', ignorecase=True):
@@ -167,8 +173,8 @@ class ScriptHandler:
         self.missing_scripts = results
         return results
 
-    def try_exclude_unmodified_scripts(self) -> dict:
-        psc_paths: dict = {}
+    def try_exclude_unmodified_scripts(self) -> dict[str, str]:
+        psc_paths: dict[str, str] = {}
 
         for object_name, script_path in self.psc_paths.items():
             if endswith(object_name, '.pex', ignorecase=True):

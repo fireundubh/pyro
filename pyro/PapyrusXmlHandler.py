@@ -3,8 +3,7 @@ import logging
 import os
 import re
 import sys
-
-from typing import Union
+from collections.abc import Callable
 
 from lxml import etree
 
@@ -99,15 +98,15 @@ class PapyrusXmlHandler:
 
     @property
     def game_type(self) -> str:
-        return self.ppj_root.get(XmlAttributeName.GAME, default='')
+        return self.ppj_root.get(XmlAttributeName.GAME, default='') or ''
 
     @property
     def flags_path(self) -> str:
-        return self.ppj_root.get(XmlAttributeName.FLAGS, default='')
+        return self.ppj_root.get(XmlAttributeName.FLAGS, default='') or ''
 
     @property
     def output_path(self) -> str:
-        return self.ppj_root.get(XmlAttributeName.OUTPUT, default='')
+        return self.ppj_root.get(XmlAttributeName.OUTPUT, default='') or ''
 
     @property
     def packages_output(self) -> str:
@@ -117,7 +116,7 @@ class PapyrusXmlHandler:
     def zip_output(self) -> str:
         return self.zip_files_node.get(XmlAttributeName.OUTPUT, default='') if self.zip_files_node is not None else ''
 
-    def update_attributes(self, parse_func) -> None:
+    def update_attributes(self, parse_func: Callable[[str], str]) -> None:
         """Updates attributes of element tree with missing attributes and default values"""
         ppj_bool_keys = [
             XmlAttributeName.OPTIMIZE,
@@ -199,7 +198,8 @@ class PapyrusXmlHandler:
                 value = value.casefold() in ('true', '1') if key in ppj_bool_keys + other_bool_keys else parse_func(value)
                 node.set(key, str(value))
 
-    def get_boolean_attribute(self, element: Union[etree._Element, XmlRoot], attr_name: str, default: bool = False) -> bool:
+    def get_boolean_attribute(self, element: etree._Element | XmlRoot | None, attr_name: str, default: bool = False) -> bool:
         if element is None:
             return default
-        return element.get(attr_name) == 'True'
+        value = element.get(attr_name)
+        return value == 'True' if value is not None else default

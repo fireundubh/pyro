@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import configparser
 import hashlib
 import logging
 import os
 import sys
+from typing import TYPE_CHECKING
 
 from lxml import etree
 
@@ -16,10 +19,14 @@ from pyro.PathHelper import PathHelper
 
 from wcmatch import wcmatch
 
+if TYPE_CHECKING:
+    from pyro.PapyrusProject import PapyrusProject
+
+
 class ImportHandler:
     log: logging.Logger = logging.getLogger('pyro')
 
-    def __init__(self, papyrus_project) -> None:
+    def __init__(self, papyrus_project: PapyrusProject) -> None:
         self.project = papyrus_project
         self.imports_node = papyrus_project.xml_handler.imports_node
         self.folders_node = papyrus_project.xml_handler.folders_node
@@ -27,11 +34,11 @@ class ImportHandler:
         self.remote_schemas = ('https:', 'http:')
 
     @property
-    def remote_paths(self) -> list:
+    def remote_paths(self) -> list[str]:
         """
         Collects list of remote paths from Import and Folder nodes
         """
-        results: list = []
+        results: list[str] = []
 
         if self.imports_node is not None:
             results.extend([node.text for node in filter(is_import_node, self.imports_node)
@@ -80,9 +87,9 @@ class ImportHandler:
                     self.log.error(f'Cannot proceed while node contains invalid URL: "{path}"')
                     sys.exit(1)
 
-    def get_import_paths(self) -> list:
+    def get_import_paths(self) -> list[str]:
         """Returns absolute import paths from Papyrus Project"""
-        results: list = []
+        results: list[str] = []
 
         if self.imports_node is None:
             return []
@@ -132,6 +139,6 @@ class ImportHandler:
         matcher = wcmatch.WcMatch(local_path, '*.psc', flags=wcmatch.IGNORECASE | wcmatch.RECURSIVE)
 
         for f in matcher.imatch():
-            return os.path.dirname(f)
+            return str(os.path.dirname(f))
 
-        return local_path
+        return str(local_path)

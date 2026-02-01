@@ -48,14 +48,14 @@ class PapyrusProject(ProjectBase):
     post_zip_node: etree.ElementBase = None
 
     remote: RemoteBase
-    remote_schemas: tuple = ('https:', 'http:')
+    remote_schemas: tuple[str, str] = ('https:', 'http:')
 
     zip_file_name: str = ''
     zip_root_path: str = ''
 
-    missing_scripts: dict = {}
-    pex_paths: list = []
-    psc_paths: dict = {}
+    missing_scripts: dict[str, str] = {}
+    pex_paths: list[str] = []
+    psc_paths: dict[str, str] = {}
 
     xml_handler: PapyrusXmlHandler
     import_handler: ImportHandler
@@ -77,8 +77,9 @@ class PapyrusProject(ProjectBase):
         self.xml_handler.update_attributes(self.parse)
 
         if self.options.resolve_project:
-            xml_output = etree.tostring(self.xml_handler.ppj_root.node, encoding='utf-8', xml_declaration=True, pretty_print=True)  # type: ignore[assignment]
-            PapyrusProject.log.debug(f'Resolved PPJ. Text output:{os.linesep * 2}{xml_output.decode()}')
+            xml_output = etree.tostring(self.xml_handler.ppj_root.node, encoding='utf-8', xml_declaration=True, pretty_print=True)
+            if isinstance(xml_output, bytes):
+                PapyrusProject.log.debug(f'Resolved PPJ. Text output:{os.linesep * 2}{xml_output.decode()}')
             sys.exit(1)
 
         self.options.flags_path = self.xml_handler.flags_path
@@ -196,7 +197,7 @@ class PapyrusProject(ProjectBase):
         self.pex_paths = self.script_handler.get_pex_paths()
 
         # these are relative paths to psc scripts whose pex counterparts are missing
-        self.missing_scripts: dict = self.script_handler.find_missing_scripts()
+        self.missing_scripts = self.script_handler.find_missing_scripts()
 
     def try_set_game_path(self) -> None:
         # game type must be set before we call this
@@ -204,7 +205,7 @@ class PapyrusProject(ProjectBase):
             self.options.game_path = self.get_game_path(self.options.game_type)
 
     def _parse_variables(self, variables_node: etree.ElementBase) -> None:
-        reserved_characters: tuple = ('!', '#', '^', '&', '*')
+        reserved_characters: tuple[str, ...] = ('!', '#', '^', '&', '*')
 
         # noinspection PyTypeChecker
         for node in filter(is_variable_node, variables_node):
@@ -250,16 +251,16 @@ class PapyrusProject(ProjectBase):
             value = self.variables[key]
             self.variables.update({key: self.parse(value)})
 
-    def build_commands(self) -> tuple[int, list]:
+    def build_commands(self) -> tuple[int, list[str]]:
         """
         Builds list of commands for compiling scripts
         """
-        commands: list = []
+        commands: list[str] = []
 
         arguments = CommandArguments()
 
         if self.options.no_incremental_build:
-            psc_paths: dict = self.psc_paths
+            psc_paths: dict[str, str] = self.psc_paths
         else:
             psc_paths = self.script_handler.try_exclude_unmodified_scripts()
 

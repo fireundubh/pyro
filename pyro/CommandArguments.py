@@ -1,6 +1,6 @@
 class CommandArguments:
     def __init__(self) -> None:
-        self._items: list = []
+        self._items: list[str] = []
 
     def append(self, value: str, *, key: str = '', enquote_value: bool = False) -> None:
         if enquote_value:

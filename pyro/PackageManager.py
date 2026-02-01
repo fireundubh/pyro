@@ -4,8 +4,8 @@ import os
 import shutil
 import sys
 import threading
-import typing
 import zipfile
+from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -80,7 +80,7 @@ class PackageManager:
                 sys.exit(1)
 
     @staticmethod
-    def _match(root_dir: str, file_pattern: str, *, exclude_pattern: str = '', user_path: str = '', no_recurse: bool = False) -> typing.Generator:
+    def _match(root_dir: str, file_pattern: str, *, exclude_pattern: str = '', user_path: str = '', no_recurse: bool = False) -> Generator[tuple[str, str], None, None]:
         user_flags = wcmatch.RECURSIVE if not no_recurse else 0x0
         matcher = wcmatch.WcMatch(root_dir, file_pattern,
                                   exclude_pattern=exclude_pattern,
@@ -92,7 +92,7 @@ class PackageManager:
             yield file_path, user_path
 
     @staticmethod
-    def _generate_include_paths(includes_node: etree.ElementBase, root_path: str, zip_mode: bool = False) -> typing.Generator:
+    def _generate_include_paths(includes_node: etree.ElementBase, root_path: str, zip_mode: bool = False) -> Generator[tuple[str, str], None, None]:
         for include_node in filter(is_include_node, includes_node):
             attr_no_recurse: bool = include_node.get(XmlAttributeName.NO_RECURSE) == 'True'
             attr_path: str = include_node.get(XmlAttributeName.PATH).strip()
@@ -300,7 +300,7 @@ class PackageManager:
 
                 self.includes = len(tasks)
 
-                def copy_task_fn(s, t):
+                def copy_task_fn(s: str, t: str) -> None:
                     os.makedirs(os.path.dirname(t), exist_ok=True)
                     shutil.copy2(s, t)
 

@@ -1,6 +1,7 @@
 import configparser
+import logging
 import os
-from typing import Generator, Optional
+from collections.abc import Generator
 from urllib.error import HTTPError
 from urllib.parse import urlparse
 
@@ -9,16 +10,17 @@ from pyro.Remotes.RemoteUri import RemoteUri
 
 
 class RemoteBase:
+    log: logging.Logger = logging.getLogger('pyro')
     access_token: str = ''
 
-    url_patterns: dict = {
+    url_patterns: dict[str, tuple[int, ...]] = {
         'api.github.com': (3, 0),  # pop 'contents', 'repos'
         'github.com': (3, 2),  # pop branch, 'tree'
         'api.bitbucket.org': (5, 4, 1, 0),  # pop branch, 'src', 'repositories', '2.0'
         'bitbucket.org': (3, 2)  # pop branch, 'src'
     }
 
-    def __init__(self, *, config: configparser.ConfigParser = None, access_token: str = '', worker_limit: int = -1, force_overwrite: bool = False) -> None:
+    def __init__(self, *, config: configparser.ConfigParser | None = None, access_token: str = '', worker_limit: int = -1, force_overwrite: bool = False) -> None:
         self.config = config
         self.access_token = access_token
         self.worker_limit = worker_limit
@@ -127,7 +129,7 @@ class RemoteBase:
         else:
             return all([result.scheme, result.netloc, result.path])
 
-    def find_access_token(self, schemeless_url: str) -> Optional[str]:
+    def find_access_token(self, schemeless_url: str) -> str | None:
         if self.config:
             for section_url in self.config.sections():
                 if section_url.casefold() in schemeless_url.casefold():
@@ -136,8 +138,8 @@ class RemoteBase:
                         return os.path.expanduser(os.path.expandvars(token))
         return None
 
-    def fetch_contents(self, url: str, output_path: str) -> Generator:
+    def fetch_contents(self, url: str, output_path: str) -> Generator[str | None, None, None]:
         """
         Downloads files from URL to output path
         """
-        pass
+        yield from ()

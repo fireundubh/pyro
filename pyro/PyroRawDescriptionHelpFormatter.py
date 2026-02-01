@@ -17,7 +17,7 @@ class PyroRawDescriptionHelpFormatter(argparse.RawDescriptionHelpFormatter):
             metavar = self._metavar_formatter(action, default)(1)
             return ', '.join(metavar)
 
-        parts: list = []
+        parts: list[str] = []
 
         if action.nargs == 0:
             parts.extend(action.option_strings)

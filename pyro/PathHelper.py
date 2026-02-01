@@ -1,7 +1,5 @@
 import os
-from typing import (Generator,
-                    Iterable,
-                    Optional)
+from collections.abc import Generator, Iterable
 from urllib.parse import (unquote_plus,
                           urlparse)
 
@@ -13,7 +11,7 @@ from pyro.Comparators import (endswith,
 
 class PathHelper:
     @staticmethod
-    def calculate_absolute_script_path(object_name: str, import_paths: list) -> str:
+    def calculate_absolute_script_path(object_name: str, import_paths: list[str]) -> str:
         for import_path in reversed(PathHelper.uniqify(import_paths)):
             if not os.path.isabs(import_path):
                 import_path = os.path.join(os.getcwd(), import_path)
@@ -31,7 +29,7 @@ class PathHelper:
         return ''
 
     @staticmethod
-    def calculate_relative_object_name(script_path: str, import_paths: list) -> str:
+    def calculate_relative_object_name(script_path: str, import_paths: list[str]) -> str:
         """Returns import-relative path from absolute path"""
         # reverse the list to find the best import path
         file_name = os.path.basename(script_path)
@@ -51,7 +49,7 @@ class PathHelper:
         return file_name
 
     @staticmethod
-    def find_script_paths_from_folder(root_dir: str, *, no_recurse: bool, matcher: Optional[wcmatch.WcMatch] = None) -> Generator:
+    def find_script_paths_from_folder(root_dir: str, *, no_recurse: bool, matcher: wcmatch.WcMatch[str] | None = None) -> Generator[str, None, None]:
         """Yields existing script paths starting from absolute folder path"""
         if not matcher:
             user_flags = wcmatch.RECURSIVE if not no_recurse else 0x0
@@ -68,7 +66,7 @@ class PathHelper:
         return os.path.normpath(os.path.expanduser(os.path.expandvars(path)))
 
     @staticmethod
-    def uniqify(items: Iterable) -> list:
+    def uniqify(items: Iterable[str]) -> list[str]:
         """Returns ordered list without duplicates"""
         return list(dict.fromkeys(items))
 

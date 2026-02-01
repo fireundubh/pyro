@@ -2,17 +2,22 @@ import json
 import os
 import sys
 import urllib.error
+from collections.abc import Generator
 from http import HTTPStatus
-from typing import Generator
+from typing import cast
 from urllib.request import Request
 from urllib.request import urlopen
 
 from pyro.Comparators import endswith
 from pyro.Remotes.RemoteBase import RemoteBase
 
+# Type alias for JSON payload from Bitbucket API
+type JsonPayload = dict[str, 'JsonValue']
+type JsonValue = str | int | float | bool | None | list['JsonValue'] | JsonPayload
+
 
 class BitbucketRemote(RemoteBase):
-    def _fetch_payloads(self, request_url: str) -> Generator:
+    def _fetch_payloads(self, request_url: str) -> Generator[JsonPayload, None, None]:
         """
         Recursively generates payloads from paginated responses
         """
@@ -22,22 +27,24 @@ class BitbucketRemote(RemoteBase):
             response = urlopen(request, timeout=30)
         except urllib.error.HTTPError as e:
             status: HTTPStatus = HTTPStatus(e.code)
-            yield 'Failed to load remote: "%s" (%s %s)' % (request_url, e.code, status.phrase)
+            BitbucketRemote.log.error('Failed to load remote: "%s" (%s %s)' % (request_url, e.code, status.phrase))
             sys.exit(1)
 
         if response.status != 200:
-            status: HTTPStatus = HTTPStatus(response.status)  # type: ignore
-            yield 'Failed to load remote: "%s" (%s %s)' % (request_url, response.status, status.phrase)
+            status = HTTPStatus(response.status)
+            BitbucketRemote.log.error('Failed to load remote: "%s" (%s %s)' % (request_url, response.status, status.phrase))
             sys.exit(1)
 
-        payload: dict = json.loads(response.read().decode('utf-8'))
+        payload: JsonPayload = json.loads(response.read().decode('utf-8'))
 
         yield payload
 
         if 'next' in payload:
-            yield from self._fetch_payloads(payload['next'])
+            next_url = payload['next']
+            if isinstance(next_url, str):
+                yield from self._fetch_payloads(next_url)
 
-    def fetch_contents(self, url: str, output_path: str) -> Generator:
+    def fetch_contents(self, url: str, output_path: str) -> Generator[str | None, None, None]:
         """
         Downloads files from URL to output path
         """
@@ -46,12 +53,30 @@ class BitbucketRemote(RemoteBase):
         script_count: int = 0
 
         for payload in self._fetch_payloads(request_url.url):
-            for payload_object in payload['values']:
-                payload_object_type = payload_object['type']
+            values = payload.get('values')
+            if not isinstance(values, list):
+                continue
 
-                target_path = os.path.normpath(os.path.join(output_path, request_url.owner, request_url.repo, payload_object['path']))
+            for payload_object in values:
+                if not isinstance(payload_object, dict):
+                    continue
 
-                download_url = payload_object['links']['self']['href']
+                payload_object_type = payload_object.get('type')
+                path_value = payload_object.get('path')
+                links = payload_object.get('links')
+
+                if not isinstance(path_value, str) or not isinstance(links, dict):
+                    continue
+
+                self_link = links.get('self')
+                if not isinstance(self_link, dict):
+                    continue
+
+                download_url = self_link.get('href')
+                if not isinstance(download_url, str):
+                    continue
+
+                target_path = os.path.normpath(os.path.join(output_path, request_url.owner, request_url.repo, path_value))
 
                 if payload_object_type == 'commit_file':
                     # we only care about scripts

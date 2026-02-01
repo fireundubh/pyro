@@ -33,9 +33,9 @@ class ProcessManager:
 
         ProcessManager.log.info(event_node.get(XmlAttributeName.DESCRIPTION))
 
-        ws: re.Pattern = re.compile('[ \t\n\r]+')
+        ws: re.Pattern[str] = re.compile('[ \t\n\r]+')
 
-        environ: dict = os.environ.copy()
+        environ: dict[str, str] = os.environ.copy()
         # command: str = ' && '.join(
         #     ws.sub(' ', node.text)
         #     for node in filter(is_command_node, event_node)
@@ -46,7 +46,7 @@ class ProcessManager:
             ProcessManager.run_command(command, project_path, environ)
 
     @staticmethod
-    def run_command(command: str, cwd: str, env: dict) -> ProcessState:
+    def run_command(command: str, cwd: str, env: dict[str, str]) -> ProcessState:
         try:
             process = subprocess.Popen(command,
                                        stdout=subprocess.PIPE,
@@ -61,7 +61,7 @@ class ProcessManager:
 
         try:
             while process.poll() is None:
-                if (line := process.stdout.readline().strip()) != '':
+                if process.stdout and (line := process.stdout.readline().strip()) != '':
                     ProcessManager.log.info(line)
 
         except KeyboardInterrupt:
@@ -111,7 +111,7 @@ class ProcessManager:
 
         try:
             while process.poll() is None:
-                if (line := process.stdout.readline().strip()) != '':
+                if process.stdout and (line := process.stdout.readline().strip()) != '':
                     if startswith(line, exclusions):
                         continue
 
@@ -170,13 +170,13 @@ class ProcessManager:
             'Starting'
         )
 
-        line_error = re.compile(r'(.*)(\(-?\d*\.?\d+,-?\d*\.?\d+\)):\s+(.*)')
+        line_error: re.Pattern[str] = re.compile(r'(.*)(\(-?\d*\.?\d+,-?\d*\.?\d+\)):\s+(.*)')
 
         error_count = 0
 
         try:
             while process.poll() is None:
-                if (line := process.stdout.readline().strip()) != '':
+                if process.stdout and (line := process.stdout.readline().strip()) != '':
                     if startswith(line, exclusions):
                         continue
 

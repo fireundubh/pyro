@@ -13,6 +13,7 @@ Implements a 5-tier detection hierarchy:
 import logging
 import os
 import sys
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from pyro.Comparators import endswith
@@ -60,7 +61,7 @@ class GameTypeResolver:
         Returns:
             Game type string (fo4, sf1, sse, tes5) or empty string if not detected
         """
-        parts: list = path.casefold().split(os.sep)
+        parts: list[str] = path.casefold().split(os.sep)
 
         if GameName.SF1.casefold() in parts:
             return GameType.SF1
@@ -129,7 +130,7 @@ class GameTypeResolver:
 
         return None
 
-    def detect_from_flags_path(self, get_game_path_fn=None) -> str | None:
+    def detect_from_flags_path(self, get_game_path_fn: Callable[[str], str] | None = None) -> str | None:
         """
         Detect game type from the flags path option.
 
@@ -186,7 +187,7 @@ class GameTypeResolver:
 
         return None
 
-    def resolve(self, xml_game_type: str = '', get_game_path_fn=None) -> str:
+    def resolve(self, xml_game_type: str = '', get_game_path_fn: Callable[[str], str] | None = None) -> str:
         """
         Resolve the game type using the detection hierarchy.
 

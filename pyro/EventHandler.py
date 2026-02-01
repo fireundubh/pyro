@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
 
 from pyro.Enums.Event import (Event,
                               ImportEvent,
@@ -9,11 +12,14 @@ from pyro.Enums.Event import (Event,
                               ZipEvent)
 from pyro.ProcessManager import ProcessManager
 
+if TYPE_CHECKING:
+    from pyro.PapyrusProject import PapyrusProject
+
 
 class EventHandler:
     log: logging.Logger = logging.getLogger('pyro')
 
-    def __init__(self, papyrus_project) -> None:
+    def __init__(self, papyrus_project: PapyrusProject) -> None:
         self.project = papyrus_project
         self.xml_handler = papyrus_project.xml_handler
 

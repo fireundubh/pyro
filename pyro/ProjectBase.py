@@ -1,7 +1,6 @@
 import logging
 import os
 import sys
-from typing import Union
 
 from pyro.Comparators import (endswith,
                               startswith)
@@ -18,13 +17,13 @@ class ProjectBase:
 
     options: ProjectOptions
 
-    variables: dict = {}
+    variables: dict[str, str] = {}
 
     program_path: str = ''
     project_name: str = ''
     project_path: str = ''
 
-    import_paths: list = []
+    import_paths: list[str] = []
 
     final: bool = False
     optimize: bool = False
@@ -49,7 +48,7 @@ class ProjectBase:
         super(ProjectBase, self).__setattr__(key, value)
 
     @staticmethod
-    def _get_path(path: str, *, relative_root_path: str, fallback_path: Union[str, list]) -> str:
+    def _get_path(path: str, *, relative_root_path: str, fallback_path: str | list[str]) -> str:
         """
         Returns absolute path from path or fallback path if path empty or unset
 
@@ -61,8 +60,8 @@ class ProjectBase:
             path = os.path.expanduser(os.path.expandvars(path))
             return os.path.normpath(path) if os.path.isabs(path) else os.path.normpath(os.path.join(relative_root_path, path))
         if isinstance(fallback_path, list):
-            return os.path.abspath(os.path.join(*fallback_path))
-        return fallback_path
+            return str(os.path.abspath(os.path.join(*fallback_path)))
+        return str(fallback_path)
 
     def parse(self, value: str) -> str:
         """Expands string tokens and environment variables, and returns the parsed string"""
@@ -210,7 +209,7 @@ class ProjectBase:
             ProjectBase.log.error(f'Installed Path for {game_type} does not exist: {reg_value}')
             sys.exit(1)
 
-        return reg_value
+        return str(reg_value)
 
     # bsarch arguments
     def get_bsarch_path(self) -> str:
@@ -246,7 +245,7 @@ class ProjectBase:
 
     @staticmethod
     def _get_game_type_from_path(path: str) -> str:
-        parts: list = path.casefold().split(os.sep)
+        parts: list[str] = path.casefold().split(os.sep)
         if GameName.SF1.casefold() in parts:
             return GameType.SF1
         if GameName.SF1.casefold().replace(' ', '') in parts:

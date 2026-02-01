@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
-from typing import (IO,  # type: ignore
-                    Literal)
+from typing import IO, Literal
 
 from pyro.PexTypes import PexInt
 from pyro.PexTypes import PexStr
@@ -23,7 +22,7 @@ class PexHeader:
     computer_name_size: PexInt = field(init=False, default_factory=PexInt)
     computer_name: PexStr = field(init=False, default_factory=PexStr)
 
-    def read(self, f: IO, name: str, length: int) -> None:
+    def read(self, f: IO[bytes], name: str, length: int) -> None:
         """Reads a set of bytes and their offset to an attribute by name"""
         try:
             obj = getattr(self, name)
