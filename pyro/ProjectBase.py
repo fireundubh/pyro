@@ -26,8 +26,11 @@ class ProjectBase:
 
     _import_paths: list[str] = []  # Private storage for import_paths property
 
+    asm: str = 'none'
+    debug: bool = False
     final: bool = False
     optimize: bool = False
+    quiet: bool = False
     release: bool = False
 
     def __init__(self, options: ProjectOptions) -> None:

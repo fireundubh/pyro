@@ -103,7 +103,10 @@ class PapyrusXmlHandler:
         self.pre_zip_node: etree.ElementBase = self.ppj_root.find(XmlTagName.PRE_ZIP_EVENT)
         self.post_zip_node: etree.ElementBase = self.ppj_root.find(XmlTagName.POST_ZIP_EVENT)
 
+        self.asm: str = self.ppj_root.get(XmlAttributeName.ASM, default='none') or 'none'
+        self.debug: bool = self.get_boolean_attribute(self.ppj_root, XmlAttributeName.DEBUG)
         self.optimize: bool = self.get_boolean_attribute(self.ppj_root, XmlAttributeName.OPTIMIZE)
+        self.quiet: bool = self.get_boolean_attribute(self.ppj_root, XmlAttributeName.QUIET)
         self.release: bool = self.get_boolean_attribute(self.ppj_root, XmlAttributeName.RELEASE)
         self.final: bool = self.get_boolean_attribute(self.ppj_root, XmlAttributeName.FINAL)
         self.anonymize: bool = self.get_boolean_attribute(self.ppj_root, XmlAttributeName.ANONYMIZE)
@@ -146,7 +149,9 @@ class PapyrusXmlHandler:
     def update_attributes(self, parse_func: Callable[[str], str]) -> None:
         """Updates attributes of element tree with missing attributes and default values"""
         ppj_bool_keys = [
+            XmlAttributeName.DEBUG,
             XmlAttributeName.OPTIMIZE,
+            XmlAttributeName.QUIET,
             XmlAttributeName.RELEASE,
             XmlAttributeName.FINAL,
             XmlAttributeName.ANONYMIZE,
@@ -173,6 +178,8 @@ class PapyrusXmlHandler:
                     node.set(XmlAttributeName.FLAGS, '')
                 if XmlAttributeName.OUTPUT not in node.attrib:
                     node.set(XmlAttributeName.OUTPUT, '')
+                if XmlAttributeName.ASM not in node.attrib:
+                    node.set(XmlAttributeName.ASM, 'none')
                 for key in ppj_bool_keys:
                     if key not in node.attrib:
                         node.set(key, 'False')

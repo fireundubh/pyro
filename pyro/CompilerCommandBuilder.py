@@ -56,6 +56,38 @@ class CompilerCommandBuilder:
         else:
             return 'starfield'
 
+    def format_object_name_for_compiler(self, object_name: str) -> str:
+        """
+        Format object name according to game-specific compiler requirements.
+
+        Converts from Pyro's internal format (forward slashes, may include .psc)
+        to compiler-expected format (colons for FO4/SF1, no extension).
+
+        Args:
+            object_name: Internal object name (e.g., "Scripts/MyMod/Player.psc")
+
+        Returns:
+            Compiler-ready object name:
+            - FO4/SF1: "Scripts:MyMod:Player" (colons, no extension)
+            - TES5/SSE: "Scripts/MyMod/Player" (slashes, no extension)
+
+        Examples:
+            FO4:  "Scripts/MyMod/Player.psc" → "Scripts:MyMod:Player"
+            SSE:  "Scripts/MyMod/Player.psc" → "Scripts/MyMod/Player"
+        """
+        # Strip .psc extension if present
+        if object_name.endswith('.psc'):
+            object_name = object_name[:-4]
+
+        # Convert separators for FO4/SF1
+        if self.ppj.options.game_type in [GameType.FO4, GameType.SF1]:
+            # Replace forward slashes with colons
+            object_name = object_name.replace('/', ':')
+            # Also handle backslashes (shouldn't exist, but be defensive)
+            object_name = object_name.replace('\\', ':')
+
+        return object_name
+
     def build_caprica_commands(self, psc_paths: dict[str, str]) -> tuple[int, list[list[str]]]:
         """
         Build commands for Caprica compiler.
@@ -137,10 +169,14 @@ class CompilerCommandBuilder:
             arguments.clear()
             arguments.append(self.ppj.get_compiler_path(), enquote_value=True)
 
-            # FO4 uses object names, others use script paths
-            if self.ppj.options.game_type == GameType.FO4:
-                arguments.append(object_name, enquote_value=True)
+            # Modern compilers (FO4, SF1) use formatted object names with colons
+            # Legacy compilers (TES5, SSE) use absolute script paths
+            if self.ppj.options.game_type in [GameType.FO4, GameType.SF1]:
+                # Format: strip extension, convert / to :
+                formatted_name = self.format_object_name_for_compiler(object_name)
+                arguments.append(formatted_name, enquote_value=True)
             else:
+                # TES5/SSE can use absolute paths directly
                 arguments.append(script_path, enquote_value=True)
 
             arguments.append(self.ppj.get_flags_path(), key='f', enquote_value=True)
@@ -154,9 +190,25 @@ class CompilerCommandBuilder:
                 if self.ppj.final:
                     arguments.append('-final')
 
-            # Optimize flag
+            # Optimize flag (all games)
             if self.ppj.optimize:
                 arguments.append('-op')
+
+            # Debug and quiet flags (supported by both FO4 and SSE compilers)
+            if self.ppj.debug:
+                arguments.append('-debug')
+
+            if self.ppj.quiet:
+                arguments.append('-quiet')
+
+            # Assembly output control (all compilers)
+            if self.ppj.asm == 'keep':
+                arguments.append('-keepasm')
+            elif self.ppj.asm == 'only':
+                arguments.append('-asmonly')
+            elif self.ppj.asm == 'discard':
+                arguments.append('-noasm')
+            # 'none' = default compiler behavior (no flag needed)
 
             commands.append(arguments.to_list())
 

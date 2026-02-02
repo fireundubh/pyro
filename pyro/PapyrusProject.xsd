@@ -39,6 +39,8 @@
             <xs:attribute name="Optimize" type="pyro:bool" default="false"/>
             <xs:attribute name="Release" type="pyro:bool" default="false"/>
             <xs:attribute name="Final" type="pyro:bool" default="false"/>
+            <xs:attribute name="Debug" type="pyro:bool" default="false"/>
+            <xs:attribute name="Quiet" type="pyro:bool" default="false"/>
             <xs:attribute name="Anonymize" type="pyro:bool" default="false"/>
             <xs:attribute name="Package" type="pyro:bool" default="false"/>
             <xs:attribute name="Zip" type="pyro:bool" default="false"/>

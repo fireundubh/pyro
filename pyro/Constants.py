@@ -24,7 +24,9 @@ class GameType(Constant):
 
 class XmlAttributeName(Constant):
     ANONYMIZE: str = 'Anonymize'
+    ASM: str = 'Asm'
     COMPRESSION: str = 'Compression'
+    DEBUG: str = 'Debug'
     DESCRIPTION: str = 'Description'
     EXCLUDE: str = 'Exclude'
     FINAL: str = 'Final'
@@ -37,6 +39,7 @@ class XmlAttributeName(Constant):
     OUTPUT: str = 'Output'
     PACKAGE: str = 'Package'
     PATH: str = 'Path'
+    QUIET: str = 'Quiet'
     RELEASE: str = 'Release'
     ROOT_DIR: str = 'RootDir'
     USE_IN_BUILD: str = 'UseInBuild'

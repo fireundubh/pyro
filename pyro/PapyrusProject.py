@@ -88,7 +88,10 @@ class PapyrusProject(ProjectBase):
         if self.options.output_path and not os.path.isabs(self.options.output_path):
             self.options.output_path = self.get_output_path()
 
+        self.asm = self.xml_handler.ppj_root.get(XmlAttributeName.ASM, default='none') or 'none'
+        self.debug = self.xml_handler.get_boolean_attribute(self.xml_handler.ppj_root, XmlAttributeName.DEBUG)
         self.optimize = self.xml_handler.get_boolean_attribute(self.xml_handler.ppj_root, XmlAttributeName.OPTIMIZE)
+        self.quiet = self.xml_handler.get_boolean_attribute(self.xml_handler.ppj_root, XmlAttributeName.QUIET)
         self.release = self.xml_handler.get_boolean_attribute(self.xml_handler.ppj_root, XmlAttributeName.RELEASE)
         self.final = self.xml_handler.get_boolean_attribute(self.xml_handler.ppj_root, XmlAttributeName.FINAL)
 
