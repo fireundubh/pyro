@@ -1,12 +1,16 @@
 """
 CompilerCommandBuilder - Handles building compiler command lines.
 
+DEPRECATED: This class is maintained for backward compatibility.
+New code should use the pyro.compilers module instead.
+
 Extracted from PapyrusProject.build_commands().
 Supports both standard Papyrus compiler and Caprica compiler.
 """
 import logging
 import os
 import time
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -37,6 +41,14 @@ class CompilerCommandBuilder:
             ppj: The PapyrusProject instance containing project configuration
         """
         self.ppj = ppj
+
+        # Emit deprecation warning
+        warnings.warn(
+            "CompilerCommandBuilder is deprecated and will be removed in a future version. "
+            "Use pyro.compilers module instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
 
     def is_using_caprica(self) -> bool:
         """Check if the project is configured to use Caprica compiler."""
@@ -241,16 +253,25 @@ class CompilerCommandBuilder:
 
         This is the main entry point, matching the original PapyrusProject.build_commands() API.
 
+        DEPRECATED: Delegates to new compiler abstraction layer.
+
         Returns:
             Tuple of (script count, list of command lists)
         """
+        from pyro.compilers import create_compiler
+
         psc_paths = self.get_scripts_to_compile()
 
         # Do not try to compile nothing
         if not psc_paths:
             return 0, []
 
-        if self.is_using_caprica():
-            return self.build_caprica_commands(psc_paths)
-        else:
-            return self.build_standard_commands(psc_paths)
+        # Delegate to new compiler abstraction
+        compiler = create_compiler(
+            self.ppj.get_compiler_path(),
+            self.ppj.get_compiler_config_path()
+        )
+        context = self.ppj.create_compilation_context(psc_paths)
+        result = compiler.build_commands(context)
+
+        return result.command_count, result.commands

@@ -121,3 +121,26 @@ def create_minimal_options(input_path: str, **overrides):
 def project_options_factory():
     """Factory fixture for creating ProjectOptions with custom settings."""
     return create_minimal_options
+
+
+@pytest.fixture
+def minimal_compilation_context():
+    """Minimal compilation context for testing."""
+    from pyro.compilers.protocol import CompilationContext
+    from pyro.Constants import GameType
+
+    return CompilationContext(
+        psc_paths={'Scripts/Test': 'H:/path/to/Test.psc'},
+        import_paths=['H:/import/path'],
+        flags_path='H:/flags.flg',
+        output_path='H:/output',
+        game_type=GameType.SSE,
+        release=False,
+        final=False,
+        optimize=False,
+        debug=False,
+        quiet=False,
+        asm='none',
+        no_parallel=False,
+        worker_limit=4
+    )

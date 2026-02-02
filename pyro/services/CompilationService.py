@@ -124,6 +124,36 @@ class CompilationService:
         """Get the appropriate compile data tracker based on compiler type."""
         return self.compile_data_caprica if self.is_using_caprica() else self.compile_data
 
+    def _get_scripts_to_compile(self) -> dict[str, str]:
+        """
+        Get scripts that need compilation (handles incremental builds).
+
+        Extracted from CompilerCommandBuilder.get_scripts_to_compile().
+
+        Returns:
+            Dictionary of object_name -> script_path
+        """
+        if self.ppj.options.no_incremental_build:
+            psc_paths = self.ppj.psc_paths.copy()
+        else:
+            psc_paths = self.ppj.script_handler.try_exclude_unmodified_scripts()
+
+        # Add scripts whose PEX counterparts are missing
+        for object_name, script_path in self.ppj.missing_scripts.items():
+            if object_name not in psc_paths:
+                psc_paths[object_name] = script_path
+
+        return psc_paths
+
+    def _get_compiler(self):
+        """Get appropriate compiler instance."""
+        from pyro.compilers import create_compiler
+
+        compiler_path = self.ppj.get_compiler_path()
+        config_path = self.ppj.get_compiler_config_path()
+
+        return create_compiler(compiler_path, config_path)
+
     def compile_sequential(self, commands: list[list[str]], compile_data: CompileData) -> None:
         """
         Compile scripts sequentially (one at a time).
@@ -158,21 +188,33 @@ class CompilationService:
 
         This is the main entry point, matching the original BuildFacade.try_compile() API.
         """
-        using_caprica = self.is_using_caprica()
-        compile_data = self.get_compile_data()
+        # Get scripts to compile
+        psc_paths = self._get_scripts_to_compile()
 
-        compile_data.command_count, commands = self.ppj.build_commands()
+        # Early exit if nothing to compile
+        if not psc_paths:
+            return
+
+        # Get compiler and build commands
+        compiler = self._get_compiler()
+        context = self.ppj.create_compilation_context(psc_paths)
+        result = compiler.build_commands(context)
+
+        # Get appropriate compile data tracker
+        compile_data = self.get_compile_data()
+        compile_data.command_count = result.command_count
 
         compile_data.time.start_time = time.time()
 
-        if using_caprica or self.ppj.options.no_parallel or compile_data.command_count == 1:
-            self.compile_sequential(commands, compile_data)
-        elif compile_data.command_count > 0:
-            worker_limit = min(compile_data.command_count, self.ppj.options.worker_limit)
-            self.compile_parallel(commands, compile_data, worker_limit)
+        # Decide execution strategy based on compiler capabilities
+        if not compiler.supports_parallel_execution(context) or result.command_count == 1:
+            self.compile_sequential(result.commands, compile_data)
+        elif result.command_count > 0:
+            worker_limit = min(result.command_count, context.worker_limit)
+            self.compile_parallel(result.commands, compile_data, worker_limit)
 
         compile_data.time.end_time = time.time()
 
         # Caprica success = all files compiled
-        if using_caprica and compile_data.success_count > 0:
+        if result.is_batch and compile_data.success_count > 0:
             compile_data.scripts_count = compile_data.command_count

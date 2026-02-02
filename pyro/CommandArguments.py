@@ -38,8 +38,27 @@ class CommandArguments:
         self._items.clear()
 
     def to_list(self) -> list[str]:
-        """Return the command arguments as a list suitable for subprocess."""
-        return self._items.copy()
+        """
+        Return the command arguments as a list suitable for subprocess.
+
+        Returns unquoted arguments since subprocess.Popen handles quoting internally.
+        """
+        # Remove quotes from elements for subprocess - it handles quoting automatically
+        result = []
+        for item in self._items:
+            # Handle key=value arguments (e.g., -f="value")
+            if '=' in item and item.count('=') == 1:
+                key, value = item.split('=', 1)
+                # Strip quotes from value part
+                if value.startswith('"') and value.endswith('"'):
+                    value = value[1:-1]
+                result.append(f'{key}={value}')
+            # Handle standalone quoted arguments
+            elif item.startswith('"') and item.endswith('"'):
+                result.append(item[1:-1])
+            else:
+                result.append(item)
+        return result
 
     def join(self, delimiter: str = ' ') -> str:
         """Deprecated: Returns space-joined string for backward compatibility."""

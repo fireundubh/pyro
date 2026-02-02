@@ -254,6 +254,36 @@ class PapyrusProject(ProjectBase):
             value = self.variables[key]
             self.variables.update({key: self.parse(value)})
 
+    def create_compilation_context(self, psc_paths: dict[str, str]):
+        """
+        Create compilation context from project settings.
+
+        Centralizes context building logic to avoid duplication.
+
+        Args:
+            psc_paths: Dictionary of object_name -> script_path
+
+        Returns:
+            CompilationContext with all necessary information
+        """
+        from pyro.compilers.protocol import CompilationContext
+
+        return CompilationContext(
+            psc_paths=psc_paths,
+            import_paths=self.import_paths,
+            flags_path=self.get_flags_path(),
+            output_path=self.get_output_path(),
+            game_type=self.options.game_type,
+            release=self.release,
+            final=self.final,
+            optimize=self.optimize,
+            debug=self.debug,
+            quiet=self.quiet,
+            asm=self.asm,
+            no_parallel=self.options.no_parallel,
+            worker_limit=self.options.worker_limit
+        )
+
     def build_commands(self) -> tuple[int, list[str]]:
         """
         Builds list of commands for compiling scripts

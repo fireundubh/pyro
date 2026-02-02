@@ -113,8 +113,8 @@ class TestStandardCommandBuilding:
         assert count == 1
         assert len(commands) == 1
         assert isinstance(commands[0], list)
-        assert '"C:\\Compiler\\PapyrusCompiler.exe"' in commands[0]
-        assert '"C:\\Source\\TestScript.psc"' in commands[0]
+        assert 'C:\\Compiler\\PapyrusCompiler.exe' in commands[0]
+        assert 'C:\\Source\\TestScript.psc' in commands[0]
         assert any('-f=' in arg for arg in commands[0])
         assert any('-i=' in arg for arg in commands[0])
         assert any('-o=' in arg for arg in commands[0])
@@ -163,7 +163,7 @@ class TestStandardCommandBuilding:
         count, commands = builder.build_standard_commands(psc_paths)
 
         assert count == 1
-        assert '"Namespace:Script"' in commands[0]
+        assert 'Namespace:Script' in commands[0]
         assert not any('Script.psc' in arg for arg in commands[0])  # Uses object name, not path
 
     def test_fo4_release_flag(self):
@@ -321,11 +321,11 @@ class TestCommandStructure:
 
         count, commands = builder.build_standard_commands(psc_paths)
 
-        # Verify command is a list with properly quoted paths
+        # Verify command is a list with unquoted paths (subprocess handles quoting)
         assert isinstance(commands[0], list)
-        assert '"C:\\Program Files\\Compiler\\PapyrusCompiler.exe"' in commands[0]
-        assert any('"C:\\My Output"' in arg for arg in commands[0])
-        assert any('"C:\\My Source\\Script.psc"' in arg for arg in commands[0])
+        assert 'C:\\Program Files\\Compiler\\PapyrusCompiler.exe' in commands[0]
+        assert any('C:\\My Output' in arg for arg in commands[0])
+        assert any('C:\\My Source\\Script.psc' in arg for arg in commands[0])
 
     def test_import_paths_semicolon_separated(self):
         """Test that multiple import paths are semicolon-separated."""
