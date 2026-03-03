@@ -153,8 +153,13 @@ class ScriptHandler:
         pex_paths: list[str] = []
 
         for object_name, script_path in self.psc_paths.items():
-            # noinspection PyTypeChecker
-            pex_path = os.path.join(self.project.options.output_path, os.path.basename(script_path).replace('.psc', '.pex'))
+            # Use object_name to preserve namespace subdirectories (e.g., AutoLoot\ScriptName)
+            if endswith(object_name, '.pex', ignorecase=True):
+                pex_path = os.path.join(self.project.options.output_path, object_name)
+            elif endswith(object_name, '.psc', ignorecase=True):
+                pex_path = os.path.join(self.project.options.output_path, object_name.replace('.psc', '.pex'))
+            else:
+                pex_path = os.path.join(self.project.options.output_path, f'{object_name}.pex')
 
             # do not check if file exists, we do that in _find_missing_script_paths for a different reason
             if pex_path not in pex_paths:
